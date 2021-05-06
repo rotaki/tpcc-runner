@@ -1,5 +1,3 @@
-#pragma once
-
 #include "db_wrapper.hpp"
 
 DBWrapper::DBWrapper() {
