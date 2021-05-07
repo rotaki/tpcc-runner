@@ -4,6 +4,16 @@
 
 #include "table_utils.hpp"
 
+std::map<std::string, std::string> warehouses;
+std::map<std::string, std::string> districts;
+std::map<std::string, std::string> customers;
+std::map<std::string, std::string> histories;
+std::map<std::string, std::string> orders;
+std::map<std::string, std::string> neworders;
+std::map<std::string, std::string> orderlines;
+std::map<std::string, std::string> items;
+std::map<std::string, std::string> stocks;
+
 DBWrapper::DBWrapper() {}
 
 bool DBWrapper::insert_record(Storage st, const std::string& key, const Record* record) {
