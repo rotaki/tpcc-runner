@@ -1,7 +1,5 @@
 #include "table_utils.hpp"
 
-#include <cassert>
-
 template <typename T>
 std::string to_string(const T& t) {
     return std::string(reinterpret_cast<const char*>(&t), sizeof(t));
