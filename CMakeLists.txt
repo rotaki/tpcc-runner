@@ -13,5 +13,6 @@ add_definitions("-Wall -std=c++17")
 add_executable(main
   main.cpp
   db_wrapper.cpp
+  table_utils.cpp
   )
 

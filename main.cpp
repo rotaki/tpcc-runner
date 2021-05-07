@@ -1,6 +1,7 @@
 #include <iostream>
 
 #include "db_wrapper.hpp"
+#include "table_utils.hpp"
 
 int main() {
     DBWrapper db;
@@ -19,6 +20,6 @@ int main() {
     Warehouse new_w;
     db.find_record(Storage::WAREHOUSE, "bar", &new_w);
     std::cout << new_w.w_address.zip << std::endl;
-    auto x = new_w.serialize();
+    auto x = TableUtils::serialize_warehouse(&new_w);
     std::cout << x << std::endl;
 }

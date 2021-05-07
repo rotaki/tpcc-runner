@@ -1,34 +1,29 @@
 #pragma once
 
 #include <map>
-#include <string_view>
+#include <string>
 #include <vector>
 
 #include "table_layout.hpp"
-
-enum Storage {
-    WAREHOUSE = 0,
-    DISTRICT,
-    CUSTOMER,
-    HISTORY,
-    ORDER,
-    NEWORDER,
-    ORDERLINE,
-    ITEM,
-    STOCK
-};
 
 class DBWrapper {
 public:
     static const int DB_SIZE = 9;
     // setup emtpy tables
     DBWrapper();
-    // get serialized version of record and store it into db
-    bool insert_record(Storage st, std::string_view key, const Record* record);
-
-    // store it into record if it exists
-    bool find_record(Storage st, std::string_view key, Record* record);
+    // store record into db
+    bool insert_record(Storage st, const std::string& key, const Record* record);
+    // store into record if exists
+    bool find_record(Storage st, const std::string& key, Record* record);
 
 private:
-    std::vector<std::map<std::string_view, std::string_view>> indexes;
+    std::map<std::string, std::string> warehouses;
+    std::map<std::string, std::string> districts;
+    std::map<std::string, std::string> customers;
+    std::map<std::string, std::string> histories;
+    std::map<std::string, std::string> orders;
+    std::map<std::string, std::string> neworders;
+    std::map<std::string, std::string> orderlines;
+    std::map<std::string, std::string> items;
+    std::map<std::string, std::string> stocks;
 };
