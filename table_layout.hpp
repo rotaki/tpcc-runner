@@ -21,8 +21,10 @@ struct Address {
     friend struct Warehouse;
     friend struct District;
     friend struct Customer;
+    static const int MIN_STREET = 10;
     static const int MAX_STREET = 20;
-    static const int MAX_CITY = 10;
+    static const int MIN_CITY = 10;
+    static const int MAX_CITY = 20;
     static const int STATE = 2;
     static const int ZIP = 9;
     char street_1[MAX_STREET + 1];
@@ -42,7 +44,7 @@ struct Address {
     }
 
 private:
-    inline Address(){};
+    Address(){};
 };
 
 struct Record {
@@ -51,6 +53,7 @@ struct Record {
 
 // Primary Key w_id
 struct Warehouse : Record {
+    static const int MIN_NAME = 6;
     static const int MAX_NAME = 10;
     uint16_t w_id;  // 2*W unique ids
     float w_tax;    // signed numeric(4, 4)
@@ -62,6 +65,8 @@ struct Warehouse : Record {
 // Primary Key (d_w_id, d_id)
 // Foreign Key d_w_id references w_id
 struct District : Record {
+    static constexpr uint8_t DISTS_PER_WARE = 10;
+    static const int MIN_NAME = 6;
     static const int MAX_NAME = 10;
     uint8_t d_id;  // 20 unique ids
     uint16_t d_w_id;
@@ -75,18 +80,21 @@ struct District : Record {
 // Primary Key (c_w_id, c_d_id, c_id)
 // Foreign Key (c_w_id, c_d_id) references (d_w_id, d_id)
 struct Customer : Record {
+    static constexpr uint32_t CUSTS_PER_DIST = 3000;
+    static const int MIN_FIRST = 8;
     static const int MAX_FIRST = 16;
     static const int MAX_MIDDLE = 2;
     static const int MAX_LAST = 16;
     static const int PHONE = 16;
     static const int CREDIT = 2;
+    static const int MIN_DATA = 300;
     static const int MAX_DATA = 500;
     uint32_t c_id;  // 96000 unique ids
     uint8_t c_d_id;
     uint16_t c_w_id;
     uint16_t c_payment_cnt;   // numeric(4)
     uint16_t c_delivery_cnt;  // numeric(4)
-    uint64_t c_since;         // date and time
+    int64_t c_since;          // date and time (long = int64_t)
     float c_credit_lim;       // signed numeric(2, 2)
     float c_discount;         // signed numeric(4, 4)
     float c_balance;          // signed numeric(12, 2)
@@ -104,20 +112,23 @@ struct Customer : Record {
 // Foreign Key (h_c_w_id, h_c_d_id, h_c_id) references (c_w_id, c_d_id, c_id)
 // Foreign Key (h_w_id, h_d_id) references (d_w_id, d_id)
 struct History : Record {
+    static const int HISTS_PER_CUST = 1;
+    static const int MIN_DATA = 12;
     static const int MAX_DATA = 24;
     uint32_t h_c_id;
     uint8_t h_c_d_id;
     uint16_t h_c_w_id;
     uint8_t h_d_id;
     uint16_t h_w_id;
-    uint64_t h_date;  // date and time
-    float h_amount;   // signed numeric(6, 2)
+    int64_t h_date;  // date and time
+    float h_amount;  // signed numeric(6, 2)
     char h_data[MAX_DATA + 1];
 };
 
 // Primary Key (o_w_id, o_d_id, o_id)
 // Foreign Key (o_w_id, o_d_id, o_c_id) references (c_w_id, c_d_id, c_id)
 struct Order : Record {
+    static constexpr uint32_t ORDS_PER_DIST = 3000;
     uint32_t o_id;  // 10000000 unique ids
     uint8_t o_d_id;
     uint16_t o_w_id;
@@ -125,7 +136,7 @@ struct Order : Record {
     uint8_t o_carrier_id;  // 10 unique ids or null
     uint8_t o_ol_cnt;      // numeric(2)
     uint8_t o_all_local;   // numeric(1)
-    uint64_t o_entry_d;    // date and time
+    int64_t o_entry_d;     // date and time
 };
 
 // Primary Key (no_w_id, no_d_id, no_o_id)
@@ -147,6 +158,7 @@ struct OrderLine : Record {
     uint8_t ol_number;  // 15 unique ids
     uint32_t ol_i_id;   // 200000 unique ids
     uint16_t ol_supply_w_id;
+    int64_t ol_delivery_d;
     uint8_t ol_quantity;  // numeric(2)
     float ol_amount;      // signed numeric(6, 2)
     char ol_dist_info[DIST_INFO + 1];
@@ -154,7 +166,10 @@ struct OrderLine : Record {
 
 // Primary Key i_id
 struct Item : Record {
+    static constexpr uint32_t ITEMS = 100000;
+    static const int MIN_NAME = 14;
     static const int MAX_NAME = 24;
+    static const int MIN_DATA = 26;
     static const int MAX_DATA = 50;
     uint32_t i_id;     // 200000 unique ids
     uint32_t i_im_id;  // 200000 unique ids
@@ -166,7 +181,9 @@ struct Item : Record {
 // Primary Key (s_w_id, s_i_id)
 // Foreign Key s_w_id references w_id
 struct Stock : Record {
+    static constexpr uint32_t STOCKS_PER_WARE = 100000;
     static const int DIST = 24;
+    static const int MIN_DATA = 26;
     static const int MAX_DATA = 50;
     uint32_t s_i_id;  // 200000 unique ids
     uint16_t s_w_id;

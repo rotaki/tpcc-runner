@@ -16,12 +16,9 @@ extern std::map<std::string, std::string> orderlines;
 extern std::map<std::string, std::string> items;
 extern std::map<std::string, std::string> stocks;
 
-class DBWrapper {
-public:
-  // setup emtpy tables
-  DBWrapper();
-  // store record into db
-  bool insert_record(Storage st, const std::string& key, const Record* record);
-  // store into record if exists
-  bool find_record(Storage st, const std::string& key, Record* record);
-};
+namespace DBWrapper {
+// store record into db
+bool insert_record(Storage st, const std::string& key, const Record* record);
+// store into record if exists
+bool find_record(Storage st, const std::string& key, Record* record);
+};  // namespace DBWrapper

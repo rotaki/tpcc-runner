@@ -113,11 +113,11 @@ void TableUtils::deserialize_orderline(OrderLine* o, const std::string& serializ
     o->ol_number = x->ol_number;
     o->ol_i_id = x->ol_i_id;
     o->ol_supply_w_id = x->ol_supply_w_id;
+    o->ol_delivery_d = x->ol_delivery_d;
     o->ol_quantity = x->ol_quantity;
     o->ol_amount = x->ol_amount;
     strcpy(o->ol_dist_info, x->ol_dist_info);
 }
-
 
 std::string TableUtils::serialize_item(const Item* i) {
     return to_string(*i);

@@ -14,5 +14,6 @@ add_executable(main
   main.cpp
   db_wrapper.cpp
   table_utils.cpp
+  table_generator.cpp
   )
 

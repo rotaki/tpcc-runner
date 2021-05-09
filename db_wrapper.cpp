@@ -14,8 +14,6 @@ std::map<std::string, std::string> orderlines;
 std::map<std::string, std::string> items;
 std::map<std::string, std::string> stocks;
 
-DBWrapper::DBWrapper() {}
-
 bool DBWrapper::insert_record(Storage st, const std::string& key, const Record* record) {
     switch (st) {
     case WAREHOUSE:
