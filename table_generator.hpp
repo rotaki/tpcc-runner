@@ -16,13 +16,7 @@ unsigned get_digit(int value);
 std::string add_zero_padding(const int value, const unsigned precision);
 
 // random int within |x..y|
-template <typename T>
-T random_int(T min, T max) {
-    std::random_device rand_dev;
-    std::mt19937 generator(rand_dev());
-    std::uniform_int_distribution<T> distr(min, max);
-    return distr(generator);
-}
+uint64_t random_int(uint64_t min, uint64_t max);
 
 float random_float(uint64_t min, uint64_t max, size_t divider);
 

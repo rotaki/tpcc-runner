@@ -21,7 +21,26 @@ std::string add_zero_padding(const int value, const unsigned precision) {
     oss << std::setw(precision) << std::setfill('0') << value;
     return oss.str();
 }
+  
+// https://stackoverflow.com/questions/1640258/need-a-fast-random-generator-for-c/1640399#1640399
+uint64_t random_int(uint64_t min, uint64_t max) {
+  static unsigned long x=123456789, y=362436069, z=521288629;
+  unsigned long t;
+  x ^= x << 16;
+  x ^= x >> 5;
+  x ^= x << 1;
 
+  t = x;
+  x = y;
+  y = z;
+  z = t ^ x ^ y;
+
+  z %= (max-min+1);
+  z += min;
+  return min;
+}
+
+  
 float random_float(uint64_t min, uint64_t max, size_t divider) {
     return random_int(min, max) / static_cast<float>(divider);
 }
