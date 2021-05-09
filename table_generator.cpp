@@ -1,8 +1,8 @@
 #include "table_generator.hpp"
 
 #include <ctime>
-#include <string>
 #include <iostream>
+#include <string>
 
 #include "db_wrapper.hpp"
 
@@ -21,26 +21,26 @@ std::string add_zero_padding(const int value, const unsigned precision) {
     oss << std::setw(precision) << std::setfill('0') << value;
     return oss.str();
 }
-  
+
 // https://stackoverflow.com/questions/1640258/need-a-fast-random-generator-for-c/1640399#1640399
 uint64_t random_int(uint64_t min, uint64_t max) {
-  static unsigned long x=123456789, y=362436069, z=521288629;
-  unsigned long t;
-  x ^= x << 16;
-  x ^= x >> 5;
-  x ^= x << 1;
+    static unsigned long x = 123456789, y = 362436069, z = 521288629;  // period 2^96-1
+    unsigned long t;
+    x ^= x << 16;
+    x ^= x >> 5;
+    x ^= x << 1;
 
-  t = x;
-  x = y;
-  y = z;
-  z = t ^ x ^ y;
+    t = x;
+    x = y;
+    y = z;
+    z = t ^ x ^ y;
 
-  z %= (max-min+1);
-  z += min;
-  return min;
+    z %= (max - min + 1);
+    z += min;
+    return min;
 }
 
-  
+
 float random_float(uint64_t min, uint64_t max, size_t divider) {
     return random_int(min, max) / static_cast<float>(divider);
 }
@@ -281,11 +281,10 @@ Stock& create_stock(Stock& s, uint16_t s_w_id, uint32_t s_i_id) {
 
 
 void load_items_table() {
-  for (uint32_t i = 1; i <= Item::ITEMS; i++) {
-      std::string item_key = add_zero_padding(i, get_digit(Item::ITEMS));
+    for (uint32_t i = 1; i <= Item::ITEMS; i++) {
+        std::string item_key = add_zero_padding(i, get_digit(Item::ITEMS));
         Item item;
-        DBWrapper::insert_record(
-            Storage::ITEM, item_key, &create_item(item, i));
+        DBWrapper::insert_record(Storage::ITEM, item_key, &create_item(item, i));
     }
 }
 
