@@ -6,9 +6,9 @@
 using namespace RecordGenerator;
 
 int main() {
-  NumWarehouse::init(3);
-  // TableGenerator::load_items_table();
-  // std::cout << NUM_WAREHOUSE << std::endl;
+    NumWarehouse::init(3);
+    // TableGenerator::load_items_table();
+    // std::cout << NUM_WAREHOUSE << std::endl;
     // DBWrapper db;
     // Warehouse w;
     // w.w_id = 10;
