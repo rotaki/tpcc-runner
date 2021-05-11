@@ -1,7 +1,16 @@
 #include "db_wrapper.hpp"
 
+DBWrapper::DBWrapper() {}
+
+DBWrapper::~DBWrapper() {}
+
+DBWrapper& DBWrapper::get_db() {
+  static DBWrapper db;
+  return db;
+}
+
 Warehouse& DBWrapper::allocate_warehouse_record(uint64_t key) {
-    return warehouses[key];
+  return warehouses[key];
 }
 
 District& DBWrapper::allocate_district_record(uint64_t key) {

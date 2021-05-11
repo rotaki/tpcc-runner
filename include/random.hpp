@@ -35,7 +35,7 @@ Modified by Riki Otaki
 class Xoshiro256PlusPlus {
 public:
     struct State {
-        static uint64_t s[4];
+      uint64_t s[4];
         const uint64_t& operator[](std::size_t i) const { return s[i]; }
         uint64_t& operator[](std::size_t i) { return s[i]; }
         void operator+=(uint64_t v) { s[0] += v; }
@@ -45,15 +45,6 @@ private:
     State s_;
 
 public:
-    Xoshiro256PlusPlus() {
-        std::random_device rnd;
-        s_[0] = rnd();
-        SplitMix64 initializer(s_[0]);
-        s_[1] = initializer();
-        s_[2] = initializer();
-        s_[3] = initializer();
-    }
-
     explicit Xoshiro256PlusPlus(uint64_t seed, std::size_t num_jumps = 0) {
         SplitMix64 initializer(seed);
         s_[0] = seed;
@@ -62,11 +53,6 @@ public:
         s_[3] = initializer();
         jump(num_jumps);
     }
-
-    static uint64_t rand() {
-        static Xoshiro256PlusPlus instance;
-        return instance();
-    };
 
     uint64_t operator()() {
         const uint64_t result = rotl(s_[0] + s_[3], 23) + s_[0];

@@ -49,15 +49,6 @@ private:
 namespace RecordGenerator {
 using namespace RecordGeneratorUtils;
 
-class NumWarehouse {
-public:
-    static void init(std::size_t n);
-    static std::size_t get_num();
-
-private:
-    static std::size_t num_warehouse;
-};
-
 uint64_t create_item_key(uint32_t i_id);
 void create_item(Item& i, uint32_t i_id);
 

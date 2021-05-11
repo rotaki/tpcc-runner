@@ -3,6 +3,12 @@
 #include <cstdint>
 #include <cstring>
 #include <string_view>
+#include <ctime>
+
+using Timestamp = time_t;
+inline Timestamp get_timestamp() {
+  return ::time(nullptr);
+}
 
 enum Storage {
     WAREHOUSE = 0,
@@ -94,7 +100,7 @@ struct Customer : Record {
     uint16_t c_w_id;
     uint16_t c_payment_cnt;   // numeric(4)
     uint16_t c_delivery_cnt;  // numeric(4)
-    int64_t c_since;          // date and time (long = int64_t)
+    Timestamp c_since;          // date and time 
     double c_credit_lim;      // signed numeric(2, 2)
     double c_discount;        // signed numeric(4, 4)
     double c_balance;         // signed numeric(12, 2)
@@ -120,7 +126,7 @@ struct History : Record {
     uint16_t h_c_w_id;
     uint8_t h_d_id;
     uint16_t h_w_id;
-    int64_t h_date;   // date and time
+    Timestamp h_date;   // date and time
     double h_amount;  // signed numeric(6, 2)
     char h_data[MAX_DATA + 1];
 };
@@ -136,7 +142,7 @@ struct Order : Record {
     uint8_t o_carrier_id;  // 10 unique ids or null
     uint8_t o_ol_cnt;      // numeric(2)
     uint8_t o_all_local;   // numeric(1)
-    int64_t o_entry_d;     // date and time
+    Timestamp o_entry_d;     // date and time
 };
 
 // Primary Key (no_w_id, no_d_id, no_o_id)
@@ -160,7 +166,7 @@ struct OrderLine : Record {
     uint8_t ol_number;  // 15 unique ids
     uint32_t ol_i_id;   // 200000 unique ids
     uint16_t ol_supply_w_id;
-    int64_t ol_delivery_d;
+    Timestamp ol_delivery_d;
     uint8_t ol_quantity;  // numeric(2)
     double ol_amount;     // signed numeric(6, 2)
     char ol_dist_info[DIST_INFO + 1];

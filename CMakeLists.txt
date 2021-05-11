@@ -11,13 +11,14 @@ message(STATUS "Welcome to tpcc-bench, Version: ${PROJECT_VERSION}")
 add_definitions("-Wall -std=c++17")
 
 add_executable(main
-  test/main.cpp
-  test/db_wrapper.cpp
-  test/initializer.cpp
+  app/src/main.cpp
+  app/src/db_wrapper.cpp
+  app/src/initializer.cpp
+  src/utils.cpp
   src/record_generator.cpp
   )
 
 target_include_directories(main PUBLIC
   ${PROJECT_SOURCE_DIR}/include
-  ${PROJECT_SOURCE_DIR}/test
+  ${PROJECT_SOURCE_DIR}/app/include
   )
