@@ -1,14 +1,14 @@
 #include <iostream>
 
 #include "db_wrapper.hpp"
-#include "table_utils.hpp"
-#include "table_generator.hpp"
+#include "record_generator.hpp"
 
-int NUM_WAREHOUSE = 3;
+using namespace RecordGenerator;
 
 int main() {
-  TableGenerator::load_items_table();
-  std::cout << NUM_WAREHOUSE << std::endl;
+  NumWarehouse::init(3);
+  // TableGenerator::load_items_table();
+  // std::cout << NUM_WAREHOUSE << std::endl;
     // DBWrapper db;
     // Warehouse w;
     // w.w_id = 10;
