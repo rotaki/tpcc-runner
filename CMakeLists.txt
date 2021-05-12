@@ -8,17 +8,160 @@ project(
 
 message(STATUS "Welcome to tpcc-bench, Version: ${PROJECT_VERSION}")
 
-add_definitions("-Wall -std=c++17")
 
-add_executable(main
-  app/src/main.cpp
-  app/src/db_wrapper.cpp
-  app/src/initializer.cpp
-  src/utils.cpp
-  src/record_generator.cpp
+###############################################################################
+#                            Static library of tpcc                           #
+###############################################################################
+
+set(TPCCBENCH_COMPILE_DEFINITIONS "")
+set(TPCCBENCH_COMPILE_OPTIONS "")
+set(TPCCBENCH_COMPILE_FEATURES "cxx_std_17")
+set(TPCCBENCH_LINK_OPTIONS "")
+set(TPCCBENCH_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include")
+
+if (APPLE)
+  list(APPEND TPCCBENCH_COMPILE_OPTIONS "-fvisibility=hidden")
+  list(APPEND TPCCBENCH_LINK_OPTIONS "-fvisibility=hidden")
+endif ()
+
+# Create an objectlib, which can be used for creating both static and dynamic library
+file(GLOB_RECURSE
+  TPCCBENCH_SRCS
+  ${PROJECT_SOURCE_DIR}/src/*.cpp
+  ${PROJECT_SORUCE_DIR}/include/*.hpp
   )
 
-target_include_directories(main PUBLIC
-  ${PROJECT_SOURCE_DIR}/include
-  ${PROJECT_SOURCE_DIR}/app/include
+add_library(tpccbench_objlib OBJECT ${TPCCBENCH_SRCS})
+
+target_compile_definitions(tpccbench_objlib PUBLIC ${TPCCBENCH_COMPILE_DEFINITIONS})
+target_compile_options(tpccbench_objlib PUBLIC ${TPCCBENCH_COMPILE_OPTIONS})
+target_compile_features(tpccbench_objlib PUBLIC ${TPCCBENCH_COMPILE_FEATURES})
+target_link_options(tpccbench_objlib PUBLIC ${TPCCBENCH_LINK_OPTIONS})
+target_include_directories(tpccbench_objlib PUBLIC ${TPCCBENCH_INCLUDE_DIRECTORIES})
+
+target_compile_options(tpccbench_objlib PRIVATE "-fPIC" "-Werror" "-Wall")
+
+# create static library
+add_library(tpccbench_static STATIC $<TARGET_OBJECTS:tpccbench_objlib>)
+
+target_link_libraries(tpccbench_static PUBLIC tpccbench_objlib)
+
+set_target_properties(
+  tpccbench_static
+  PROPERTIES
+  ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
   )
+
+message(STATUS "tpccbench_static created!")
+
+###############################################################################
+#                         Static library for glue code                        #
+###############################################################################
+
+set(GLUE_COMPILE_DEFINITIONS "")
+set(GLUE_COMPILE_OPTIONS "")
+set(GLUE_COMPILE_FEATURES "cxx_std_17")
+set(GLUE_LINK_OPTIONS "")
+set(GLUE_LINK_LIBRARIES "tpccbench_static")
+set(GLUE_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/app/include")
+
+if (APPLE)
+  list(APPEND GLUE_COMPILE_OPTIONS "-fvisibility=hidden")
+  list(APPEND GLUE_LINK_OPTIONS "-fvisibility=hidden")
+endif ()
+
+file(GLOB_RECURSE
+  GLUE_SRCS
+  ${PROJECT_SOURCE_DIR}/app/src/*.cpp
+  ${PROJECT_SOURCE_DIR}/app/include/*.hpp
+  )
+
+add_library(glue_objlib OBJECT ${GLUE_SRCS})
+
+target_compile_definitions(glue_objlib PUBLIC ${GLUE_COMPILE_DEFINITIONS})
+target_compile_options(glue_objlib PUBLIC ${GLUE_COMPILE_OPTIONS})
+target_compile_features(glue_objlib PUBLIC ${GLUE_COMPILE_FEATURES})
+target_link_options(glue_objlib PUBLIC ${GLUE_LINK_OPTIONS})
+target_link_libraries(glue_objlib PUBLIC ${GLUE_LINK_LIBRARIES})
+target_include_directories(glue_objlib PUBLIC ${GLUE_INCLUDE_DIRECTORIES})
+
+target_compile_options(glue_objlib PRIVATE "-fPIC" "-Werror" "-Wall")
+
+# create static library
+add_library(glue_static STATIC $<TARGET_OBJECTS:glue_objlib>)
+
+target_link_libraries(glue_static PUBLIC glue_objlib)
+
+set_target_properties(
+  glue_static
+  PROPERTIES
+  ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+  )
+
+message(STATUS "glue_static created!")
+
+###############################################################################
+#                                 Test binaries                                #
+###############################################################################
+
+# Ref: https://google.github.io/googletest/quickstart-cmake.html
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
+)
+# For Windows: Prevent overriding the parent project's compiler/linker settings
+set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+FetchContent_MakeAvailable(googletest)
+
+enable_testing()
+
+include(GoogleTest)
+
+# test for tpcc
+
+file(GLOB_RECURSE TPCC_TESTS "${PROJECT_SOURCE_DIR}/test/*.cpp")
+foreach (TPCC_TEST ${TPCC_TESTS})
+  get_filename_component(FILENAME ${TPCC_TEST} NAME_WE)
+  if (${FILENAME} MATCHES "test")
+    add_executable(${FILENAME} ${TPCC_TEST})
+    gtest_discover_tests(${FILENAME})
+    target_compile_options(${FILENAME} PRIVATE "-Werror" "-Wall")
+    target_include_directories(${FILENAME} PRIVATE "${PROJECT_SOURCE_DIR}/test")
+    target_link_libraries(${FILENAME} tpccbench_static gtest_main)
+    set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
+    set_target_properties(
+      ${FILENAME}
+      PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/tpcctest"
+      )
+  endif ()
+endforeach (TPCC_TEST ${TPCC_TESTS})
+
+set(STATUS "tpccbench tests created!")
+
+# test for glue code
+
+file(GLOB_RECURSE GLUE_TESTS "${PROJECT_SOURCE_DIR}/app/test/*.cpp")
+foreach (GLUE_TEST ${GLUE_TESTS})
+  get_filename_component(FILENAME ${GLUE_TEST} NAME_WE)
+  if (${FILENAME} MATCHES "test")
+    add_executable(${FILENAME} ${GLUE_TEST})
+    gtest_discover_tests(${FILENAME})
+    target_compile_options(${FILENAME} PRIVATE "-Werror" "-Wall")
+    target_include_directories(${FILENAME} PRIVATE "${PROJECT_SOURCE_DIR}/app/test")
+    target_link_libraries(${FILENAME} glue_static gtest_main)
+    set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
+    set_target_properties(
+      ${FILENAME}
+      PROPERTIES
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/gluetest"
+      )
+  endif ()
+endforeach (GLUE_TEST ${GLUE_TESTS})
+
+set(STATUS "gluecode tests created!")
