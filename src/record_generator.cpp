@@ -3,6 +3,8 @@
 #include <cassert>
 
 #include "random.hpp"
+#include "record_key.hpp"
+#include "record_layout.hpp"
 
 namespace RecordGeneratorUtils {
 Xoshiro256PlusPlus& get_rand() {
@@ -124,12 +126,6 @@ size_t Permutation::operator[](size_t i) const {
 }  // namespace RecordGeneratorUtils
 
 namespace RecordGenerator {
-uint64_t create_item_key(uint32_t i_id) {
-    assert(i_id >= 1);
-    assert(i_id <= Item::ITEMS);
-    return i_id - 1;
-}
-
 void create_item(Item& i, uint32_t i_id) {
     i.i_id = i_id;                            // 200000 unique ids
     i.i_im_id = urand_int(1, 10000);          // 200000 unique ids
@@ -139,23 +135,12 @@ void create_item(Item& i, uint32_t i_id) {
     if (urand_int(0, 99) < 10) make_original(i.i_data);
 }
 
-uint64_t create_warehouse_key(uint16_t w_id) {
-    assert(w_id >= 1);
-    return w_id - 1;
-}
-
 void create_warehouse(Warehouse& w, uint16_t w_id) {
     w.w_id = w_id;                           // 2*W unique ids
     w.w_tax = urand_double(0, 2000, 10000);  // signed numeric(4, 4)
     w.w_ytd = 300000;                        // signed numeric(12, 2)
     make_random_astring(w.w_name, Warehouse::MIN_NAME, Warehouse::MAX_NAME);
     make_random_address(w.w_address);
-}
-
-uint64_t create_stock_key(uint16_t w_id, uint32_t i_id) {
-    assert(i_id >= 1);
-    assert(i_id <= Stock::STOCKS_PER_WARE);
-    return create_warehouse_key(w_id) * Stock::STOCKS_PER_WARE + i_id - 1;
 }
 
 void create_stock(Stock& s, uint16_t s_w_id, uint32_t s_i_id) {
@@ -179,12 +164,6 @@ void create_stock(Stock& s, uint16_t s_w_id, uint32_t s_i_id) {
     if (urand_int(0, 99) < 10) make_original(s.s_data);
 }
 
-uint64_t create_district_key(uint16_t w_id, uint8_t d_id) {
-    assert(d_id >= 1);
-    assert(d_id <= District::DISTS_PER_WARE);
-    return create_warehouse_key(w_id) * District::DISTS_PER_WARE + d_id - 1;
-}
-
 void create_district(District& d, uint16_t d_w_id, uint8_t d_id) {
     d.d_w_id = d_w_id;
     d.d_id = d_id;
@@ -195,13 +174,6 @@ void create_district(District& d, uint16_t d_w_id, uint8_t d_id) {
     make_random_address(d.d_address);
 }
 
-uint64_t create_customer_key(uint16_t w_id, uint8_t d_id, uint32_t c_id) {
-    assert(c_id >= 1);
-    assert(c_id <= Customer::CUSTS_PER_DIST);
-    return create_district_key(w_id, d_id) * Customer::CUSTS_PER_DIST + c_id - 1;
-}
-
-using Timestamp = int64_t;
 void create_customer(Customer& c, uint16_t c_w_id, uint8_t c_d_id, uint32_t c_id, Timestamp t) {
     c.c_id = c_id;  // 96000 unique ids
     c.c_d_id = c_d_id;
@@ -223,12 +195,6 @@ void create_customer(Customer& c, uint16_t c_w_id, uint8_t c_d_id, uint32_t c_id
     make_random_address(c.c_address);
 }
 
-uint64_t create_history_key(uint16_t w_id, uint8_t d_id, uint32_t c_id, uint8_t h_id) {
-    assert(h_id >= 1);
-    assert(h_id <= History::HISTS_PER_CUST);
-    return create_customer_key(w_id, d_id, c_id) * History::HISTS_PER_CUST + h_id - 1;
-}
-
 void create_history(
     History& h, uint16_t h_c_w_id, uint8_t h_c_d_id, uint32_t h_c_id, uint16_t h_w_id,
     uint8_t h_d_id) {
@@ -242,12 +208,6 @@ void create_history(
     make_random_astring(h.h_data, History::MIN_DATA, History::MAX_DATA);
 }
 
-uint64_t create_order_key(uint16_t w_id, uint8_t d_id, uint32_t o_id) {
-    assert(o_id >= 1);
-    assert(o_id <= Order::ORDS_PER_DIST);
-    return create_district_key(w_id, d_id) * Order::ORDS_PER_DIST + o_id - 1;
-}
-
 void create_order(Order& o, uint16_t o_w_id, uint8_t o_d_id, uint32_t o_c_id, uint32_t o_id) {
     o.o_id = o_id;  // 10000000 unique ids
     o.o_d_id = o_d_id;
@@ -257,12 +217,6 @@ void create_order(Order& o, uint16_t o_w_id, uint8_t o_d_id, uint32_t o_c_id, ui
     o.o_ol_cnt = urand_int(5, 15);                            // numeric(2)
     o.o_all_local = 1;                                        // numeric(1)
     o.o_entry_d = get_timestamp();
-}
-
-uint64_t create_orderline_key(uint16_t w_id, uint8_t d_id, uint32_t o_id, uint8_t ol_number) {
-    assert(ol_number >= 1);
-    assert(ol_number <= OrderLine::MAX_ORDLINES_PER_ORD);
-    return create_order_key(w_id, d_id, o_id) * OrderLine::MAX_ORDLINES_PER_ORD + ol_number - 1;
 }
 
 void create_orderline(
@@ -279,10 +233,6 @@ void create_orderline(
     ol.ol_amount =
         (ol.ol_o_id < 2101 ? 0.00 : urand_double(1, 999999, 100));  // signed numeric(6, 2)
     make_random_astring(ol.ol_dist_info, OrderLine::DIST_INFO, OrderLine::DIST_INFO);
-}
-
-uint64_t create_neworder_key(uint16_t w_id, uint8_t d_id, uint32_t o_id) {
-    return create_order_key(w_id, d_id, o_id);
 }
 
 void create_neworder(NewOrder& no, uint16_t no_w_id, uint8_t no_d_id, uint32_t no_o_id) {

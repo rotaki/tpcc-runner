@@ -6,7 +6,8 @@
 
 // TPCC code //////////////////////////////////////////////////////////////////
 #include "record_generator.hpp"
-#include "table_layout.hpp"
+#include "record_key.hpp"
+#include "record_layout.hpp"
 #include "utils.hpp"
 
 using namespace RecordGenerator;
@@ -18,7 +19,7 @@ TEST(LoadTablesSuit, LoadItemsTable) {
 
     Item i;
     uint32_t i_id = 1;
-    DBWrapper::get_db().get_item_record(i, create_item_key(i_id));
+    DBWrapper::get_db().get_item_record(i, i_id);
     EXPECT_EQ(i.i_id, i_id);
     EXPECT_GE(i.i_im_id, 1);
     EXPECT_LE(i.i_im_id, 10000);
