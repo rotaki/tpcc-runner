@@ -165,3 +165,62 @@ foreach (GLUE_TEST ${GLUE_TESTS})
 endforeach (GLUE_TEST ${GLUE_TESTS})
 
 set(STATUS "gluecode tests created!")
+
+###############################################################################
+#                                 Clang-format                                #
+###############################################################################
+
+set(BUILD_SUPPORT_DIR "${CMAKE_SOURCE_DIR}/build_support")
+
+find_program(CLANG_FORMAT_BIN clang-format)
+if ("${CLANG_FORMAT_BIN}" STREQUAL "CLANG_FORMAT_BIN-NOTFOUND")
+  message(STATUS "[MISSING] clang-format not found, no check-format")
+else()
+  
+  # target format is only build when `make format` is issued
+  add_custom_target(format
+    COMMENT "Running: format"
+    COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
+    --clang-format-executable ${CLANG_FORMAT_BIN}
+    -r ${CMAKE_CURRENT_SOURCE_DIR}/app
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/test
+    -i                          # format file instead of printing diff
+    -q
+    USES_TERMINAL
+    )
+
+  add_custom_target(check-format
+    COMMENT "Running: check-format"
+    COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
+    --clang-format-executable ${CLANG_FORMAT_BIN}
+    -r ${CMAKE_CURRENT_SOURCE_DIR}/app
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/test
+    USES_TERMINAL
+    )
+
+  add_custom_command(TARGET format DEPENDS gtest_main)
+  add_custom_command(TARGET check-format DEPENDS gtest_main)
+  
+  message(STATUS "[ADDED] format and check-format (${CLANG_FORMAT_BIN})")
+  unset(FORMAT_DIRS)
+  
+endif()
+unset(CLANG_FORMAT_BIN)
+
+###############################################################################
+#             Apply +x permissions to all scripts in build_support            #
+###############################################################################
+
+file(GLOB_RECURSE
+        BUILD_SUPPORT_SCRIPTS
+        CONFIGURE_DEPENDS
+        ${BUILD_SUPPORT_DIR}/*.py
+        )
+
+foreach (_var IN LISTS BUILD_SUPPORT_SCRIPTS)
+    execute_process(COMMAND chmod +x "${_var}")
+endforeach ()

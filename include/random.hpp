@@ -35,7 +35,7 @@ Modified by Riki Otaki
 class Xoshiro256PlusPlus {
 public:
     struct State {
-      uint64_t s[4];
+        uint64_t s[4];
         const uint64_t& operator[](std::size_t i) const { return s[i]; }
         uint64_t& operator[](std::size_t i) { return s[i]; }
         void operator+=(uint64_t v) { s[0] += v; }

@@ -6,7 +6,7 @@
 
 namespace Initializer {
 using namespace RecordGenerator;
-  using Timestamp = int64_t;
+using Timestamp = int64_t;
 
 void create_and_insert_item_record(uint32_t i_id) {
     uint64_t key = create_item_key(i_id);
@@ -33,7 +33,8 @@ void create_and_insert_district_record(uint16_t d_w_id, uint8_t d_id) {
     create_district(d, d_w_id, d_id);
 }
 
-void create_and_insert_customer_record(uint16_t c_w_id, uint8_t c_d_id, uint32_t c_id, Timestamp t) {
+void create_and_insert_customer_record(
+    uint16_t c_w_id, uint8_t c_d_id, uint32_t c_id, Timestamp t) {
     uint64_t key = create_customer_key(c_w_id, c_d_id, c_id);
     Customer& c = DBWrapper::get_db().allocate_customer_record(key);
     create_customer(c, c_w_id, c_d_id, c_id, t);
@@ -71,13 +72,13 @@ void create_and_insert_orderline_record(
 
 void load_items_table() {
     for (int i_id = 1; i_id <= Item::ITEMS; i_id++) {
-      create_and_insert_item_record(i_id);
+        create_and_insert_item_record(i_id);
     }
 }
 
 // Loading warehouses table eventually evokes loading of all the tables other than the items table.
 void load_warehouses_table() {
-  const Config& c = get_config();
+    const Config& c = get_config();
     for (int w_id = 1; w_id <= c.get_num_warehouses(); w_id++) {
         create_and_insert_warehouse_record(w_id);
         load_stocks_table(w_id);
@@ -100,7 +101,7 @@ void load_districts_table(uint16_t d_w_id) {
 }
 
 void load_customers_table(uint16_t c_w_id, uint8_t c_d_id) {
-  Timestamp t = get_timestamp();
+    Timestamp t = get_timestamp();
     for (int c_id = 1; c_id <= Customer::CUSTS_PER_DIST; c_id++) {
         create_and_insert_customer_record(c_w_id, c_d_id, c_id, t);
         load_histories_table(c_w_id, c_d_id, c_id);
@@ -125,12 +126,13 @@ void load_orders_table(uint16_t o_w_id, uint8_t o_d_id) {
     }
 }
 
-void load_orderlines_table(uint16_t ol_w_id, uint8_t ol_d_id, uint32_t ol_o_id, Timestamp o_entry_d) {
+void load_orderlines_table(
+    uint16_t ol_w_id, uint8_t ol_d_id, uint32_t ol_o_id, Timestamp o_entry_d) {
     uint8_t ol_cnt = urand_int(OrderLine::MIN_ORDLINES_PER_ORD, OrderLine::MAX_ORDLINES_PER_ORD);
     for (int ol_number = 1; ol_number <= ol_cnt; ol_number++) {
         uint32_t ol_i_id = urand_int(1, 100000);
         create_and_insert_orderline_record(
-                                           ol_w_id, ol_d_id, ol_o_id, ol_w_id, ol_i_id, ol_number, o_entry_d);
+            ol_w_id, ol_d_id, ol_o_id, ol_w_id, ol_i_id, ol_number, o_entry_d);
     }
 }
 
