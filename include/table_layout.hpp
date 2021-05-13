@@ -71,7 +71,7 @@ struct Warehouse : Record {
 // Primary Key (d_w_id, d_id)
 // Foreign Key d_w_id references w_id
 struct District : Record {
-    static constexpr uint8_t DISTS_PER_WARE = 10;
+    static const int DISTS_PER_WARE = 10;
     static const int MIN_NAME = 6;
     static const int MAX_NAME = 10;
     uint8_t d_id;  // 20 unique ids
@@ -86,7 +86,7 @@ struct District : Record {
 // Primary Key (c_w_id, c_d_id, c_id)
 // Foreign Key (c_w_id, c_d_id) references (d_w_id, d_id)
 struct Customer : Record {
-    static constexpr uint32_t CUSTS_PER_DIST = 3000;
+    static const int CUSTS_PER_DIST = 3000;
     static const int MIN_FIRST = 8;
     static const int MAX_FIRST = 16;
     static const int MAX_MIDDLE = 2;
@@ -134,7 +134,7 @@ struct History : Record {
 // Primary Key (o_w_id, o_d_id, o_id)
 // Foreign Key (o_w_id, o_d_id, o_c_id) references (c_w_id, c_d_id, c_id)
 struct Order : Record {
-    static constexpr uint32_t ORDS_PER_DIST = 3000;
+    static const int ORDS_PER_DIST = 3000;
     uint32_t o_id;  // 10000000 unique ids
     uint8_t o_d_id;
     uint16_t o_w_id;
@@ -174,7 +174,7 @@ struct OrderLine : Record {
 
 // Primary Key i_id
 struct Item : Record {
-    static constexpr uint32_t ITEMS = 100000;
+    static const int ITEMS = 100000;
     static const int MIN_NAME = 14;
     static const int MAX_NAME = 24;
     static const int MIN_DATA = 26;
@@ -189,7 +189,7 @@ struct Item : Record {
 // Primary Key (s_w_id, s_i_id)
 // Foreign Key s_w_id references w_id
 struct Stock : Record {
-    static constexpr uint32_t STOCKS_PER_WARE = 100000;
+    static const int STOCKS_PER_WARE = 100000;
     static const int DIST = 24;
     static const int MIN_DATA = 26;
     static const int MAX_DATA = 50;

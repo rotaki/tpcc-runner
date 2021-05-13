@@ -260,11 +260,11 @@ namespace RecordGenerator {
   }
 
   uint64_t create_orderline_key(uint16_t w_id, uint8_t d_id, uint32_t o_id, uint8_t ol_number) {
-    assert(ol_number >= OrderLine::MIN_ORDLINES_PER_ORD);
+    assert(ol_number >= 1);
     assert(ol_number <= OrderLine::MAX_ORDLINES_PER_ORD);
     return create_order_key(w_id, d_id, o_id)
-      * (OrderLine::MAX_ORDLINES_PER_ORD - OrderLine::MIN_ORDLINES_PER_ORD + 1)
-      + ol_number - OrderLine::MIN_ORDLINES_PER_ORD;
+      * OrderLine::MAX_ORDLINES_PER_ORD
+      + ol_number - 1;
   }
 
   void create_orderline(
