@@ -17,7 +17,7 @@ bool DBWrapper::get_item_record(Item& i, uint64_t key) {
     if (items.find(key) == items.end()) {
         return false;
     } else {
-        i = items[key];
+        i.deep_copy(items[key]);
         return true;
     }
 }
@@ -30,7 +30,7 @@ bool DBWrapper::get_warehouse_record(Warehouse& w, uint64_t key) {
     if (warehouses.find(key) == warehouses.end()) {
         return false;
     } else {
-        w = warehouses[key];
+        w.deep_copy(warehouses[key]);
         return true;
     }
 }
@@ -43,7 +43,7 @@ bool DBWrapper::get_stock_record(Stock& s, uint64_t key) {
     if (stocks.find(key) == stocks.end()) {
         return false;
     } else {
-        s = stocks[key];
+        s.deep_copy(stocks[key]);
         return true;
     }
 }
@@ -56,7 +56,7 @@ bool DBWrapper::get_district_record(District& d, uint64_t key) {
     if (districts.find(key) == districts.end()) {
         return false;
     } else {
-        d = districts[key];
+        d.deep_copy(districts[key]);
         return true;
     }
 }
@@ -69,7 +69,7 @@ bool DBWrapper::get_customer_record(Customer& c, uint64_t key) {
     if (customers.find(key) == customers.end()) {
         return false;
     } else {
-        c = customers[key];
+        c.deep_copy(customers[key]);
         return true;
     }
 }
@@ -82,7 +82,7 @@ bool DBWrapper::get_history_record(History& h, uint64_t key) {
     if (histories.find(key) == histories.end()) {
         return false;
     } else {
-        h = histories[key];
+        h.deep_copy(histories[key]);
         return true;
     }
 }
@@ -95,7 +95,7 @@ bool DBWrapper::get_order_record(Order& o, uint64_t key) {
     if (orders.find(key) == orders.end()) {
         return false;
     } else {
-        o = orders[key];
+        o.deep_copy(orders[key]);
         return true;
     }
 }
@@ -108,7 +108,7 @@ bool DBWrapper::get_neworder_record(NewOrder& no, uint64_t key) {
     if (neworders.find(key) == neworders.end()) {
         return false;
     } else {
-        no = neworders[key];
+        no.deep_copy(neworders[key]);
         return true;
     }
 }
@@ -121,7 +121,7 @@ bool DBWrapper::get_orderline_record(OrderLine& ol, uint64_t key) {
     if (orderlines.find(key) == orderlines.end()) {
         return false;
     } else {
-        ol = orderlines[key];
+        ol.deep_copy(orderlines[key]);
         return true;
     }
 }
