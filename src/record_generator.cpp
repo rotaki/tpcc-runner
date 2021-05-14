@@ -63,7 +63,7 @@ size_t make_random_nstring(char* out, size_t min_len, size_t max_len) {
 void make_original(char* out) {
     size_t len = strlen(out);
     assert(len >= 8);
-    strcpy(&out[urand_int(static_cast<size_t>(0), len - 8)], "ORIGINAL");
+    memcpy(&out[urand_int(static_cast<size_t>(0), len - 8)], "ORIGINAL", 8);
 }
 
 // c_last
@@ -186,7 +186,7 @@ void create_customer(Customer& c, uint16_t c_w_id, uint8_t c_d_id, uint32_t c_id
     c.c_balance = -10.00;                         // signed numeric(12, 2)
     c.c_ytd_payment = 10.00;                      // signed numeric(12, 2)
     make_random_astring(c.c_first, Customer::MIN_FIRST, Customer::MAX_FIRST);
-    strcpy(c.c_middle, "OL");
+    strcpy(c.c_middle, "OE");
     (c_id <= 1000 ? make_clast(c.c_last, c_id - 1)
                   : make_clast(c.c_last, nurand_int(NURandConstantType::C_LOAD, 0, 999)));
     make_random_nstring(c.c_phone, Customer::PHONE, Customer::PHONE);

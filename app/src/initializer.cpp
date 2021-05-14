@@ -1,5 +1,7 @@
 #include "initializer.hpp"
 
+#include <iostream>
+
 #include "db_wrapper.hpp"
 #include "record_generator.hpp"
 #include "record_key.hpp"

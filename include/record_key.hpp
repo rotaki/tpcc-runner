@@ -11,7 +11,7 @@ struct StockKey {
             uint64_t i_id : 32;
             uint64_t w_id : 16;
         };
-        uint64_t s_key;
+        uint64_t s_key = 0;
     };
     inline bool operator<(const StockKey& rhs) const noexcept { return s_key < rhs.s_key; }
     inline static StockKey create_key(uint16_t w_id, uint32_t i_id) {
@@ -28,7 +28,7 @@ struct DistrictKey {
             uint32_t d_id : 8;
             uint32_t w_id : 16;
         };
-        uint32_t d_key;
+        uint32_t d_key = 0;
     };
     inline bool operator<(const DistrictKey& rhs) const noexcept { return d_key < rhs.d_key; }
     inline static DistrictKey create_key(uint16_t w_id, uint8_t d_id) {
@@ -46,7 +46,7 @@ struct CustomerKey {
             uint64_t d_id : 8;
             uint64_t w_id : 16;
         };
-        uint64_t c_key;
+        uint64_t c_key = 0;
     };
     inline bool operator<(const CustomerKey& rhs) const noexcept { return c_key < rhs.c_key; }
     inline static CustomerKey create_key(uint16_t w_id, uint8_t d_id, uint32_t c_id) {
@@ -67,7 +67,7 @@ struct OrderKey {
             uint64_t d_id : 8;
             uint64_t w_id : 16;
         };
-        uint64_t o_key;
+        uint64_t o_key = 0;
     };
     inline bool operator<(const OrderKey& rhs) const noexcept { return o_key < rhs.o_key; }
     inline static OrderKey create_key(uint16_t w_id, uint8_t d_id, uint32_t o_id) {
