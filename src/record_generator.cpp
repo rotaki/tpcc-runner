@@ -8,8 +8,8 @@
 
 namespace RecordGeneratorUtils {
 Xoshiro256PlusPlus& get_rand() {
-  thread_local Xoshiro256PlusPlus r(std::random_device{}());
-  return r;
+    thread_local Xoshiro256PlusPlus r(std::random_device{}());
+    return r;
 }
 
 uint64_t urand_int(uint64_t min, uint64_t max) {
