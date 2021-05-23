@@ -5,22 +5,12 @@
 #include <ctime>
 #include <string_view>
 
+#include "utils.hpp"
+
 using Timestamp = time_t;
 inline Timestamp get_timestamp() {
     return ::time(nullptr);
 }
-
-enum Storage {
-    ITEM = 0,
-    WAREHOUSE,
-    STOCK,
-    DISTRICT,
-    CUSTOMER,
-    HISTORY,
-    ORDER,
-    NEWORDER,
-    ORDERLINE
-};
 
 // Keys defined in record_key.hpp
 struct ItemKey;
@@ -31,31 +21,30 @@ struct CustomerKey;
 struct OrderKey;
 struct NewOrderKey;
 struct OrderLineKey;
-
-struct Record {
-    virtual ~Record(){};
-};
+struct CustomerSecondaryKey;
+struct OrderSecondaryKey;
 
 // Primary Key i_id
-struct Item : Record {
+struct Item {
     using Key = ItemKey;
     static const int ITEMS = 100000;
     static const int MIN_NAME = 14;
     static const int MAX_NAME = 24;
     static const int MIN_DATA = 26;
     static const int MAX_DATA = 50;
+    static const int UNUSED_ID = 1;
     uint32_t i_id;     // 200000 unique ids
     uint32_t i_im_id;  // 200000 unique ids
     double i_price;    // numeric(5, 2)
     char i_name[MAX_NAME + 1];
     char i_data[MAX_DATA + 1];
-    inline void deep_copy(const Item& src) {
+    inline void deep_copy_from(const Item& src) {
         if (this != &src) {
             i_id = src.i_id;
             i_im_id = src.i_im_id;
             i_price = src.i_price;
-            strcpy(i_name, src.i_name);
-            strcpy(i_data, src.i_data);
+            copy_cstr(i_name, src.i_name, sizeof(i_name));
+            copy_cstr(i_data, src.i_data, sizeof(i_data));
         }
     }
 };
@@ -78,19 +67,19 @@ struct Address {
 
 private:
     Address(){};
-    inline void deep_copy(const Address& src) {
+    inline void deep_copy_from(const Address& src) {
         if (this != &src) {
-            strcpy(street_1, src.street_1);
-            strcpy(street_2, src.street_2);
-            strcpy(city, src.city);
-            strcpy(state, src.state);
-            strcpy(zip, src.zip);
+            copy_cstr(street_1, src.street_1, sizeof(street_1));
+            copy_cstr(street_2, src.street_2, sizeof(street_2));
+            copy_cstr(city, src.city, sizeof(city));
+            copy_cstr(state, src.state, sizeof(state));
+            copy_cstr(zip, src.zip, sizeof(zip));
         }
     }
 };
 
 // Primary Key w_id
-struct Warehouse : Record {
+struct Warehouse {
     using Key = WarehouseKey;
     static const int MIN_NAME = 6;
     static const int MAX_NAME = 10;
@@ -99,20 +88,20 @@ struct Warehouse : Record {
     double w_ytd;   // signed numeric(12, 2)
     char w_name[MAX_NAME + 1];
     Address w_address;
-    inline void deep_copy(const Warehouse& src) {
+    inline void deep_copy_from(const Warehouse& src) {
         if (this != &src) {
             w_id = src.w_id;
             w_tax = src.w_tax;
             w_ytd = src.w_ytd;
-            strcpy(w_name, src.w_name);
-            w_address.deep_copy(src.w_address);
+            copy_cstr(w_name, src.w_name, sizeof(w_name));
+            w_address.deep_copy_from(src.w_address);
         }
     }
 };
 
 // Primary Key (s_w_id, s_i_id)
 // Foreign Key s_w_id references w_id
-struct Stock : Record {
+struct Stock {
     using Key = StockKey;
     static const int STOCKS_PER_WARE = 100000;
     static const int DIST = 24;
@@ -136,7 +125,7 @@ struct Stock : Record {
     char s_dist_10[DIST + 1];
     char s_data[MAX_DATA + 1];
 
-    inline void deep_copy(const Stock& src) {
+    inline void deep_copy_from(const Stock& src) {
         if (this != &src) {
             s_i_id = src.s_i_id;
             s_w_id = src.s_w_id;
@@ -144,17 +133,17 @@ struct Stock : Record {
             s_ytd = src.s_ytd;
             s_order_cnt = src.s_order_cnt;
             s_remote_cnt = src.s_remote_cnt;
-            strcpy(s_dist_01, src.s_dist_01);
-            strcpy(s_dist_02, src.s_dist_02);
-            strcpy(s_dist_03, src.s_dist_03);
-            strcpy(s_dist_04, src.s_dist_04);
-            strcpy(s_dist_05, src.s_dist_05);
-            strcpy(s_dist_06, src.s_dist_06);
-            strcpy(s_dist_07, src.s_dist_07);
-            strcpy(s_dist_08, src.s_dist_08);
-            strcpy(s_dist_09, src.s_dist_09);
-            strcpy(s_dist_10, src.s_dist_10);
-            strcpy(s_data, src.s_data);
+            copy_cstr(s_dist_01, src.s_dist_01, sizeof(s_dist_01));
+            copy_cstr(s_dist_02, src.s_dist_02, sizeof(s_dist_02));
+            copy_cstr(s_dist_03, src.s_dist_03, sizeof(s_dist_03));
+            copy_cstr(s_dist_04, src.s_dist_04, sizeof(s_dist_04));
+            copy_cstr(s_dist_05, src.s_dist_05, sizeof(s_dist_05));
+            copy_cstr(s_dist_06, src.s_dist_06, sizeof(s_dist_06));
+            copy_cstr(s_dist_07, src.s_dist_07, sizeof(s_dist_07));
+            copy_cstr(s_dist_08, src.s_dist_08, sizeof(s_dist_08));
+            copy_cstr(s_dist_09, src.s_dist_09, sizeof(s_dist_09));
+            copy_cstr(s_dist_10, src.s_dist_10, sizeof(s_dist_10));
+            copy_cstr(s_data, src.s_data, sizeof(s_data));
         }
     }
 };
@@ -162,7 +151,7 @@ struct Stock : Record {
 
 // Primary Key (d_w_id, d_id)
 // Foreign Key d_w_id references w_id
-struct District : Record {
+struct District {
     using Key = DistrictKey;
     static const int DISTS_PER_WARE = 10;
     static const int MIN_NAME = 6;
@@ -174,23 +163,26 @@ struct District : Record {
     double d_ytd;          // signed numeric(12, 2)
     char d_name[MAX_NAME + 1];
     Address d_address;
-    inline void deep_copy(const District& src) {
+    inline void deep_copy_from(const District& src) {
         if (this != &src) {
             d_id = src.d_id;
             d_w_id = src.d_w_id;
             d_next_o_id = src.d_next_o_id;
             d_tax = src.d_tax;
             d_ytd = src.d_ytd;
-            strcpy(d_name, src.d_name);
-            d_address.deep_copy(src.d_address);
+            copy_cstr(d_name, src.d_name, sizeof(d_name));
+            d_address.deep_copy_from(src.d_address);
         }
     }
 };
 
+struct CustomerSecondary;
+
 // Primary Key (c_w_id, c_d_id, c_id)
 // Foreign Key (c_w_id, c_d_id) references (d_w_id, d_id)
-struct Customer : Record {
+struct Customer {
     using Key = CustomerKey;
+    using Secondary = CustomerSecondary;
     static const int CUSTS_PER_DIST = 3000;
     static const int MIN_FIRST = 8;
     static const int MAX_FIRST = 16;
@@ -200,6 +192,7 @@ struct Customer : Record {
     static const int CREDIT = 2;
     static const int MIN_DATA = 300;
     static const int MAX_DATA = 500;
+    static const int UNUSED_ID = 0;
     uint32_t c_id;  // 96000 unique ids
     uint8_t c_d_id;
     uint16_t c_w_id;
@@ -217,7 +210,7 @@ struct Customer : Record {
     char c_credit[CREDIT + 1];  // "GC"=good, "BC"=bad
     char c_data[MAX_DATA + 1];  // miscellaneous information
     Address c_address;
-    inline void deep_copy(const Customer& src) {
+    inline void deep_copy_from(const Customer& src) {
         if (this != &src) {
             c_id = src.c_id;
             c_d_id = src.c_d_id;
@@ -229,21 +222,29 @@ struct Customer : Record {
             c_discount = src.c_discount;
             c_balance = src.c_balance;
             c_ytd_payment = src.c_ytd_payment;
-            strcpy(c_first, src.c_first);
-            strcpy(c_middle, src.c_middle);
-            strcpy(c_last, src.c_last);
-            strcpy(c_phone, src.c_phone);
-            strcpy(c_credit, src.c_credit);
-            strcpy(c_data, src.c_data);
-            c_address.deep_copy(src.c_address);
+            copy_cstr(c_first, src.c_first, sizeof(c_first));
+            copy_cstr(c_middle, src.c_middle, sizeof(c_middle));
+            copy_cstr(c_last, src.c_last, sizeof(c_last));
+            copy_cstr(c_phone, src.c_phone, sizeof(c_phone));
+            copy_cstr(c_credit, src.c_credit, sizeof(c_credit));
+            copy_cstr(c_data, src.c_data, sizeof(c_data));
+            c_address.deep_copy_from(src.c_address);
         }
     }
+};
+
+struct CustomerSecondary {
+    using Key = CustomerSecondaryKey;
+    Customer* ptr = nullptr;
+    inline CustomerSecondary() {}
+    inline CustomerSecondary(Customer* ptr)
+        : ptr(ptr) {}
 };
 
 // Primary Key None
 // Foreign Key (h_c_w_id, h_c_d_id, h_c_id) references (c_w_id, c_d_id, c_id)
 // Foreign Key (h_w_id, h_d_id) references (d_w_id, d_id)
-struct History : Record {
+struct History {
     static const int HISTS_PER_CUST = 1;
     static const int MIN_DATA = 12;
     static const int MAX_DATA = 24;
@@ -255,7 +256,7 @@ struct History : Record {
     Timestamp h_date;  // date and time
     double h_amount;   // signed numeric(6, 2)
     char h_data[MAX_DATA + 1];
-    inline void deep_copy(const History& src) {
+    inline void deep_copy_from(const History& src) {
         if (this != &src) {
             h_c_id = src.h_c_id;
             h_c_d_id = src.h_c_d_id;
@@ -264,15 +265,18 @@ struct History : Record {
             h_w_id = src.h_w_id;
             h_date = src.h_date;
             h_amount = src.h_amount;
-            strcpy(h_data, src.h_data);
+            copy_cstr(h_data, src.h_data, sizeof(h_data));
         }
     }
 };
 
+struct OrderSecondary;
+
 // Primary Key (o_w_id, o_d_id, o_id)
 // Foreign Key (o_w_id, o_d_id, o_c_id) references (c_w_id, c_d_id, c_id)
-struct Order : Record {
+struct Order {
     using Key = OrderKey;
+    using Secondary = OrderSecondary;
     static const int ORDS_PER_DIST = 3000;
     uint32_t o_id;  // 10000000 unique ids
     uint8_t o_d_id;
@@ -282,7 +286,7 @@ struct Order : Record {
     uint8_t o_ol_cnt;      // numeric(2)
     uint8_t o_all_local;   // numeric(1)
     Timestamp o_entry_d;   // date and time
-    inline void deep_copy(const Order& src) {
+    inline void deep_copy_from(const Order& src) {
         if (this != &src) {
             o_id = src.o_id;
             o_d_id = src.o_d_id;
@@ -296,14 +300,22 @@ struct Order : Record {
     }
 };
 
+struct OrderSecondary {
+    using Key = OrderSecondaryKey;
+    Order* ptr = nullptr;
+    inline OrderSecondary() {}
+    inline OrderSecondary(Order* ptr)
+        : ptr(ptr) {}
+};
+
 // Primary Key (no_w_id, no_d_id, no_o_id)
 // Foreign Key (no_w_id, no_d_id, no_o_id) references (o_w_id, o_d_id, o_id)
-struct NewOrder : Record {
+struct NewOrder {
     using Key = NewOrderKey;
     uint32_t no_o_id;
     uint8_t no_d_id;
     uint16_t no_w_id;
-    inline void deep_copy(const NewOrder& src) {
+    inline void deep_copy_from(const NewOrder& src) {
         if (this != &src) {
             no_o_id = src.no_o_id;
             no_d_id = src.no_d_id;
@@ -315,7 +327,7 @@ struct NewOrder : Record {
 // Primary Key (ol_w_id, ol_d_id, ol_o_id, ol_number)
 // Foregin Key (ol_w_id, ol_d_id, ol_o_id) references (o_w_id, o_d_id, o_id)
 // Foreign Key (ol_supply_w_id, ol_i_id) references (s_w_id, s_i_id)
-struct OrderLine : Record {
+struct OrderLine {
     using Key = OrderLineKey;
     static const int MIN_ORDLINES_PER_ORD = 5;
     static const int MAX_ORDLINES_PER_ORD = 15;
@@ -330,7 +342,7 @@ struct OrderLine : Record {
     uint8_t ol_quantity;  // numeric(2)
     double ol_amount;     // signed numeric(6, 2)
     char ol_dist_info[DIST_INFO + 1];
-    inline void deep_copy(const OrderLine& src) {
+    inline void deep_copy_from(const OrderLine& src) {
         if (this != &src) {
             ol_o_id = src.ol_o_id;
             ol_d_id = src.ol_d_id;
@@ -341,7 +353,7 @@ struct OrderLine : Record {
             ol_delivery_d = src.ol_delivery_d;
             ol_quantity = src.ol_quantity;
             ol_amount = src.ol_amount;
-            strcpy(ol_dist_info, src.ol_dist_info);
+            copy_cstr(ol_dist_info, src.ol_dist_info, sizeof(ol_dist_info));
         }
     }
 };

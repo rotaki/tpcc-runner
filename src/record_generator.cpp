@@ -5,6 +5,7 @@
 #include "random.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
+#include "utils.hpp"
 
 namespace RecordGeneratorUtils {
 Xoshiro256PlusPlus& get_rand() {
@@ -70,10 +71,10 @@ size_t make_clast(char* out, size_t num) {
     const char* candidates[] = {"BAR", "OUGHT", "ABLE",  "PRI",   "PRES",
                                 "ESE", "ANTI",  "CALLY", "ATION", "EING"};
     assert(num < 1000);
+    constexpr size_t buf_size = Customer::MAX_LAST + 1;
     int len = 0;
     for (size_t i: {num / 100, (num % 100) / 10, num % 10}) {
-        strcpy(&out[len], candidates[i]);
-        len += strlen(candidates[i]);
+        len += copy_cstr(&out[len], candidates[i], buf_size - len);
     }
     assert(len < Customer::MAX_LAST);
     out[len] = '\0';
@@ -185,11 +186,13 @@ void create_customer(Customer& c, uint16_t c_w_id, uint8_t c_d_id, uint32_t c_id
     c.c_balance = -10.00;                         // signed numeric(12, 2)
     c.c_ytd_payment = 10.00;                      // signed numeric(12, 2)
     make_random_astring(c.c_first, Customer::MIN_FIRST, Customer::MAX_FIRST);
-    strcpy(c.c_middle, "OE");
+    copy_cstr(c.c_middle, "OE", sizeof(c.c_middle));
     (c_id <= 1000 ? make_clast(c.c_last, c_id - 1)
                   : make_clast(c.c_last, nurand_int(NURandConstantType::C_LOAD, 0, 999)));
     make_random_nstring(c.c_phone, Customer::PHONE, Customer::PHONE);
-    (urand_int(0, 99) < 10 ? strcpy(c.c_credit, "BC") : strcpy(c.c_credit, "GC"));
+    (urand_int(0, 99) < 10 ? copy_cstr(c.c_credit, "BC", sizeof(c.c_credit))
+                           : copy_cstr(c.c_credit, "GC", sizeof(c.c_credit)));
+    ;
     make_random_astring(c.c_data, Customer::MIN_DATA, Customer::MAX_DATA);
     make_random_address(c.c_address);
 }

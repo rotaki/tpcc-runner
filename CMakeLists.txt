@@ -18,6 +18,7 @@ set(TPCCBENCH_COMPILE_OPTIONS "")
 set(TPCCBENCH_COMPILE_FEATURES "cxx_std_17")
 set(TPCCBENCH_LINK_OPTIONS "")
 set(TPCCBENCH_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include")
+list(APPEND TPCCBENCH_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/app/include")
 
 if (APPLE)
   list(APPEND TPCCBENCH_COMPILE_OPTIONS "-fvisibility=hidden")
@@ -29,6 +30,8 @@ file(GLOB_RECURSE
   TPCCBENCH_SRCS
   ${PROJECT_SOURCE_DIR}/src/*.cpp
   ${PROJECT_SORUCE_DIR}/include/*.hpp
+  ${PROJECT_SOURCE_DIR}/app/src/*.cpp
+  ${PROJECT_SOURCE_DIR}/app/include/*.hpp
   )
 
 add_library(tpccbench_objlib OBJECT ${TPCCBENCH_SRCS})
@@ -55,54 +58,6 @@ set_target_properties(
   )
 
 message(STATUS "tpccbench_static created!")
-
-###############################################################################
-#                         Static library for glue code                        #
-###############################################################################
-
-set(GLUE_COMPILE_DEFINITIONS "")
-set(GLUE_COMPILE_OPTIONS "")
-set(GLUE_COMPILE_FEATURES "cxx_std_17")
-set(GLUE_LINK_OPTIONS "")
-set(GLUE_LINK_LIBRARIES "tpccbench_static")
-set(GLUE_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/app/include")
-
-if (APPLE)
-  list(APPEND GLUE_COMPILE_OPTIONS "-fvisibility=hidden")
-  list(APPEND GLUE_LINK_OPTIONS "-fvisibility=hidden")
-endif ()
-
-file(GLOB_RECURSE
-  GLUE_SRCS
-  ${PROJECT_SOURCE_DIR}/app/src/*.cpp
-  ${PROJECT_SOURCE_DIR}/app/include/*.hpp
-  )
-
-add_library(glue_objlib OBJECT ${GLUE_SRCS})
-
-target_compile_definitions(glue_objlib PUBLIC ${GLUE_COMPILE_DEFINITIONS})
-target_compile_options(glue_objlib PUBLIC ${GLUE_COMPILE_OPTIONS})
-target_compile_features(glue_objlib PUBLIC ${GLUE_COMPILE_FEATURES})
-target_link_options(glue_objlib PUBLIC ${GLUE_LINK_OPTIONS})
-target_link_libraries(glue_objlib PUBLIC ${GLUE_LINK_LIBRARIES})
-target_include_directories(glue_objlib PUBLIC ${GLUE_INCLUDE_DIRECTORIES})
-
-target_compile_options(glue_objlib PRIVATE "-fPIC" "-Werror" "-Wall")
-
-# create static library
-add_library(glue_static STATIC $<TARGET_OBJECTS:glue_objlib>)
-
-target_link_libraries(glue_static PUBLIC glue_objlib)
-
-set_target_properties(
-  glue_static
-  PROPERTIES
-  ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-  )
-
-message(STATUS "glue_static created!")
 
 ###############################################################################
 #                                 Test binaries                                #
@@ -137,34 +92,12 @@ foreach (TPCC_TEST ${TPCC_TESTS})
     set_target_properties(
       ${FILENAME}
       PROPERTIES
-      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/tpcctest"
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/"
       )
   endif ()
 endforeach (TPCC_TEST ${TPCC_TESTS})
 
 set(STATUS "tpccbench tests created!")
-
-# test for glue code
-
-file(GLOB_RECURSE GLUE_TESTS "${PROJECT_SOURCE_DIR}/app/test/*.cpp")
-foreach (GLUE_TEST ${GLUE_TESTS})
-  get_filename_component(FILENAME ${GLUE_TEST} NAME_WE)
-  if (${FILENAME} MATCHES "test")
-    add_executable(${FILENAME} ${GLUE_TEST})
-    gtest_discover_tests(${FILENAME})
-    target_compile_options(${FILENAME} PRIVATE "-Werror" "-Wall")
-    target_include_directories(${FILENAME} PRIVATE "${PROJECT_SOURCE_DIR}/app/test")
-    target_link_libraries(${FILENAME} glue_static gtest_main)
-    set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
-    set_target_properties(
-      ${FILENAME}
-      PROPERTIES
-      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests/gluetest"
-      )
-  endif ()
-endforeach (GLUE_TEST ${GLUE_TESTS})
-
-set(STATUS "gluecode tests created!")
 
 ###############################################################################
 #                                 Clang-format                                #

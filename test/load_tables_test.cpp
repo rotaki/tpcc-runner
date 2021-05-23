@@ -1,7 +1,7 @@
 #include "gtest/gtest.h"
 
 // Glue code //////////////////////////////////////////////////////////////////
-#include "db_wrapper.hpp"
+#include "database.hpp"
 #include "initializer.hpp"
 
 // TPCC code //////////////////////////////////////////////////////////////////
@@ -37,12 +37,12 @@ void check_items_table() {
     Item i;
     uint32_t i_id = 1;
     Item::Key i_key = Item::Key::create_key(i_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Item>(i, i_key));
+    ASSERT_TRUE(Database::get_db().get_record<Item>(i, i_key));
     check_item_record(i);
 
     i_id = 100000;
     i_key = Item::Key::create_key(i_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Item>(i, i_key));
+    ASSERT_TRUE(Database::get_db().get_record<Item>(i, i_key));
     check_item_record(i);
 }
 
@@ -76,12 +76,12 @@ void check_warehouses_table(uint16_t num_warehouse) {
     Warehouse w;
     uint16_t w_id = 1;
     Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Warehouse>(w, w_key));
+    ASSERT_TRUE(Database::get_db().get_record<Warehouse>(w, w_key));
     check_warehouse_record(num_warehouse, w);
 
     w_id = num_warehouse;
     w_key = Warehouse::Key::create_key(w_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Warehouse>(w, w_key));
+    ASSERT_TRUE(Database::get_db().get_record<Warehouse>(w, w_key));
     check_warehouse_record(num_warehouse, w);
 }
 
@@ -115,13 +115,13 @@ void check_stocks_table(uint16_t num_warehouse) {
     uint16_t w_id = 1;
     uint32_t i_id = 1;
     StockKey s_key = StockKey::create_key(w_id, i_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Stock>(s, s_key));
+    ASSERT_TRUE(Database::get_db().get_record<Stock>(s, s_key));
     check_stock_record(num_warehouse, s);
 
     w_id = num_warehouse;
     i_id = 100000;
     s_key = StockKey::create_key(w_id, i_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Stock>(s, s_key));
+    ASSERT_TRUE(Database::get_db().get_record<Stock>(s, s_key));
     check_stock_record(num_warehouse, s);
 }
 
@@ -144,13 +144,13 @@ void check_districts_table(uint16_t num_warehouse) {
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     DistrictKey d_key = DistrictKey::create_key(w_id, d_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<District>(d, d_key));
+    ASSERT_TRUE(Database::get_db().get_record<District>(d, d_key));
     check_district_record(num_warehouse, d);
 
     w_id = num_warehouse;
     d_id = 10;
     d_key = DistrictKey::create_key(w_id, d_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<District>(d, d_key));
+    ASSERT_TRUE(Database::get_db().get_record<District>(d, d_key));
     check_district_record(num_warehouse, d);
 }
 
@@ -192,14 +192,14 @@ void check_customers_table(uint16_t num_warehouse) {
     uint8_t d_id = 1;
     uint32_t c_id = 1;
     CustomerKey c_key = CustomerKey::create_key(w_id, d_id, c_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Customer>(c, c_key));
+    ASSERT_TRUE(Database::get_db().get_record<Customer>(c, c_key));
     check_customer_record(num_warehouse, c);
 
     w_id = num_warehouse;
     d_id = 10;
     c_id = 3000;
     c_key = CustomerKey::create_key(w_id, d_id, c_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Customer>(c, c_key));
+    ASSERT_TRUE(Database::get_db().get_record<Customer>(c, c_key));
     check_customer_record(num_warehouse, c);
 }
 
@@ -224,14 +224,14 @@ void check_histories_table(uint16_t num_warehouse) {
     // uint8_t d_id = 1;
     // uint32_t c_id = 1;
     // HistoryKey h_key = HistoryKey::create_key(w_id, d_id, c_id);
-    // ASSERT_TRUE(DBWrapper::get_db().get_history_record(h, h_key));
+    // ASSERT_TRUE(Database::get_db().get_history_record(h, h_key));
     // check_history_record(num_warehouse, h);
 
     // w_id = num_warehouse;
     // d_id = 10;
     // c_id = 3000;
     // h_key = HistoryKey::create_key(w_id, d_id, c_id);
-    // ASSERT_TRUE(DBWrapper::get_db().get_history_record(h, h_key));
+    // ASSERT_TRUE(Database::get_db().get_history_record(h, h_key));
     // check_history_record(num_warehouse, h);
 }
 
@@ -262,14 +262,14 @@ void check_orders_table(uint16_t num_warehouse) {
     uint8_t d_id = 1;
     uint32_t o_id = 1;
     OrderKey o_key = OrderKey::create_key(w_id, d_id, o_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Order>(o, o_key));
+    ASSERT_TRUE(Database::get_db().get_record<Order>(o, o_key));
     check_order_record(num_warehouse, o);
 
     w_id = num_warehouse;
     d_id = 10;
     o_id = 3000;
     o_key = OrderKey::create_key(w_id, d_id, o_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<Order>(o, o_key));
+    ASSERT_TRUE(Database::get_db().get_record<Order>(o, o_key));
     check_order_record(num_warehouse, o);
 }
 
@@ -307,7 +307,7 @@ void check_orderlines_table(uint16_t num_warehouse) {
     uint32_t o_id = 1;
     uint8_t ol_number = 1;
     OrderLineKey ol_key = OrderLineKey::create_key(w_id, d_id, o_id, ol_number);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<OrderLine>(ol, ol_key));
+    ASSERT_TRUE(Database::get_db().get_record<OrderLine>(ol, ol_key));
     check_orderline_record(num_warehouse, ol);
 
     w_id = num_warehouse;
@@ -315,7 +315,7 @@ void check_orderlines_table(uint16_t num_warehouse) {
     o_id = 3000;
     ol_number = 5;
     ol_key = OrderLineKey::create_key(w_id, d_id, o_id, ol_number);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<OrderLine>(ol, ol_key));
+    ASSERT_TRUE(Database::get_db().get_record<OrderLine>(ol, ol_key));
     check_orderline_record(num_warehouse, ol);
 }
 
@@ -334,14 +334,14 @@ void check_neworders_table(uint16_t num_warehouse) {
     uint8_t d_id = 1;
     uint32_t o_id = 2101;
     NewOrderKey no_key = NewOrderKey::create_key(w_id, d_id, o_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<NewOrder>(no, no_key));
+    ASSERT_TRUE(Database::get_db().get_record<NewOrder>(no, no_key));
     check_neworder_record(num_warehouse, no);
 
     w_id = num_warehouse;
     d_id = 10;
     o_id = 3000;
     no_key = NewOrderKey::create_key(w_id, d_id, o_id);
-    ASSERT_TRUE(DBWrapper::get_db().get_record<NewOrder>(no, no_key));
+    ASSERT_TRUE(Database::get_db().get_record<NewOrder>(no, no_key));
     check_neworder_record(num_warehouse, no);
 }
 

@@ -195,3 +195,71 @@ struct NewOrderKey {
         return k;
     }
 };
+
+
+struct CustomerSecondaryKey {
+    union {
+        struct {
+            uint32_t d_id : 8;
+            uint32_t w_id : 16;
+        };
+        uint32_t num = 0;
+    };
+    char c_last[Customer::MAX_LAST + 1];
+
+    inline bool operator<(const CustomerSecondaryKey& rhs) const noexcept {
+        if (num == rhs.num)
+            return strcmp(c_last, rhs.c_last) < 0;
+        else
+            return num < rhs.num;
+    }
+    inline bool operator==(const CustomerSecondaryKey& rhs) const noexcept {
+        return (num == rhs.num) && (strcmp(c_last, rhs.c_last) == 0);
+    }
+    inline static CustomerSecondaryKey create_key(
+        uint16_t w_id, uint8_t d_id, const char* c_last_in) {
+        CustomerSecondaryKey k;
+        k.w_id = w_id;
+        k.d_id = d_id;
+        copy_cstr(k.c_last, c_last_in, sizeof(k.c_last));
+        return k;
+    }
+    inline static CustomerSecondaryKey create_key(const Customer& c) {
+        CustomerSecondaryKey k;
+        k.w_id = c.c_w_id;
+        k.d_id = c.c_d_id;
+        copy_cstr(k.c_last, c.c_last, sizeof(k.c_last));
+        return k;
+    }
+};
+
+struct OrderSecondaryKey {
+    union {
+        struct {
+            uint64_t c_id : 32;
+            uint64_t d_id : 8;
+            uint64_t w_id : 16;
+        };
+        uint64_t o_sec_key = 0;
+    };
+    inline bool operator<(const OrderSecondaryKey& rhs) const noexcept {
+        return o_sec_key < rhs.o_sec_key;
+    }
+    inline bool operator==(const OrderSecondaryKey& rhs) const noexcept {
+        return o_sec_key == rhs.o_sec_key;
+    }
+    inline static OrderSecondaryKey create_key(uint16_t w_id, uint8_t d_id, uint32_t c_id) {
+        OrderSecondaryKey k;
+        k.w_id = w_id;
+        k.d_id = d_id;
+        k.c_id = c_id;
+        return k;
+    }
+    inline static OrderSecondaryKey create_key(const Order& o) {
+        OrderSecondaryKey k;
+        k.w_id = o.o_w_id;
+        k.d_id = o.o_d_id;
+        k.c_id = o.o_c_id;
+        return k;
+    }
+};
