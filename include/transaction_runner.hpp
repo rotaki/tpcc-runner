@@ -60,10 +60,8 @@ bool run_with_retry(const Input& input, Transaction& tx) {
     }
 }
 
-template <
-    typename Input, typename Transaction,
-    typename std::enable_if<std::is_same<Input, InputData::NewOrder>::value, Input>::type = nullptr>
-Status run(const Input& input, Transaction& tx) {
+template <typename Transaction>
+Status run(const InputData::NewOrder& input, Transaction& tx) {
     using namespace TransactionRunnerUtils::NewOrderTx;
     typename Transaction::Result res;
 
@@ -132,10 +130,8 @@ Status run(const Input& input, Transaction& tx) {
     return Status::SUCCESS;
 }
 
-template <
-    typename Input, typename Transaction,
-    typename std::enable_if<std::is_same<Input, InputData::Payment>::value, Input>::type = nullptr>
-Status run(const Input& input, Transaction& tx) {
+template <typename Transaction>
+Status run(const InputData::Payment& input, Transaction& tx) {
     using namespace TransactionRunnerUtils::PaymentTx;
     typename Transaction::Result res;
 
@@ -189,11 +185,8 @@ Status run(const Input& input, Transaction& tx) {
     return Status::SUCCESS;
 }
 
-template <
-    typename Input, typename Transaction,
-    typename std::enable_if<std::is_same<Input, InputData::OrderStatus>::value, Input>::type =
-        nullptr>
-Status run(const Input& input, Transaction& tx) {
+template <typename Transaction>
+Status run(const InputData::OrderStatus& input, Transaction& tx) {
     typename Transaction::Result res;
 
     uint16_t c_w_id = input.w_id;
@@ -224,9 +217,9 @@ Status run(const Input& input, Transaction& tx) {
     std::set<double> ol_amounts;
     std::set<Timestamp> ol_delivery_ds;
     OrderLine::Key low = OrderLine::Key::create_key(o.o_w_id, o.o_d_id, o.o_c_id, 0);
-    OrderLine::Key high = OrderLine::Key::create_key(o.o_w_id, o.o_d_id, o.o_c_id, 0xFF);
+    OrderLine::Key up = OrderLine::Key::create_key(o.o_w_id, o.o_d_id, o.o_c_id + 1, 0);
     res = tx.range_query(
-        low, high,
+        low, up,
         [&ol_i_ids, &ol_supply_w_ids, &ol_quantities, &ol_amounts, &ol_delivery_ds](OrderLine& ol) {
             ol_i_ids.insert(ol.ol_i_id);
             ol_supply_w_ids.insert(ol.ol_supply_w_id);
@@ -241,10 +234,8 @@ Status run(const Input& input, Transaction& tx) {
     return Status::SUCCESS;
 }
 
-template <
-    typename Input, typename Transaction,
-    typename std::enable_if<std::is_same<Input, InputData::Delivery>::value, Input>::type = nullptr>
-Status run(const Input& input, Transaction& tx) {
+template <typename Transaction>
+Status run(const InputData::Delivery& input, Transaction& tx) {
     typename Transaction::Result res;
 
     uint16_t w_id = input.w_id;
@@ -254,8 +245,7 @@ Status run(const Input& input, Transaction& tx) {
     for (uint8_t d_id = 1; d_id <= District::DISTS_PER_WARE; d_id++) {
         NewOrder no;
         NewOrder::Key no_low = NewOrder::Key::create_key(w_id, d_id, 0);
-        NewOrder::Key no_up = NewOrder::Key::create_key(w_id, d_id, 0xFFFFFFFF);
-        res = tx.get_neworder_with_smallest_key_in_range(no, no_low, no_up);
+        res = tx.get_neworder_with_smallest_key_no_less_than(no, no_low);
         if (res == Transaction::Result::FAIL) {
             delivery_skipped_dists.emplace_back(d_id);
             continue;
@@ -272,7 +262,7 @@ Status run(const Input& input, Transaction& tx) {
 
         double total_ol_amount = 0.0;
         OrderLine::Key o_low = OrderLine::Key::create_key(o.o_w_id, o.o_d_id, o.o_id, 0);
-        OrderLine::Key o_up = OrderLine::Key::create_key(o.o_w_id, o.o_d_id, o.o_id, 0xFF);
+        OrderLine::Key o_up = OrderLine::Key::create_key(o.o_w_id, o.o_d_id, o.o_id + 1, 0);
         res = range_update(o_low, o_up, [&total_ol_amount](OrderLine& ol) {
             ol.ol_amount = get_timestamp();
             total_ol_amount += ol.ol_amount;
@@ -294,11 +284,8 @@ Status run(const Input& input, Transaction& tx) {
     return Status::SUCCESS;
 }
 
-template <
-    typename Input, typename Transaction,
-    typename std::enable_if<std::is_same<Input, InputData::StockLevel>::value, Input>::type =
-        nullptr>
-Status run(const Input& input, Transaction& tx) {
+template <typename Transaction>
+Status run(const InputData::StockLevel& input, Transaction& tx) {
     typename Transaction::Result res;
 
     uint16_t w_id = input.w_id;
@@ -311,15 +298,23 @@ Status run(const Input& input, Transaction& tx) {
 
     std::set<uint32_t> s_i_ids;
     OrderLine::Key low = OrderLine::Key::create_key(w_id, d_id, d.d_next_o_id - 20, 0);
-    OrderLine::Key up = OrderLine::Key::create_key(w_id, d_id, d.d_next_o_id, 0);
-    res = tx.range_query(low, up, [&tx, &s_i_ids, &w_id, &threshold](const OrderLine& ol) {
-        typename Transaction::Result res;
-        Stock s;
-        res = tx.get_record(s, Stock::Key::create_key(w_id, ol.ol_i_id));
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
-        if (s.s_quantity < threshold && ol.ol_i_id != Item::UNUSED_ID) s_i_ids.insert(ol.ol_i_id);
+    OrderLine::Key up = OrderLine::Key::create_key(w_id, d_id, d.d_next_o_id + 1, 0);
+    res = tx.range_query(low, up, [&s_i_ids](const OrderLine& ol) {
+        if (ol.ol_i_id != Item::UNUSED_ID) s_i_ids.insert(ol.ol_i_id);
     });
     if (res != Transaction::Result::SUCCESS) abort(tx, res);
+
+    auto it = s_i_ids.begin();
+    Stock s;
+    while (it != s_i_ids.end()) {
+        res = tx.get_record(s, Stock::Key::create_key(w_id, *it));
+        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (s.s_quantity >= threshold) {
+            it = s_i_ids.erase(it);
+        } else {
+            it++;
+        }
+    }
 
     if (!tx.commit()) return abort(tx, res);
     return Status::SUCCESS;

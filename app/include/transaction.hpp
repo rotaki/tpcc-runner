@@ -10,9 +10,11 @@
 
 class Transaction {
 public:
-    Transaction();
+    Transaction() = default
 
-    void abort();
+        void abort() {
+        // do nothing
+    }
 
     enum Result {
         SUCCESS,
@@ -74,7 +76,7 @@ public:
         }
     }
 
-    inline Result get_customer_by_last_name(Customer& c, CustomerSecondary::Key c_sec_key) {
+    Result get_customer_by_last_name(Customer& c, CustomerSecondary::Key c_sec_key) {
         if (!cm.slock()) {
             abort();
             return Result::ABORT;
@@ -85,23 +87,24 @@ public:
         if (low_iter == up_iter) return Result::FAIL;
         int n = std::distance(low_iter, up_iter);
 
-        std::vector<CustomerSecondary> temp(n);
+        std::vector<CustomerSecondary> temp;
+        temp.reserve(n);
         for (auto it = low_iter; it != up_iter; it++) {
             assert(it->second.ptr != nullptr);
-            temp.emplace_back(it->second);
+            temp.push_back(it->second);
         }
 
         std::sort(
             temp.begin(), temp.end(),
             [](const CustomerSecondary& lhs, const CustomerSecondary& rhs) {
-                return strcmp(lhs.ptr->c_first, rhs.ptr->c_first) < 0;
+                return strncmp(lhs.ptr->c_first, rhs.ptr->c_first, Customer::MAX_FIRST) < 0;
             });
 
         c.deep_copy_from(*(temp[(n + 1) / 2 - 1].ptr));
         return Result::SUCCESS;
     }
 
-    inline Result get_order_by_customer_id(Order& o, OrderSecondary::Key o_sec_key) {
+    Result get_order_by_customer_id(Order& o, OrderSecondary::Key o_sec_key) {
         if (!cm.slock()) {
             abort();
             return Result::ABORT;
@@ -124,20 +127,21 @@ public:
         return Result::SUCCESS;
     }
 
-    inline Result get_neworder_with_smallest_key_in_range(
-        NewOrder& no, NewOrder::Key low, NewOrder::Key up) {
+    Result get_neworder_with_smallest_key_no_less_than(NewOrder& no, NewOrder::Key low) {
         if (cm.slock()) {
             abort();
             return Result::ABORT;
         }
         auto low_iter = db.get_lower_bound_iter<NewOrder>(low);
-        auto up_iter = db.get_upper_bound_iter<NewOrder>(up);
-        if (low_iter == up_iter) return Result::FAIL;
-        no.deep_copy_from(low_iter->second);
-        return Result::SUCCESS;
+        if (low_iter->first.w_id == low.w_id && low_iter->first.d_id == low.d_id) {
+            no.deep_copy_from(low_iter->second);
+            return Result::SUCCESS;
+        } else {
+            return Result::FAIL;
+        }
     }
 
-    // [low ,up]
+    // [low ,up)
     template <typename Record, typename Func>
     Result range_query(typename Record::Key low, typename Record::Key up, Func&& func) {
         if (cm.slock()) {
@@ -145,7 +149,7 @@ public:
             return Result::ABORT;
         }
         auto low_iter = db.get_lower_bound_iter<Record>(low);
-        auto up_iter = db.get_upper_bound_iter<Record>(up);
+        auto up_iter = db.get_lower_bound_iter<Record>(up);
         if (low_iter == up_iter) return Result::FAIL;
         for (auto it = low_iter; it != up_iter; it++) {
             Func(it->second);
@@ -153,7 +157,7 @@ public:
         return Result::SUCCESS;
     }
 
-    // [low ,up]
+    // [low ,up)
     template <typename Record, typename Func>
     Result range_update(typename Record::Key low, typename Record::Key up, Func&& func) {
         if (cm.xlock()) {
@@ -161,7 +165,7 @@ public:
             return Result::ABORT;
         }
         auto low_iter = db.get_lower_bound_iter<Record>(low);
-        auto up_iter = db.get_upper_bound_iter<Record>(up);
+        auto up_iter = db.get_lower_bound_iter<Record>(up);
         if (low_iter == up_iter) return Result::FAIL;
         for (auto it = low_iter; it != up_iter; it++) {
             Func(it->second);
@@ -176,7 +180,7 @@ private:
 
 
 template <>
-Transaction::Result Transaction::insert_record<History>(const History& rec) {
+inline Transaction::Result Transaction::insert_record<History>(const History& rec) {
     if (!cm.xlock()) {
         abort();
         return Result::ABORT;

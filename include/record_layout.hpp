@@ -7,9 +7,10 @@
 
 #include "utils.hpp"
 
-using Timestamp = time_t;
+using Timestamp = int64_t;
 inline Timestamp get_timestamp() {
-    return ::time(nullptr);
+    thread_local Timestamp i = 0;
+    return i++;
 }
 
 // Keys defined in record_key.hpp
@@ -38,7 +39,7 @@ struct Item {
     double i_price;    // numeric(5, 2)
     char i_name[MAX_NAME + 1];
     char i_data[MAX_DATA + 1];
-    inline void deep_copy_from(const Item& src) {
+    void deep_copy_from(const Item& src) {
         if (this != &src) {
             i_id = src.i_id;
             i_im_id = src.i_im_id;
@@ -67,7 +68,7 @@ struct Address {
 
 private:
     Address(){};
-    inline void deep_copy_from(const Address& src) {
+    void deep_copy_from(const Address& src) {
         if (this != &src) {
             copy_cstr(street_1, src.street_1, sizeof(street_1));
             copy_cstr(street_2, src.street_2, sizeof(street_2));
@@ -88,7 +89,7 @@ struct Warehouse {
     double w_ytd;   // signed numeric(12, 2)
     char w_name[MAX_NAME + 1];
     Address w_address;
-    inline void deep_copy_from(const Warehouse& src) {
+    void deep_copy_from(const Warehouse& src) {
         if (this != &src) {
             w_id = src.w_id;
             w_tax = src.w_tax;
@@ -125,7 +126,7 @@ struct Stock {
     char s_dist_10[DIST + 1];
     char s_data[MAX_DATA + 1];
 
-    inline void deep_copy_from(const Stock& src) {
+    void deep_copy_from(const Stock& src) {
         if (this != &src) {
             s_i_id = src.s_i_id;
             s_w_id = src.s_w_id;
@@ -163,7 +164,7 @@ struct District {
     double d_ytd;          // signed numeric(12, 2)
     char d_name[MAX_NAME + 1];
     Address d_address;
-    inline void deep_copy_from(const District& src) {
+    void deep_copy_from(const District& src) {
         if (this != &src) {
             d_id = src.d_id;
             d_w_id = src.d_w_id;
@@ -210,7 +211,7 @@ struct Customer {
     char c_credit[CREDIT + 1];  // "GC"=good, "BC"=bad
     char c_data[MAX_DATA + 1];  // miscellaneous information
     Address c_address;
-    inline void deep_copy_from(const Customer& src) {
+    void deep_copy_from(const Customer& src) {
         if (this != &src) {
             c_id = src.c_id;
             c_d_id = src.c_d_id;
@@ -236,8 +237,8 @@ struct Customer {
 struct CustomerSecondary {
     using Key = CustomerSecondaryKey;
     Customer* ptr = nullptr;
-    inline CustomerSecondary() {}
-    inline CustomerSecondary(Customer* ptr)
+    CustomerSecondary() {}
+    CustomerSecondary(Customer* ptr)
         : ptr(ptr) {}
 };
 
@@ -256,7 +257,7 @@ struct History {
     Timestamp h_date;  // date and time
     double h_amount;   // signed numeric(6, 2)
     char h_data[MAX_DATA + 1];
-    inline void deep_copy_from(const History& src) {
+    void deep_copy_from(const History& src) {
         if (this != &src) {
             h_c_id = src.h_c_id;
             h_c_d_id = src.h_c_d_id;
@@ -286,7 +287,7 @@ struct Order {
     uint8_t o_ol_cnt;      // numeric(2)
     uint8_t o_all_local;   // numeric(1)
     Timestamp o_entry_d;   // date and time
-    inline void deep_copy_from(const Order& src) {
+    void deep_copy_from(const Order& src) {
         if (this != &src) {
             o_id = src.o_id;
             o_d_id = src.o_d_id;
@@ -303,8 +304,8 @@ struct Order {
 struct OrderSecondary {
     using Key = OrderSecondaryKey;
     Order* ptr = nullptr;
-    inline OrderSecondary() {}
-    inline OrderSecondary(Order* ptr)
+    OrderSecondary() {}
+    OrderSecondary(Order* ptr)
         : ptr(ptr) {}
 };
 
@@ -315,7 +316,7 @@ struct NewOrder {
     uint32_t no_o_id;
     uint8_t no_d_id;
     uint16_t no_w_id;
-    inline void deep_copy_from(const NewOrder& src) {
+    void deep_copy_from(const NewOrder& src) {
         if (this != &src) {
             no_o_id = src.no_o_id;
             no_d_id = src.no_d_id;
@@ -342,7 +343,7 @@ struct OrderLine {
     uint8_t ol_quantity;  // numeric(2)
     double ol_amount;     // signed numeric(6, 2)
     char ol_dist_info[DIST_INFO + 1];
-    inline void deep_copy_from(const OrderLine& src) {
+    void deep_copy_from(const OrderLine& src) {
         if (this != &src) {
             ol_o_id = src.ol_o_id;
             ol_d_id = src.ol_d_id;

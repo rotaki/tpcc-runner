@@ -23,7 +23,7 @@ struct NewOrder {
         uint8_t ol_quantity;
     } items[OrderLine::MAX_ORDLINES_PER_ORD];
 
-    inline void generate(uint16_t w_id0) {
+    void generate(uint16_t w_id0) {
         const Config& c = get_config();
         uint16_t num_warehouses = c.get_num_warehouses();
         w_id = w_id0;
@@ -62,7 +62,7 @@ struct Payment {
     bool by_last_name;
     char c_last[Customer::MAX_LAST + 1];
 
-    inline void generate(uint16_t w_id0) {
+    void generate(uint16_t w_id0) {
         const Config& c = get_config();
         uint16_t num_warehouses = c.get_num_warehouses();
         w_id = w_id0;
@@ -112,7 +112,7 @@ struct Delivery {
     uint8_t o_carrier_id;
     Timestamp ol_delivery_d;
 
-    inline void generate(uint16_t w_id0) {
+    void generate(uint16_t w_id0) {
         w_id = w_id0;
         o_carrier_id = urand_int(1, 10);
         ol_delivery_d = get_timestamp();
@@ -124,7 +124,7 @@ struct StockLevel {
     uint8_t d_id;
     uint8_t threshold;
 
-    inline void generate(uint16_t w_id0, uint8_t d_id0) {
+    void generate(uint16_t w_id0, uint8_t d_id0) {
         w_id = w_id0;
         d_id = d_id0;
         threshold = urand_int(10, 20);

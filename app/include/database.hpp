@@ -40,8 +40,8 @@ struct RecordToTable<History> {
 
 class Database {
 private:
-    Database();
-    ~Database();
+    Database() = default;
+    ~Database() = default;
     RecordToTable<Item>::Table items;
     RecordToTable<Warehouse>::Table warehouses;
     RecordToTable<Stock>::Table stocks;
@@ -50,6 +50,7 @@ private:
     RecordToTable<CustomerSecondary>::Table customers_secondary;
     RecordToTable<History>::Table histories;
     RecordToTable<Order>::Table orders;
+    RecordToTable<OrderSecondary>::Table orders_secondary;
     RecordToTable<NewOrder>::Table neworders;
     RecordToTable<OrderLine>::Table orderlines;
 
@@ -57,7 +58,10 @@ public:
     Database(Database const&) = delete;
     Database& operator=(Database const&) = delete;
 
-    static Database& get_db();
+    static Database& get_db() {
+        static Database db;
+        return db;
+    }
 
     template <typename Record>
     typename RecordToTable<Record>::Table& get_table() {
@@ -77,6 +81,8 @@ public:
             return histories;
         } else if constexpr (std::is_same<Record, Order>::value) {
             return orders;
+        } else if constexpr (std::is_same<Record, OrderSecondary>::value) {
+            return orders_secondary;
         } else if constexpr (std::is_same<Record, NewOrder>::value) {
             return neworders;
         } else if constexpr (std::is_same<Record, OrderLine>::value) {
