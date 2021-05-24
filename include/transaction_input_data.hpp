@@ -14,9 +14,9 @@ struct NewOrder {
     uint16_t w_id;
     uint8_t d_id;
     uint32_t c_id;
+    uint8_t ol_cnt;
     bool rbk;
     bool is_remote;
-    uint8_t ol_cnt;
     struct {
         uint32_t ol_i_id;
         uint16_t ol_supply_w_id;

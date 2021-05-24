@@ -7,7 +7,7 @@
 #include "transaction_input_data.hpp"
 
 namespace TransactionRunnerUtils {
-namespace NewOrderTx {
+namespace NewOrderUtils {
 void create_neworder(NewOrder& no, uint16_t w_id, uint16_t d_id, uint32_t o_id);
 void create_order(
     Order& o, uint16_t w_id, uint8_t d_id, uint32_t c_id, uint32_t o_id, uint8_t ol_cnt,
@@ -16,32 +16,38 @@ void create_orderline(
     OrderLine& ol, uint16_t w_id, uint8_t d_id, uint32_t o_id, uint8_t ol_num, uint32_t ol_i_id,
     uint16_t ol_supply_w_id, uint8_t ol_quantity, double ol_amount, const Stock& s);
 void modify_stock(Stock& s, uint8_t ol_quantity, bool is_remote);
-}  // namespace NewOrderTx
+}  // namespace NewOrderUtils
 
-namespace PaymentTx {
+namespace PaymentUtils {
 void modify_customer(
     Customer& c, uint16_t w_id, uint8_t d_id, uint16_t c_w_id, uint8_t c_d_id, double h_amount);
 void create_history(
     History& h, uint16_t w_id, uint8_t d_id, uint32_t c_id, uint16_t c_w_id, uint8_t c_d_id,
     double h_amount, const char* w_name, const char* d_name);
 
-}  // namespace PaymentTx
+}  // namespace PaymentUtils
 }  // namespace TransactionRunnerUtils
 
 
 namespace TransactionRunner {
+using namespace TransactionRunnerUtils;
 enum Status {
-    SUCCESS,      // all stages of transaction return SUCCESS
-    USER_ABORT,   // if any stage returns FAIL
-    SYSTEM_ABORT  // if any stage returns ABORT
+    SUCCESS,       // if all stages of transaction return Result::SUCCESS
+    USER_ABORT,    // if rollback defined in the specification occurs (e.g. 1% of NewOrder Tx)
+    SYSTEM_ABORT,  // if any stage of a transaction returns Result::ABORT
+    BUG            // if any stage of a transaciton returns unexpected Result::FAIL
 };
 
 template <typename Transaction>
-Status abort(Transaction& tx, typename Transaction::Result res) {
-    assert(res != Transaction::Result::SUCCESS);
+bool not_suceeded(typename Transaction::Result res) {
+    return res != Transaction::Result::SUCCESS;
+}
+
+template <typename Transaction>
+Status kill_tx(Transaction& tx, typename Transaction::Result res) {
+    assert(not_suceeded(res));
     if (res == Transaction::Result::FAIL) {
-        tx.abort();
-        return Status::USER_ABORT;
+        return Status::BUG;
     } else {
         return Status::SYSTEM_ABORT;
     }
@@ -53,8 +59,9 @@ bool run_with_retry(const Input& input, Transaction& tx) {
         Status res = run(input, tx);
         switch (res) {
         case SUCCESS: return true;
-        case USER_ABORT: return false;
-        case SYSTEM_ABORT: continue;
+        case USER_ABORT: tx.abort(); return false;
+        case SYSTEM_ABORT: continue;  // aborted by the tx engine
+        case BUG: return std::runtime_error("Unexpected Transaction Bug");
         default: assert(false);
         }
     }
@@ -62,7 +69,6 @@ bool run_with_retry(const Input& input, Transaction& tx) {
 
 template <typename Transaction>
 Status run(const InputData::NewOrder& input, Transaction& tx) {
-    using namespace TransactionRunnerUtils::NewOrderTx;
     typename Transaction::Result res;
 
     bool is_remote = input.is_remote;
@@ -73,30 +79,29 @@ Status run(const InputData::NewOrder& input, Transaction& tx) {
 
     Warehouse w;
     res = tx.get_record(w, Warehouse::Key::create_key(w_id));
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
     District d;
     District::Key d_key = District::Key::create_key(w_id, d_id);
     res = tx.get_record(d, d_key);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
     uint32_t o_id = (d.d_next_o_id)++;
     res = tx.update_record(d_key, d);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
     Customer c;
     res = tx.get_record(c, Customer::Key::create_key(w_id, d_id, c_id));
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
     NewOrder no;
-    create_neworder(no, w_id, d_id, o_id);
+    NewOrderUtils::create_neworder(no, w_id, d_id, o_id);
     res = tx.insert_record(no);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
     Order o;
-    create_order(o, w_id, d_id, c_id, o_id, ol_cnt, is_remote);
+    NewOrderUtils::create_order(o, w_id, d_id, c_id, o_id, ol_cnt, is_remote);
     res = tx.insert_record(o);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
-
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
     for (uint8_t ol_num = 1; ol_num <= ol_cnt; ol_num++) {
         uint32_t ol_i_id = input.items[ol_num - 1].ol_i_id;
@@ -104,35 +109,36 @@ Status run(const InputData::NewOrder& input, Transaction& tx) {
         uint8_t ol_quantity = input.items[ol_num - 1].ol_quantity;
 
         Item i;
-        if (ol_i_id == Item::UNUSED_ID) return Status::SYSTEM_ABORT;
+        if (ol_i_id == Item::UNUSED_ID) return Status::USER_ABORT;
         res = tx.get_record(i, Item::Key::create_key(ol_i_id));
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (not_suceeded(res)) return kill_tx(tx, res);
 
         Stock s;
         Stock::Key s_key = Stock::Key::create_key(ol_supply_w_id, ol_i_id);
         res = tx.get_record(s, s_key);
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
-        modify_stock(s, ol_quantity, is_remote);
+        if (not_suceeded(res)) return kill_tx(tx, res);
+        NewOrderUtils::modify_stock(s, ol_quantity, is_remote);
 
         res = tx.update_record(s_key, s);
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (not_suceeded(res)) return kill_tx(tx, res);
 
         double ol_amount = ol_quantity * i.i_price;
         OrderLine ol;
-        create_orderline(
+        NewOrderUtils::create_orderline(
             ol, w_id, d_id, o_id, ol_num, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, s);
         res = tx.insert_record(ol);
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (not_suceeded(res)) return kill_tx(tx, res);
     }
 
-    res = tx.commit();
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
-    return Status::SUCCESS;
+    if (tx.commit()) {
+        return Status::SUCCESS
+    } else {
+        return Status::SYSTEM_ABORT;
+    }
 }
 
 template <typename Transaction>
 Status run(const InputData::Payment& input, Transaction& tx) {
-    using namespace TransactionRunnerUtils::PaymentTx;
     typename Transaction::Result res;
 
     uint16_t w_id = input.w_id;
@@ -147,18 +153,18 @@ Status run(const InputData::Payment& input, Transaction& tx) {
     Warehouse w;
     Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
     res = tx.get_record(w, w_key);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
     w.w_ytd += h_amount;
     res = tx.update_record(w_key, w);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
     District d;
     District::Key d_key = District::Key::create_key(w_id, d_id);
     res = tx.get_record(d, d_key);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
     d.d_ytd += h_amount;
     res = tx.update_record(d_key, d);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
     Customer c;
     if (by_last_name) {
@@ -170,19 +176,22 @@ Status run(const InputData::Payment& input, Transaction& tx) {
         assert(c_id != Customer::UNUSED_ID);
         res = tx.get_record(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
     }
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
-    modify_customer(c, w_id, d_id, c_w_id, c_d_id, h_amount);
+    if (not_suceeded(res)) return kill_tx(tx, res);
+    PaymentUtils::modify_customer(c, w_id, d_id, c_w_id, c_d_id, h_amount);
     res = tx.update_record(Customer::Key::create_key(c_w_id, c_d_id, c.c_id), c);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
     History h;
-    create_history(h, w_id, d_id, c.c_id, c_w_id, c_d_id, h_amount, w.w_name, d.d_name);
+    PaymentUtils::create_history(
+        h, w_id, d_id, c.c_id, c_w_id, c_d_id, h_amount, w.w_name, d.d_name);
     res = tx.insert_record(h);
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
-    res = tx.commit();
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
-    return Status::SUCCESS;
+    if (tx.commit()) {
+        return Status::SUCCESS
+    } else {
+        return Status::SYSTEM_ABORT;
+    }
 }
 
 template <typename Transaction>
@@ -205,11 +214,11 @@ Status run(const InputData::OrderStatus& input, Transaction& tx) {
         assert(c_id != Customer::UNUSED_ID);
         res = tx.get_record(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
     }
-    if (res != Transaction::Result::SUCCES) return abort(tx, res);
+    if (res != Transaction::Result::SUCCES) return kill_tx(tx, res);
 
     Order o;
     res = tx.get_order_by_customer_id(o, OrderSecondary::Key::create_key(c_w_id, c_d_id, c_id));
-    if (res != Transaction::Result::SUCCES) return abort(tx, res);
+    if (res != Transaction::Result::SUCCES) return kill_tx(tx, res);
 
     std::set<uint32_t> ol_i_ids;
     std::set<uint16_t> ol_supply_w_ids;
@@ -227,11 +236,13 @@ Status run(const InputData::OrderStatus& input, Transaction& tx) {
             ol_amounts.insert(ol.ol_amount);
             ol_delivery_ds.insert(ol.ol_delivery_d);
         });
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
-    res = tx.commit();
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
-    return Status::SUCCESS;
+    if (tx.commit()) {
+        return Status::SUCCESS
+    } else {
+        return Status::SYSTEM_ABORT;
+    }
 }
 
 template <typename Transaction>
@@ -250,13 +261,13 @@ Status run(const InputData::Delivery& input, Transaction& tx) {
             delivery_skipped_dists.emplace_back(d_id);
             continue;
         }
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (not_suceeded(res)) return kill_tx(tx, res);
         res = tx.delete_record(NewOrder::Key::create_key(no));
 
         Order o;
         Order::Key o_key = Order::Key::create_key(w_id, d_id, no.no_o_id);
         res = tx.get_record(o, o_key);
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (not_suceeded(res)) return kill_tx(tx, res);
         o.o_carrier_id = o_carrier_id;
         res = tx.update_record(o, o_key);
 
@@ -267,21 +278,23 @@ Status run(const InputData::Delivery& input, Transaction& tx) {
             ol.ol_amount = get_timestamp();
             total_ol_amount += ol.ol_amount;
         });
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (not_suceeded(res)) return kill_tx(tx, res);
 
         Customer c;
         Customer::Key c_key = Customer::Key::create_key(w_id, d_id, o.o_c_id);
         res = tx.get_record(c, c_key);
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (not_suceeded(res)) return kill_tx(tx, res);
         c.c_balance += total_ol_amount;
         c.c_delivery_cnt += 1;
         res = tx.update_record(c_key, c);
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (not_suceeded(res)) return kill_tx(tx, res);
     }
 
-    res = tx.commit();
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
-    return Status::SUCCESS;
+    if (tx.commit()) {
+        return Status::SUCCESS
+    } else {
+        return Status::SYSTEM_ABORT;
+    }
 }
 
 template <typename Transaction>
@@ -294,7 +307,7 @@ Status run(const InputData::StockLevel& input, Transaction& tx) {
 
     District d;
     res = tx.get_record(d, District::Key::create_key(w_id, d_id));
-    if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+    if (not_suceeded(res)) return kill_tx(tx, res);
 
     std::set<uint32_t> s_i_ids;
     OrderLine::Key low = OrderLine::Key::create_key(w_id, d_id, d.d_next_o_id - 20, 0);
@@ -302,13 +315,13 @@ Status run(const InputData::StockLevel& input, Transaction& tx) {
     res = tx.range_query(low, up, [&s_i_ids](const OrderLine& ol) {
         if (ol.ol_i_id != Item::UNUSED_ID) s_i_ids.insert(ol.ol_i_id);
     });
-    if (res != Transaction::Result::SUCCESS) abort(tx, res);
+    if (not_suceeded(res)) kill_tx(tx, res);
 
     auto it = s_i_ids.begin();
     Stock s;
     while (it != s_i_ids.end()) {
         res = tx.get_record(s, Stock::Key::create_key(w_id, *it));
-        if (res != Transaction::Result::SUCCESS) return abort(tx, res);
+        if (not_suceeded(res)) return kill_tx(tx, res);
         if (s.s_quantity >= threshold) {
             it = s_i_ids.erase(it);
         } else {
@@ -316,7 +329,10 @@ Status run(const InputData::StockLevel& input, Transaction& tx) {
         }
     }
 
-    if (!tx.commit()) return abort(tx, res);
-    return Status::SUCCESS;
+    if (tx.commit()) {
+        return Status::SUCCESS
+    } else {
+        return Status::SYSTEM_ABORT;
+    }
 }
 }  // namespace TransactionRunner

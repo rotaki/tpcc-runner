@@ -14,9 +14,11 @@ public:
         // do nothing
     }
 
+    bool commit() { return true; }
+
     enum Result {
         SUCCESS,
-        FAIL,  // e.g. not found, already exists -> user abort
+        FAIL,  // e.g. not found, already exists
         ABORT  // e.g. could not acquire lock/latch and no-wait-> system abort
     };
 
@@ -148,9 +150,8 @@ public:
         }
         auto low_iter = db.get_lower_bound_iter<Record>(low);
         auto up_iter = db.get_lower_bound_iter<Record>(up);
-        if (low_iter == up_iter) return Result::FAIL;
         for (auto it = low_iter; it != up_iter; it++) {
-            Func(it->second);
+            func(it->second);
         }
         return Result::SUCCESS;
     }
@@ -164,9 +165,8 @@ public:
         }
         auto low_iter = db.get_lower_bound_iter<Record>(low);
         auto up_iter = db.get_lower_bound_iter<Record>(up);
-        if (low_iter == up_iter) return Result::FAIL;
         for (auto it = low_iter; it != up_iter; it++) {
-            Func(it->second);
+            func(it->second);
         }
         return Result::SUCCESS;
     }
