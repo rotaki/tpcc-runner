@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <stdexcept>
 #include <vector>
 
 #include "random.hpp"
@@ -12,12 +13,36 @@ uint64_t urand_int(uint64_t min, uint64_t max);
 // uniform random double
 double urand_double(uint64_t min, uint64_t max, size_t divider);
 
-enum NURandConstantType { C_LOAD = 250, C_RUN = 150, C_ID = 987, OL_I_ID = 5987 };
+constexpr uint64_t get_constant_for_nurand(uint64_t A, bool is_load) {
+    constexpr uint64_t C_FOR_C_LAST_IN_LOAD = 250;
+    constexpr uint64_t C_FOR_C_LAST_IN_RUN = 150;
+    constexpr uint64_t C_FOR_C_ID = 987;
+    constexpr uint64_t C_FOR_OL_I_ID = 5987;
 
-uint64_t get_a_from_constant_type(NURandConstantType t);
+    static_assert(C_FOR_C_LAST_IN_LOAD <= 255);
+    static_assert(C_FOR_C_LAST_IN_RUN <= 255);
+    constexpr uint64_t delta = C_FOR_C_LAST_IN_LOAD - C_FOR_C_LAST_IN_RUN;
+    static_assert(65 <= delta && delta <= 119 && delta != 96 && delta != 112);
+    static_assert(C_FOR_C_ID <= 1023);
+    static_assert(C_FOR_OL_I_ID <= 8191);
+
+    switch (A) {
+    case 255: return is_load ? C_FOR_C_LAST_IN_LOAD : C_FOR_C_LAST_IN_RUN;
+    case 1023: return C_FOR_C_ID;
+    case 8191: return C_FOR_OL_I_ID;
+    default: return UINT64_MAX;  // bug
+    }
+}
 
 // non-uniform random int
-uint64_t nurand_int(NURandConstantType t, uint64_t x, uint64_t y);
+template <uint64_t A, bool IS_LOAD = false>
+uint64_t nurand_int(uint64_t x, uint64_t y) {
+    constexpr uint64_t C = get_constant_for_nurand(A, IS_LOAD);
+    if (C == UINT64_MAX) {
+        throw std::runtime_error("nurand_int bug");
+    }
+    return (((urand_int(0, A) | urand_int(x, y)) + C) % (y - x + 1)) + x;
+}
 
 size_t make_random_astring(char* out, size_t min_len, size_t max_len);
 

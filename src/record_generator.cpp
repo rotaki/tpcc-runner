@@ -21,22 +21,6 @@ double urand_double(uint64_t min, uint64_t max, size_t divider) {
     return urand_int(min, max) / static_cast<double>(divider);
 }
 
-uint64_t get_a_from_constant_type(NURandConstantType t) {
-    switch (t) {
-    case C_LOAD: return 255;
-    case C_RUN: return 255;
-    case C_ID: return 1023;
-    case OL_I_ID: return 8191;
-    default: assert(false);
-    }
-}
-
-uint64_t nurand_int(NURandConstantType t, uint64_t x, uint64_t y) {
-    uint64_t A = get_a_from_constant_type(t);
-    uint64_t C = static_cast<uint64_t>(t);
-    return (((urand_int(static_cast<uint64_t>(0), A) | urand_int(x, y)) + C) % (y - x + 1)) + x;
-}
-
 size_t make_random_astring(char* out, size_t min_len, size_t max_len) {
     const char c[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
     size_t len_c = strlen(c);
@@ -188,7 +172,7 @@ void create_customer(Customer& c, uint16_t c_w_id, uint8_t c_d_id, uint32_t c_id
     make_random_astring(c.c_first, Customer::MIN_FIRST, Customer::MAX_FIRST);
     copy_cstr(c.c_middle, "OE", sizeof(c.c_middle));
     (c_id <= 1000 ? make_clast(c.c_last, c_id - 1)
-                  : make_clast(c.c_last, nurand_int(NURandConstantType::C_LOAD, 0, 999)));
+                  : make_clast(c.c_last, nurand_int<255, true>(0, 999)));
     make_random_nstring(c.c_phone, Customer::PHONE, Customer::PHONE);
     (urand_int(0, 99) < 10 ? copy_cstr(c.c_credit, "BC", sizeof(c.c_credit))
                            : copy_cstr(c.c_credit, "GC", sizeof(c.c_credit)));

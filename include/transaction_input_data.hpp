@@ -28,7 +28,7 @@ struct NewOrder {
         uint16_t num_warehouses = c.get_num_warehouses();
         w_id = w_id0;
         d_id = urand_int(1, District::DISTS_PER_WARE);
-        c_id = nurand_int(NURandConstantType::C_ID, 1, Customer::CUSTS_PER_DIST);
+        c_id = nurand_int<1023>(1, Customer::CUSTS_PER_DIST);
         rbk = (urand_int(1, 100) == 1 ? 1 : 0);
         is_remote = (urand_int(1, 100) == 1 ? 1 : 0);
         ol_cnt = urand_int(OrderLine::MIN_ORDLINES_PER_ORD, OrderLine::MAX_ORDLINES_PER_ORD);
@@ -36,7 +36,7 @@ struct NewOrder {
             if (i == ol_cnt && rbk) {
                 items[i - 1].ol_i_id = Item::UNUSED_ID; /* set to an unused value */
             } else {
-                items[i - 1].ol_i_id = nurand_int(NURandConstantType::OL_I_ID, 1, Item::ITEMS);
+                items[i - 1].ol_i_id = nurand_int<8191>(1, Item::ITEMS);
             }
             if (is_remote && num_warehouses > 1) {
                 uint16_t remote_w_id;
@@ -80,9 +80,9 @@ struct Payment {
         bool by_last_name = (urand_int(1, 100) <= 60);
         if (by_last_name) {
             c_id = Customer::UNUSED_ID;
-            make_clast(c_last, nurand_int(NURandConstantType::C_RUN, 0, 999));
+            make_clast(c_last, nurand_int<255>(0, 999));
         } else {
-            c_id = nurand_int(NURandConstantType::C_ID, 1, 3000);
+            c_id = nurand_int<1023>(1, 3000);
         }
     }
 };
@@ -100,9 +100,9 @@ struct OrderStatus {
         bool by_last_name = (urand_int(1, 100) <= 60);
         if (by_last_name) {
             c_id = Customer::UNUSED_ID;
-            make_clast(c_last, nurand_int(NURandConstantType::C_RUN, 0, 999));
+            make_clast(c_last, nurand_int<255>(0, 999));
         } else {
-            c_id = nurand_int(NURandConstantType::C_ID, 1, 3000);
+            c_id = nurand_int<1023>(1, 3000);
         }
     }
 };
