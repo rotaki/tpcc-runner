@@ -6,13 +6,11 @@
 #include "concurrency_manager.hpp"
 #include "database.hpp"
 
-// undo log
-
 class Transaction {
 public:
-    Transaction() = default
+    Transaction() = default;
 
-        void abort() {
+    void abort() {
         // do nothing
     }
 
