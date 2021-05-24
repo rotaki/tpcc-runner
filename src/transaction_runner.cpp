@@ -3,7 +3,7 @@
 #include <inttypes.h>
 
 namespace TransactionRunnerUtils {
-namespace NewOrderTx {
+namespace NewOrderUtils {
 void create_neworder(NewOrder& no, uint16_t w_id, uint16_t d_id, uint32_t o_id) {
     no.no_w_id = w_id;
     no.no_d_id = d_id;
@@ -63,7 +63,7 @@ void modify_stock(Stock& s, uint8_t ol_quantity, bool is_remote) {
 }
 }  // namespace NewOrderTx
 
-namespace PaymentTx {
+namespace PaymentUtils {
 void modify_customer(
     Customer& c, uint16_t w_id, uint8_t d_id, uint16_t c_w_id, uint8_t c_d_id, double h_amount) {
     c.c_balance -= h_amount;
