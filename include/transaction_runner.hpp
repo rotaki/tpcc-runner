@@ -61,7 +61,7 @@ bool run_with_retry(const Input& input, Transaction& tx) {
         case SUCCESS: return true;
         case USER_ABORT: tx.abort(); return false;
         case SYSTEM_ABORT: continue;  // aborted by the tx engine
-        case BUG: return std::runtime_error("Unexpected Transaction Bug");
+        case BUG: throw std::runtime_error("Unexpected Transaction Bug");
         default: assert(false);
         }
     }
@@ -131,7 +131,7 @@ Status run(const InputData::NewOrder& input, Transaction& tx) {
     }
 
     if (tx.commit()) {
-        return Status::SUCCESS
+        return Status::SUCCESS;
     } else {
         return Status::SYSTEM_ABORT;
     }
@@ -188,7 +188,7 @@ Status run(const InputData::Payment& input, Transaction& tx) {
     if (not_suceeded(res)) return kill_tx(tx, res);
 
     if (tx.commit()) {
-        return Status::SUCCESS
+        return Status::SUCCESS;
     } else {
         return Status::SYSTEM_ABORT;
     }
@@ -239,7 +239,7 @@ Status run(const InputData::OrderStatus& input, Transaction& tx) {
     if (not_suceeded(res)) return kill_tx(tx, res);
 
     if (tx.commit()) {
-        return Status::SUCCESS
+        return Status::SUCCESS;
     } else {
         return Status::SYSTEM_ABORT;
     }
@@ -291,7 +291,7 @@ Status run(const InputData::Delivery& input, Transaction& tx) {
     }
 
     if (tx.commit()) {
-        return Status::SUCCESS
+        return Status::SUCCESS;
     } else {
         return Status::SYSTEM_ABORT;
     }
@@ -330,7 +330,7 @@ Status run(const InputData::StockLevel& input, Transaction& tx) {
     }
 
     if (tx.commit()) {
-        return Status::SUCCESS
+        return Status::SUCCESS;
     } else {
         return Status::SYSTEM_ABORT;
     }
