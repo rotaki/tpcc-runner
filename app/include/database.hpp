@@ -108,6 +108,12 @@ public:
         return get_table<Record>()[key];
     }
 
+    template <typename Record>
+    bool lookup_record(typename Record::Key key) {
+        typename RecordToTable<Record>::Table& t = get_table<Record>();
+        return (t.find(key) != t.end());
+    }
+
     // Cannot be used for History records since it does not have a primary key
     template <typename Record>
     bool get_record(Record& rec, typename Record::Key key) {
@@ -133,6 +139,7 @@ public:
         }
     }
 
+    // update to secondary index is not needed due to the specification of TPCC
     template <typename Record>
     bool update_record(typename Record::Key key, const Record& rec) {
         typename RecordToTable<Record>::Table& t = get_table<Record>();

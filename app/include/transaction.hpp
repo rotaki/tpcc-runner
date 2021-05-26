@@ -5,16 +5,24 @@
 
 #include "concurrency_manager.hpp"
 #include "database.hpp"
+#include "writeset.hpp"
 
 class Transaction {
 public:
-    Transaction() = default;
+    Transaction(Database& db)
+        : db(db)
+        , ws(db) {}
 
-    void abort() {
-        // do nothing
+    void abort() { ws.clear_all(); }
+
+    bool commit() {
+        if (ws.apply_to_database()) {
+            return true;
+        } else {
+            abort();
+            return false;
+        }
     }
-
-    bool commit() { return true; }
 
     enum Result {
         SUCCESS,
@@ -28,7 +36,6 @@ public:
             abort();
             return Result::ABORT;
         }
-        // look up into database
         if (db.get_record<Record>(rec, key)) {
             return Result::SUCCESS;
         } else {
@@ -42,8 +49,7 @@ public:
             abort();
             return Result::ABORT;
         }
-        typename Record::Key key = Record::Key::create_key(rec);
-        if (db.insert_record<Record>(rec, key)) {
+        if (ws.create_logrecord(LogType::INSERT, rec)) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -56,7 +62,7 @@ public:
             abort();
             return Result::ABORT;
         }
-        if (db.update_record<Record>(key, rec)) {
+        if (ws.create_logrecord(LogType::UPDATE, rec)) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -69,7 +75,7 @@ public:
             abort();
             return Result::ABORT;
         }
-        if (db.delete_record<Record>(key)) {
+        if (ws.create_logrecord(LogType::DELETE, key)) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -165,14 +171,22 @@ public:
         }
         auto low_iter = db.get_lower_bound_iter<Record>(low);
         auto up_iter = db.get_lower_bound_iter<Record>(up);
+
+        LogType lt;
         for (auto it = low_iter; it != up_iter; it++) {
-            func(it->second);
+            if (!ws.create_logrecord<Record>(LogType::UPDATE, it->second)) return Result::FAIL;
+            Record* rec = ws.lookup_logrecord<Record>(lt, Record::Key::create_key(it->second));
+            if (rec)
+                func(*rec);
+            else
+                return Result::FAIL;
         }
         return Result::SUCCESS;
     }
 
 private:
     Database& db;
+    WriteSet ws;
     ConcurrencyManager cm;
 };
 

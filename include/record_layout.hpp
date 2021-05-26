@@ -67,7 +67,6 @@ struct Address {
     char zip[ZIP + 1];
 
 private:
-    Address(){};
     void deep_copy_from(const Address& src) {
         if (this != &src) {
             copy_cstr(street_1, src.street_1, sizeof(street_1));

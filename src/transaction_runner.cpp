@@ -61,7 +61,7 @@ void modify_stock(Stock& s, uint8_t ol_quantity, bool is_remote) {
     s.s_order_cnt += 1;
     if (is_remote) s.s_remote_cnt += 1;
 }
-}  // namespace NewOrderTx
+}  // namespace NewOrderUtils
 
 namespace PaymentUtils {
 void modify_customer(
@@ -94,7 +94,5 @@ void create_history(
     h.h_amount = h_amount;
     snprintf(h.h_data, sizeof(h.h_data), "%-10.10s    %.10s", w_name, d_name);
 }
-
-
-}  // namespace PaymentTx
+}  // namespace PaymentUtils
 }  // namespace TransactionRunnerUtils
