@@ -20,6 +20,27 @@ set(TPCCBENCH_LINK_OPTIONS "")
 set(TPCCBENCH_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include")
 list(APPEND TPCCBENCH_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/app/include")
 
+set(LOG_LEVEL
+  "1"
+  CACHE STRING "Log level. 0(off) 1(error) 2(warn) 3(into) 4(debug) 5(trace)")
+
+list(APPEND SIMPLEDB_COMPILE_DEFINITIONS "-DLOG_LEVEL=${LOG_LEVEL}")
+if ("${LOG_LEVEL}" STREQUAL "0")
+  message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (NONE)")
+elseif ("${LOG_LEVEL}" STREQUAL "1")
+  message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (ERROR)")
+elseif ("${LOG_LEVEL}" STREQUAL "2")
+  message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (WARN)")
+elseif ("${LOG_LEVEL}" STREQUAL "3")
+  message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (INFO)")
+elseif ("${LOG_LEVEL}" STREQUAL "4")
+  message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (DEBUG)")
+elseif ("${LOG_LEVEL}" STREQUAL "5")
+  message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (TRACE)")
+else()
+  message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (UNKWN)")
+endif()
+
 if (APPLE)
   list(APPEND TPCCBENCH_COMPILE_OPTIONS "-fvisibility=hidden")
   list(APPEND TPCCBENCH_LINK_OPTIONS "-fvisibility=hidden")

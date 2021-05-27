@@ -13,10 +13,14 @@ public:
         : db(db)
         , ws(db) {}
 
-    void abort() { ws.clear_all(); }
+    void abort() {
+        cm.release();
+        ws.clear_all();
+    }
 
     bool commit() {
         if (ws.apply_to_database()) {
+            cm.release();
             return true;
         } else {
             abort();
@@ -49,7 +53,7 @@ public:
             abort();
             return Result::ABORT;
         }
-        if (ws.create_logrecord(LogType::INSERT, rec)) {
+        if (ws.insert_logrecord(LogType::INSERT, Record::Key::create_key(rec), &rec)) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -62,7 +66,7 @@ public:
             abort();
             return Result::ABORT;
         }
-        if (ws.create_logrecord(LogType::UPDATE, rec)) {
+        if (ws.insert_logrecord(LogType::UPDATE, key, &rec)) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -75,7 +79,8 @@ public:
             abort();
             return Result::ABORT;
         }
-        if (ws.create_logrecord(LogType::DELETE, key)) {
+        Record* rec_ptr = nullptr;
+        if (ws.insert_logrecord(LogType::DELETE, key, rec_ptr)) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -172,12 +177,12 @@ public:
         auto low_iter = db.get_lower_bound_iter<Record>(low);
         auto up_iter = db.get_lower_bound_iter<Record>(up);
 
-        LogType lt;
         for (auto it = low_iter; it != up_iter; it++) {
-            if (!ws.create_logrecord<Record>(LogType::UPDATE, it->second)) return Result::FAIL;
-            Record* rec = ws.lookup_logrecord<Record>(lt, Record::Key::create_key(it->second));
-            if (rec)
-                func(*rec);
+            if (!ws.insert_logrecord<Record>(LogType::UPDATE, it->first, &(it->second)))
+                return Result::FAIL;
+            LogRecord<Record>* logrec_ptr = ws.lookup_logrecord<Record>(it->first);
+            if (logrec_ptr)
+                func(logrec_ptr->rec);
             else
                 return Result::FAIL;
         }

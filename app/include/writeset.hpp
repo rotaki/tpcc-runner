@@ -1,4 +1,5 @@
 #include "database.hpp"
+#include "logger.hpp"
 #include "record_layout.hpp"
 
 enum LogType { INSERT, UPDATE, DELETE };
@@ -8,19 +9,15 @@ struct LogRecord {
     LogType lt;
     Record rec;
     LogRecord() = default;
-    LogRecord(LogType lt, Record rec_in)
-        : lt(lt) {
-        rec.deep_copy_from(rec_in);
-    }
 };
 
 template <typename Record>
-struct LogRecordToWS {
+struct RecordToWS {
     using WS = std::map<typename Record::Key, LogRecord<Record>>;
 };
 
 template <>
-struct LogRecordToWS<History> {
+struct RecordToWS<History> {
     using WS = std::deque<LogRecord<History>>;
 };
 
@@ -31,7 +28,7 @@ struct WriteSet {
         : db(db) {}
 
     template <typename Record>
-    typename LogRecordToWS<Record>::WS& get_ws() {
+    typename RecordToWS<Record>::WS& get_ws() {
         if constexpr (std::is_same<Record, Item>::value) {
             return items;
         } else if constexpr (std::is_same<Record, Warehouse>::value) {
@@ -56,33 +53,41 @@ struct WriteSet {
     }
 
     template <typename Record>
-    Record* lookup_logrecord(LogType& lt, typename Record::Key rec_key) {
-        typename LogRecordToWS<Record>::WS& t = get_ws<Record>();
+    LogRecord<Record>* lookup_logrecord(typename Record::Key rec_key) {
+        typename RecordToWS<Record>::WS& t = get_ws<Record>();
         if (t.find(rec_key) == t.end()) {
             return nullptr;
         } else {
-            lt = t[rec_key].lt;
-            return &(t[rec_key].rec);
+            return &(t[rec_key]);
         }
     }
 
+    template <
+        typename Record,
+        typename std::enable_if<std::is_same<Record, History>::value>::type* = nullptr>
+    bool insert_logrecord(LogType lt, const Record* rec) {
+        assert(lt == LogType::INSERT);
+        typename RecordToWS<Record>::WS& t = get_ws<Record>();
+        t.emplace_back();
+        t.back().lt = lt;
+        t.back().rec.deep_copy_from(*rec);
+    }
+
     template <typename Record>
-    bool create_logrecord(LogType lt, const Record& rec) {
-        assert(lt == LogType::INSERT || lt == LogType::UPDATE);
+    bool insert_logrecord(LogType lt, typename Record::Key rec_key, const Record* rec_ptr) {
         switch (lt) {
-        case LogType::INSERT: return apply_insert_to_writeset(rec);
-        case LogType::UPDATE: return apply_update_to_writeset(rec);
+        case LogType::INSERT:
+            assert(rec_ptr != nullptr);
+            return apply_insert_to_writeset(rec_key, *rec_ptr);
+        case LogType::UPDATE:
+            assert(rec_ptr != nullptr);
+            return apply_update_to_writeset(rec_key, *rec_ptr);
+        case LogType::DELETE:
+            assert(rec_ptr == nullptr);
+            return apply_delete_to_writeset<Record>(rec_key);
         default: assert(false);
         }
     }
-
-    template <typename Record>
-    bool create_logrecord(LogType lt, typename Record::Key rec_key) {
-        assert(lt == LogType::DELETE);
-        typename LogRecordToWS<Record>::WS& t = get_ws<Record>();
-        return apply_delete_to_writeset(rec_key);
-    }
-
 
     bool apply_to_database();
 
@@ -99,31 +104,33 @@ struct WriteSet {
     }
 
 private:
-    LogRecordToWS<Item>::WS items;
-    LogRecordToWS<Warehouse>::WS warehouses;
-    LogRecordToWS<Stock>::WS stocks;
-    LogRecordToWS<District>::WS districts;
-    LogRecordToWS<Customer>::WS customers;
-    LogRecordToWS<History>::WS histories;
-    LogRecordToWS<Order>::WS orders;
-    LogRecordToWS<NewOrder>::WS neworders;
-    LogRecordToWS<OrderLine>::WS orderlines;
+    RecordToWS<Item>::WS items;
+    RecordToWS<Warehouse>::WS warehouses;
+    RecordToWS<Stock>::WS stocks;
+    RecordToWS<District>::WS districts;
+    RecordToWS<Customer>::WS customers;
+    RecordToWS<History>::WS histories;
+    RecordToWS<Order>::WS orders;
+    RecordToWS<NewOrder>::WS neworders;
+    RecordToWS<OrderLine>::WS orderlines;
 
     template <typename Record>
-    bool apply_insert_to_writeset(const Record& rec) {
-        LogType current_lt;
-        typename Record::Key rec_key = Record::Key::create_key(rec);
-        if (lookup_logrecord(current_lt, rec_key)) {
-            switch (current_lt) {
+    bool apply_insert_to_writeset(typename Record::Key rec_key, const Record& rec) {
+        LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
+        if (current_logrec_ptr) {
+            switch (current_logrec_ptr->lt) {
             case INSERT: return false;
             case UPDATE: return false;
-            case DELETE: create_update_logrecord(rec); return true;
+            case DELETE:
+                current_logrec_ptr->lt = LogType::UPDATE;
+                current_logrec_ptr->rec.deep_copy_from(rec);
+                return true;
             default: assert(false);
             }
         }
 
-        if (!db.lookup_record(rec_key)) {
-            create_insert_logrecord(rec);
+        if (!db.lookup_record<Record>(rec_key)) {
+            create_logrecord(LogType::INSERT, rec_key, &rec);
             return true;
         } else {
             return false;
@@ -131,20 +138,19 @@ private:
     }
 
     template <typename Record>
-    bool apply_update_to_writeset(const Record& rec) {
-        LogType current_lt;
-        typename Record::Key rec_key = Record::Key::create_key(rec);
-        if (lookup_logrecord(current_lt, rec_key)) {
-            switch (current_lt) {
-            case INSERT: create_insert_logrecord(rec); return true;
-            case UPDATE: create_update_logrecord(rec); return true;
+    bool apply_update_to_writeset(typename Record::Key rec_key, const Record& rec) {
+        LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
+        if (current_logrec_ptr) {
+            switch (current_logrec_ptr->lt) {
+            case INSERT: current_logrec_ptr->rec.deep_copy_from(rec); return true;
+            case UPDATE: current_logrec_ptr->rec.deep_copy_from(rec); return true;
             case DELETE: return false;
             default: assert(false);
             }
         }
 
-        if (db.lookup_record(rec_key)) {
-            create_update_logrecord(rec);
+        if (db.lookup_record<Record>(rec_key)) {
+            create_logrecord(LogType::UPDATE, rec_key, &rec);
             return true;
         } else {
             return false;
@@ -153,18 +159,21 @@ private:
 
     template <typename Record>
     bool apply_delete_to_writeset(typename Record::Key rec_key) {
-        LogType current_lt;
-        if (lookup_logrecord(current_lt, rec_key)) {
-            switch (current_lt) {
-            case INSERT: remove_insert_logrecord(rec_key); return true;
-            case UPDATE: create_delete_logrecord(rec_key); return true;
-            case DELETE: return false;  // return FAIL
+        LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
+        if (current_logrec_ptr) {
+            switch (current_logrec_ptr->lt) {
+            case INSERT:
+                remove_logrecord_with_logtype<Record>(rec_key, LogType::INSERT);
+                return true;
+            case UPDATE: current_logrec_ptr->lt = LogType::DELETE; return true;
+            case DELETE: return false;
             default: assert(false);
             }
         }
 
-        if (db.lookup_record(rec_key)) {
-            create_delete_logrecord(rec_key);
+        if (db.lookup_record<Record>(rec_key)) {
+            Record* rec_ptr = nullptr;
+            create_logrecord(LogType::DELETE, rec_key, rec_ptr);
             return true;
         } else {
             return false;
@@ -172,69 +181,52 @@ private:
     }
 
     template <typename Record>
-    void create_insert_logrecord(const Record& rec) {
-        typename LogRecordToWS<Record>::WS& t = get_ws<Record>();
-        typename Record::Key rec_key = Record::Key::create_key(rec);
-        t[rec_key].lt = LogType::INSERT;
-        t[rec_key].rec.deep_copy_from(rec);
+    void create_logrecord(LogType lt, typename Record::Key rec_key, const Record* rec_ptr) {
+        typename RecordToWS<Record>::WS& t = get_ws<Record>();
+        if (rec_ptr) {
+            assert(lt == LogType::INSERT || lt == LogType::UPDATE);
+            t[rec_key].lt = lt;
+            t[rec_key].rec.deep_copy_from(*rec_ptr);
+        } else {
+            assert(lt == LogType::DELETE);
+            t[rec_key].lt = lt;
+        }
     }
 
     template <typename Record>
-    void remove_insert_logrecord(const Record& rec) {
-        typename LogRecordToWS<Record>::WS& t = get_ws<Record>();
-        typename Record::Key rec_key = Record::Key::create_key(rec);
-        assert(t[rec_key].lt == LogType::INSERT);
-        t.erase(rec_key);
-    }
-
-    template <typename Record>
-    void create_update_logrecord(const Record& rec) {
-        typename LogRecordToWS<Record>::WS& t = get_ws<Record>();
-        typename Record::Key rec_key = Record::Key::create_key(rec);
-        t[rec_key].lt = LogType::UPDATE;
-        t[rec_key].rec.deep_copy_from(rec);
-    }
-
-    template <typename Record>
-    void create_delete_logrecord(typename Record::Key rec_key) {
-        typename LogRecordToWS<Record>::WS& t = get_ws<Record>();
-        t[rec_key].lt = LogType::DELETE;
+    void remove_logrecord_with_logtype(typename Record::Key rec_key, LogType lt) {
+        typename RecordToWS<Record>::WS& t = get_ws<Record>();
+        if (t[rec_key].lt == lt) {
+            t.erase(rec_key);
+        }
     }
 
     template <typename Record>
     void clear_writeset() {
-        typename LogRecordToWS<Record>::WS& t = get_ws<Record>();
+        typename RecordToWS<Record>::WS& t = get_ws<Record>();
         t.clear();
     }
 
     template <typename Record>
     void apply_writeset_to_database() {
-        typename LogRecordToWS<Record>::WS& t = get_ws<Record>();
+        typename RecordToWS<Record>::WS& t = get_ws<Record>();
         for (const auto& [rec_key, logrecord]: t) {
             switch (logrecord.lt) {
-            case INSERT: db.insert_record<Record>(logrecord.rec);
-            case UPDATE: db.update_record<Record>(rec_key, logrecord.rec);
-            case DELETE: db.delete_record<Record>(rec_key);
-            default: assert(false);
+            case LogType::INSERT: db.insert_record<Record>(logrecord.rec); break;
+            case LogType::UPDATE: db.update_record<Record>(rec_key, logrecord.rec); break;
+            case LogType::DELETE: db.delete_record<Record>(rec_key); break;
+            default: LOG_TRACE("%d", static_cast<int>(logrecord.lt)); assert(false);
             }
         }
     }
 };
 
 template <>
-inline bool WriteSet::create_logrecord<History>(LogType lt, const History& rec) {
-    assert(lt == LogType::INSERT);
-    LogRecordToWS<History>::WS& t = get_ws<History>();
-    t.emplace_back(lt, rec);
-    return true;
-}
-
-template <>
 inline void WriteSet::apply_writeset_to_database<History>() {
-    LogRecordToWS<History>::WS& t = get_ws<History>();
+    RecordToWS<History>::WS& t = get_ws<History>();
     for (const auto& logrecord: t) {
         switch (logrecord.lt) {
-        case INSERT: db.insert_record<History>(logrecord.rec);
+        case INSERT: db.insert_record<History>(logrecord.rec); break;
         default: assert(false);
         }
     }
