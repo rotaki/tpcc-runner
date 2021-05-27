@@ -3,6 +3,8 @@
 #include <condition_variable>
 #include <mutex>
 
+#include "logger.hpp"
+
 class LockTable {
 public:
     LockTable() = default;
@@ -71,6 +73,8 @@ public:
         lock_table.unlock();
         lock_type = 0;
     }
+
+    char get_lock_type() const { return lock_type; }
 
 private:
     static LockTable lock_table;

@@ -97,5 +97,5 @@ inline void OutputLogHeader(const char* file_name, int line, const char* func, i
     case LOG_LEVEL_TRACE: type = "TRACE"; break;
     default: type = "UNKWN";
     }
-    ::fprintf(LOG_OUTPUT_STREAM, "%s [%s:%d:%s] %s - ", time_str, file_name, line, func, type);
+    ::fprintf(LOG_OUTPUT_STREAM, "%s [/%s:%d:%s] %s - ", time_str, file_name, line, func, type);
 }

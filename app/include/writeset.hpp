@@ -62,15 +62,14 @@ struct WriteSet {
         }
     }
 
-    template <
-        typename Record,
-        typename std::enable_if<std::is_same<Record, History>::value>::type* = nullptr>
+    template <IsHistory Record>
     bool insert_logrecord(LogType lt, const Record* rec) {
         assert(lt == LogType::INSERT);
         typename RecordToWS<Record>::WS& t = get_ws<Record>();
         t.emplace_back();
         t.back().lt = lt;
         t.back().rec.deep_copy_from(*rec);
+        return true;
     }
 
     template <typename Record>
@@ -89,7 +88,18 @@ struct WriteSet {
         }
     }
 
-    bool apply_to_database();
+    bool apply_to_database() {
+        apply_writeset_to_database<Item>();
+        apply_writeset_to_database<Warehouse>();
+        apply_writeset_to_database<Stock>();
+        apply_writeset_to_database<District>();
+        apply_writeset_to_database<Customer>();
+        apply_writeset_to_database<History>();
+        apply_writeset_to_database<Order>();
+        apply_writeset_to_database<NewOrder>();
+        apply_writeset_to_database<OrderLine>();
+        return true;
+    }
 
     void clear_all() {
         clear_writeset<Item>();
@@ -207,6 +217,17 @@ private:
         t.clear();
     }
 
+    template <IsHistory Record>
+    void apply_writeset_to_database() {
+        typename RecordToWS<Record>::WS& t = get_ws<Record>();
+        for (const auto& logrecord: t) {
+            switch (logrecord.lt) {
+            case INSERT: db.insert_record(logrecord.rec); break;
+            default: assert(false);
+            }
+        }
+    }
+
     template <typename Record>
     void apply_writeset_to_database() {
         typename RecordToWS<Record>::WS& t = get_ws<Record>();
@@ -220,27 +241,3 @@ private:
         }
     }
 };
-
-template <>
-inline void WriteSet::apply_writeset_to_database<History>() {
-    RecordToWS<History>::WS& t = get_ws<History>();
-    for (const auto& logrecord: t) {
-        switch (logrecord.lt) {
-        case INSERT: db.insert_record<History>(logrecord.rec); break;
-        default: assert(false);
-        }
-    }
-}
-
-inline bool WriteSet::apply_to_database() {
-    apply_writeset_to_database<Item>();
-    apply_writeset_to_database<Warehouse>();
-    apply_writeset_to_database<Stock>();
-    apply_writeset_to_database<District>();
-    apply_writeset_to_database<Customer>();
-    apply_writeset_to_database<History>();
-    apply_writeset_to_database<Order>();
-    apply_writeset_to_database<NewOrder>();
-    apply_writeset_to_database<OrderLine>();
-    return true;
-}

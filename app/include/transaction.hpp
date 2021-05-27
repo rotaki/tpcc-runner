@@ -5,6 +5,7 @@
 
 #include "concurrency_manager.hpp"
 #include "database.hpp"
+#include "logger.hpp"
 #include "writeset.hpp"
 
 class Transaction {
@@ -36,6 +37,7 @@ public:
 
     template <typename Record>
     Result get_record(Record& rec, typename Record::Key key) {
+        LOG_TRACE("%c", cm.get_lock_type());
         if (!cm.slock()) {
             abort();
             return Result::ABORT;
@@ -47,8 +49,23 @@ public:
         }
     }
 
+    template <IsHistory Record>
+    Result insert_record(const Record& rec) {
+        LOG_TRACE("%c", cm.get_lock_type());
+        if (!cm.xlock()) {
+            abort();
+            return Result::ABORT;
+        }
+        if (ws.insert_logrecord(LogType::INSERT, &(rec))) {
+            return Result::SUCCESS;
+        } else {
+            return Result::FAIL;
+        }
+    }
+
     template <typename Record>
     Result insert_record(const Record& rec) {
+        LOG_TRACE("%c", cm.get_lock_type());
         if (!cm.xlock()) {
             abort();
             return Result::ABORT;
@@ -62,6 +79,7 @@ public:
 
     template <typename Record>
     Result update_record(typename Record::Key key, const Record& rec) {
+        LOG_TRACE("%c", cm.get_lock_type());
         if (!cm.xlock()) {
             abort();
             return Result::ABORT;
@@ -75,6 +93,7 @@ public:
 
     template <typename Record>
     Result delete_record(typename Record::Key key) {
+        LOG_TRACE("%c", cm.get_lock_type());
         if (!cm.xlock()) {
             abort();
             return Result::ABORT;
@@ -88,6 +107,7 @@ public:
     }
 
     Result get_customer_by_last_name(Customer& c, CustomerSecondary::Key c_sec_key) {
+        LOG_TRACE("%c", cm.get_lock_type());
         if (!cm.slock()) {
             abort();
             return Result::ABORT;
@@ -116,6 +136,7 @@ public:
     }
 
     Result get_order_by_customer_id(Order& o, OrderSecondary::Key o_sec_key) {
+        LOG_TRACE("%c", cm.get_lock_type());
         if (!cm.slock()) {
             abort();
             return Result::ABORT;
@@ -139,6 +160,7 @@ public:
     }
 
     Result get_neworder_with_smallest_key_no_less_than(NewOrder& no, NewOrder::Key low) {
+        LOG_TRACE("%c", cm.get_lock_type());
         if (cm.slock()) {
             abort();
             return Result::ABORT;
@@ -155,6 +177,7 @@ public:
     // [low ,up)
     template <typename Record, typename Func>
     Result range_query(typename Record::Key low, typename Record::Key up, Func&& func) {
+        LOG_TRACE("%c", cm.get_lock_type());
         if (cm.slock()) {
             abort();
             return Result::ABORT;
@@ -170,6 +193,7 @@ public:
     // [low ,up)
     template <typename Record, typename Func>
     Result range_update(typename Record::Key low, typename Record::Key up, Func&& func) {
+        LOG_TRACE("%c", cm.get_lock_type());
         if (cm.xlock()) {
             abort();
             return Result::ABORT;
@@ -194,17 +218,3 @@ private:
     WriteSet ws;
     ConcurrencyManager cm;
 };
-
-
-template <>
-inline Transaction::Result Transaction::insert_record<History>(const History& rec) {
-    if (!cm.xlock()) {
-        abort();
-        return Result::ABORT;
-    }
-    if (db.insert_record<History>(rec)) {
-        return Result::SUCCESS;
-    } else {
-        return Result::FAIL;
-    }
-}

@@ -11,6 +11,18 @@
 #include "record_key.hpp"
 #include "record_layout.hpp"
 
+template <typename T, typename... Ts>
+struct is_any : std::disjunction<std::is_same<T, Ts>...> {};
+
+template <typename T>
+concept HasSecondary = is_any<T, Customer, Order>::value;
+
+template <typename T>
+concept IsSecondary = is_any<T, CustomerSecondary, OrderSecondary>::value;
+
+template <typename T>
+concept IsHistory = std::is_same<T, History>::value;
+
 template <typename Record>
 struct RecordToTable {
     using Table = std::map<typename Record::Key, Record>;
@@ -126,7 +138,40 @@ public:
         }
     }
 
-    // Cannot be used for History records since it does not have a primary key
+    template <IsHistory Record>
+    bool insert_record(const Record& rec) {
+        typename RecordToTable<Record>::Table& t = get_table<Record>();
+        auto& deq = t.get_local_deque();
+        deq.emplace_back();
+        deq.back().deep_copy_from(rec);
+        return true;
+    }
+
+    template <HasSecondary Record>
+    bool insert_record(const Record& rec) {
+        typename RecordToTable<Record>::Table& t = get_table<Record>();
+        typename Record::Key key = Record::Key::create_key(rec);
+        if (t.find(key) == t.end()) {
+            t[key].deep_copy_from(rec);
+            typename Record::Secondary sec_rec(&(t[key]));
+            return insert_record<typename Record::Secondary>(sec_rec);
+        } else {
+            return false;
+        }
+    }
+
+    template <IsSecondary Record>
+    bool insert_record(const Record& rec) {
+        typename RecordToTable<Record>::Table& t = get_table<Record>();
+        if (rec.ptr == nullptr) {
+            typename Record::Key key = Record::Key::create_key(*(rec.ptr));
+            t.insert(std::pair<typename Record::Key, Record>(key, rec));
+            return true;
+        } else {
+            return false;
+        }
+    }
+
     template <typename Record>
     bool insert_record(const Record& rec) {
         typename RecordToTable<Record>::Table& t = get_table<Record>();
@@ -139,7 +184,7 @@ public:
         }
     }
 
-    // update to secondary index is not needed due to the specification of TPCC
+    // updating records of secondary and history table is not needed under the specification
     template <typename Record>
     bool update_record(typename Record::Key key, const Record& rec) {
         typename RecordToTable<Record>::Table& t = get_table<Record>();
@@ -152,6 +197,7 @@ public:
         }
     }
 
+    // deleting records with secondary and history table should not occur under the specification
     template <typename Record>
     bool delete_record(typename Record::Key key) {
         typename RecordToTable<Record>::Table& t = get_table<Record>();
@@ -162,61 +208,4 @@ public:
             return true;
         }
     }
-
-private:
-    // For customer, order
-    template <typename Record>
-    bool insert_record_with_secondary_index(const Record& rec) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
-        typename Record::Key key = Record::Key::create_key(rec);
-        if (t.find(key) == t.end()) {
-            t[key].deep_copy_from(rec);
-            typename Record::Secondary sec_rec(&(t[key]));
-            return insert_record<typename Record::Secondary>(sec_rec);
-        } else {
-            return false;
-        }
-    }
-
-    // For customer secondary, order secondary
-    template <typename Record>
-    bool insert_record_into_secondary_index(const Record& rec) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
-        if (rec.ptr == nullptr) {
-            typename Record::Key key = Record::Key::create_key(*(rec.ptr));
-            t.insert(std::pair<typename Record::Key, Record>(key, rec));
-            return true;
-        } else {
-            return false;
-        }
-    }
 };
-
-template <>
-inline bool Database::insert_record<History>(const History& rec) {
-    RecordToTable<History>::Table& t = get_table<History>();
-    auto& deq = t.get_local_deque();
-    deq.emplace_back();
-    deq.back().deep_copy_from(rec);
-    return true;
-}
-
-template <>
-inline bool Database::insert_record<Customer>(const Customer& rec) {
-    return insert_record_with_secondary_index<Customer>(rec);
-}
-
-template <>
-inline bool Database::insert_record<Order>(const Order& rec) {
-    return insert_record_with_secondary_index<Order>(rec);
-}
-
-template <>
-inline bool Database::insert_record<CustomerSecondary>(const CustomerSecondary& rec) {
-    return insert_record_into_secondary_index<CustomerSecondary>(rec);
-}
-
-template <>
-inline bool Database::insert_record<OrderSecondary>(const OrderSecondary& rec) {
-    return insert_record_into_secondary_index<OrderSecondary>(rec);
-}

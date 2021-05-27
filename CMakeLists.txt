@@ -14,8 +14,8 @@ message(STATUS "Welcome to tpcc-bench, Version: ${PROJECT_VERSION}")
 ###############################################################################
 
 set(TPCCBENCH_COMPILE_DEFINITIONS "")
-set(TPCCBENCH_COMPILE_OPTIONS "")
-set(TPCCBENCH_COMPILE_FEATURES "cxx_std_17")
+set(TPCCBENCH_COMPILE_OPTIONS "-fconcepts")
+set(TPCCBENCH_COMPILE_FEATURES "cxx_std_20")
 set(TPCCBENCH_LINK_OPTIONS "")
 set(TPCCBENCH_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include")
 list(APPEND TPCCBENCH_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/app/include")
