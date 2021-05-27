@@ -7,7 +7,6 @@
 
 // TPCC
 #include "neworder_tx.hpp"
-#include "record_generator.hpp"
 #include "tx_runner.hpp"
 
 class NewOrderTest : public ::testing::Test {

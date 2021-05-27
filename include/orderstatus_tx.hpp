@@ -34,9 +34,9 @@ public:
     Input input;
     Output output;
 
-    template <typename TxEngine>
-    Status run(TxEngine& tx) {
-        typename TxEngine::Result res;
+    template <typename Transaction>
+    Status run(Transaction& tx) {
+        typename Transaction::Result res;
 
         uint16_t c_w_id = input.w_id;
         uint8_t c_d_id = input.d_id;

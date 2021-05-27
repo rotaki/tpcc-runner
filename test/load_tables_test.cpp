@@ -5,12 +5,9 @@
 #include "initializer.hpp"
 
 // TPCC code //////////////////////////////////////////////////////////////////
-#include "record_generator.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
 #include "utils.hpp"
-
-using namespace RecordGenerator;
 
 bool is_numeric(const char a) {
     const char c[] = "0123456789";

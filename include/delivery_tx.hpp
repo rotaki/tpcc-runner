@@ -26,9 +26,9 @@ public:
     Input input;
     Output output;
 
-    template <typename TxEngine>
-    Status run(TxEngine& tx) {
-        typename TxEngine::Result res;
+    template <typename Transaction>
+    Status run(Transaction& tx) {
+        typename Transaction::Result res;
 
         uint16_t w_id = input.w_id;
         uint8_t o_carrier_id = input.o_carrier_id;
@@ -38,7 +38,7 @@ public:
             NewOrder no;
             NewOrder::Key no_low = NewOrder::Key::create_key(w_id, d_id, 0);
             res = tx.get_neworder_with_smallest_key_no_less_than(no, no_low);
-            if (res == TxEngine::Result::FAIL) {
+            if (res == Transaction::Result::FAIL) {
                 delivery_skipped_dists.emplace_back(d_id);
                 continue;
             }

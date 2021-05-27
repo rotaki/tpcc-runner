@@ -3,49 +3,47 @@
 #include <iostream>
 
 #include "database.hpp"
-#include "record_generator.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
 #include "utils.hpp"
 
 namespace Initializer {
-using namespace RecordGenerator;
 
 void create_and_insert_item_record(uint32_t i_id) {
     ItemKey key = ItemKey::create_key(i_id);
     Item& i = Database::get_db().allocate_record<Item>(key);
-    create_item(i, i_id);
+    i.generate(i_id);
 }
 
 void create_and_insert_warehouse_record(uint16_t w_id) {
     WarehouseKey key = WarehouseKey::create_key(w_id);
     Warehouse& w = Database::get_db().allocate_record<Warehouse>(key);
-    create_warehouse(w, w_id);
+    w.generate(w_id);
 }
 
 void create_and_insert_stock_record(uint16_t s_w_id, uint32_t s_i_id) {
     StockKey key = StockKey::create_key(s_w_id, s_i_id);
     Stock& s = Database::get_db().allocate_record<Stock>(key);
-    create_stock(s, s_w_id, s_i_id);
+    s.generate(s_w_id, s_i_id);
 }
 
 void create_and_insert_district_record(uint16_t d_w_id, uint8_t d_id) {
     DistrictKey key = DistrictKey::create_key(d_w_id, d_id);
     District& d = Database::get_db().allocate_record<District>(key);
-    create_district(d, d_w_id, d_id);
+    d.generate(d_w_id, d_id);
 }
 
 void create_and_insert_customer_record(
     uint16_t c_w_id, uint8_t c_d_id, uint32_t c_id, Timestamp t) {
     CustomerKey key = CustomerKey::create_key(c_w_id, c_d_id, c_id);
     Customer& c = Database::get_db().allocate_record<Customer>(key);
-    create_customer(c, c_w_id, c_d_id, c_id, t);
+    c.generate(c_w_id, c_d_id, c_id, t);
 }
 
 void create_and_insert_history_record(
     uint16_t h_c_w_id, uint8_t h_c_d_id, uint32_t h_c_id, uint16_t d_w_id, uint8_t h_d_id) {
     History h;
-    create_history(h, h_c_w_id, h_c_d_id, h_c_id, d_w_id, h_d_id);
+    h.generate(h_c_w_id, h_c_d_id, h_c_id, d_w_id, h_d_id);
     Database::get_db().insert_record<History>(h);
 }
 
@@ -53,14 +51,14 @@ Timestamp create_and_insert_order_record(
     uint16_t o_w_id, uint8_t o_d_id, uint32_t o_c_id, uint32_t o_id) {
     OrderKey key = OrderKey::create_key(o_w_id, o_d_id, o_id);
     Order& o = Database::get_db().allocate_record<Order>(key);
-    create_order(o, o_w_id, o_d_id, o_c_id, o_id);
+    o.generate(o_w_id, o_d_id, o_c_id, o_id);
     return o.o_entry_d;
 }
 
 void create_and_insert_neworder_record(uint16_t no_w_id, uint8_t no_d_id, uint32_t no_o_id) {
     NewOrderKey key = NewOrderKey::create_key(no_w_id, no_d_id, no_o_id);
     NewOrder& no = Database::get_db().allocate_record<NewOrder>(key);
-    create_neworder(no, no_w_id, no_d_id, no_o_id);
+    no.generate(no_w_id, no_d_id, no_o_id);
 }
 
 void create_and_insert_orderline_record(
@@ -68,7 +66,7 @@ void create_and_insert_orderline_record(
     uint8_t ol_number, Timestamp o_entry_d) {
     OrderLineKey key = OrderLineKey::create_key(ol_w_id, ol_d_id, ol_o_id, ol_number);
     OrderLine& ol = Database::get_db().allocate_record<OrderLine>(key);
-    create_orderline(ol, ol_w_id, ol_d_id, ol_o_id, ol_supply_w_id, ol_i_id, ol_number, o_entry_d);
+    ol.generate(ol_w_id, ol_d_id, ol_o_id, ol_supply_w_id, ol_i_id, ol_number, o_entry_d);
 };
 
 void load_items_table() {

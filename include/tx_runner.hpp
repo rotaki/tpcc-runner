@@ -9,20 +9,19 @@
 #include "neworder_tx.hpp"
 #include "orderstatus_tx.hpp"
 #include "payment_tx.hpp"
-#include "record_generator.hpp"
 #include "record_layout.hpp"
 #include "stocklevel_tx.hpp"
 #include "tx_utils.hpp"
 #include "utils.hpp"
 
-template <typename TxProfile, typename TxEngine>
-inline Status run(TxEngine& tx) {
+template <typename TxProfile, typename Transaction>
+inline Status run(Transaction& tx) {
     TxProfile p;
     return p.run(tx);
 }
 
-template <typename TxProfile, typename TxEngine>
-inline bool run_with_retry(TxEngine& tx) {
+template <typename TxProfile, typename Transaction>
+inline bool run_with_retry(Transaction& tx) {
     for (;;) {
         Status res = run<TxProfile>(tx);
         switch (res) {

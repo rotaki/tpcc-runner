@@ -7,7 +7,6 @@
 
 // TPCC
 #include "payment_tx.hpp"
-#include "record_generator.hpp"
 #include "tx_runner.hpp"
 
 class PaymentTest : public ::testing::Test {

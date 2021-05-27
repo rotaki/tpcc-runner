@@ -7,7 +7,6 @@
 
 // TPCC
 #include "orderstatus_tx.hpp"
-#include "record_generator.hpp"
 #include "tx_runner.hpp"
 
 class OrderStatusTest : public ::testing::Test {

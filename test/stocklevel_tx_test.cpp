@@ -6,7 +6,6 @@
 #include "transaction.hpp"
 
 // TPCC
-#include "record_generator.hpp"
 #include "stocklevel_tx.hpp"
 #include "tx_runner.hpp"
 

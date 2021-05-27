@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "record_layout.hpp"
+#include "utils.hpp"
 
 struct ItemKey {
     uint32_t i_key = 0;

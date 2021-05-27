@@ -56,9 +56,9 @@ public:
     Input input;
     Output output;
 
-    template <typename TxEngine>
-    Status run(TxEngine& tx) {
-        typename TxEngine::Result res;
+    template <typename Transaction>
+    Status run(Transaction& tx) {
+        typename Transaction::Result res;
 
         bool is_remote = input.is_remote;
         uint16_t w_id = input.w_id;

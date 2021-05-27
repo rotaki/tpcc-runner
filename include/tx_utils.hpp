@@ -1,8 +1,6 @@
 #pragma once
 
-#include "record_generator.hpp"
-
-using namespace RecordGeneratorUtils;
+#include "utils.hpp"
 
 enum Status {
     SUCCESS = 0,   // if all stages of transaction return Result::SUCCESS
