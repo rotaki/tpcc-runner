@@ -7,12 +7,7 @@
 
 class DeliveryTx {
 public:
-    DeliveryTx(uint16_t w_id0) {
-        input.generate(w_id0);
-        output = {};
-        output.w_id = input.w_id;
-        output.o_carrier_id = input.o_carrier_id;
-    }
+    DeliveryTx(uint16_t w_id0) { input.generate(w_id0); }
 
     struct Input {
         uint16_t w_id;
@@ -26,30 +21,25 @@ public:
         }
     } input;
 
-    struct Output {
-        uint16_t w_id;
-        uint8_t o_carrier_id;
-    } output;
-
     template <typename Transaction>
-    Status run(Transaction& tx) {
+    Status run(Transaction& tx, Output& out) {
         typename Transaction::Result res;
 
         uint16_t w_id = input.w_id;
         uint8_t o_carrier_id = input.o_carrier_id;
 
-        std::vector<uint8_t> delivery_skipped_dists;
+        out << w_id << o_carrier_id;
+
         for (uint8_t d_id = 1; d_id <= District::DISTS_PER_WARE; d_id++) {
             NewOrder no;
             NewOrder::Key no_low = NewOrder::Key::create_key(w_id, d_id, 0);
             res = tx.get_neworder_with_smallest_key_no_less_than(no, no_low);
-            if (res == Transaction::Result::FAIL) {
-                delivery_skipped_dists.emplace_back(d_id);
-                continue;
-            }
+            if (res == Transaction::Result::FAIL) continue;
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
             res = tx.template delete_record<NewOrder>(NewOrder::Key::create_key(no));
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
             Order o;
             Order::Key o_key = Order::Key::create_key(w_id, d_id, no.no_o_id);
@@ -81,6 +71,8 @@ public:
             res = tx.update_record(c_key, c);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
+
+            out << d_id << o.o_id;
         }
 
         if (tx.commit()) {

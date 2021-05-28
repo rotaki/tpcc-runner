@@ -30,3 +30,34 @@ inline Status kill_tx(Transaction& tx, typename Transaction::Result res) {
         return Status::SYSTEM_ABORT;
     }
 }
+
+
+class Output {
+public:
+    template <typename T>
+    Output& operator<<(const T& t) {
+        merge(&t, sizeof(T));
+        return *this;
+    };
+
+    void merge(const void* data, size_t size) {
+        uint64_t temp;
+        const uint8_t* ptr = reinterpret_cast<const uint8_t*>(data);
+        while (size >= sizeof(uint64_t)) {
+            memcpy(&temp, ptr, sizeof(uint64_t));
+            ptr += sizeof(uint64_t);
+            size -= sizeof(uint64_t);
+            out += temp;
+        }
+        if (size > 0) {
+            temp = 0;
+            memcpy(&temp, ptr, size);
+            out += temp;
+        }
+    }
+
+    void invalidate() { out = 0; }
+
+private:
+    uint64_t out = 0;
+};

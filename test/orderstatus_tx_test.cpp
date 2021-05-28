@@ -24,5 +24,6 @@ protected:
 TEST_F(OrderStatusTest, CheckRunWithRetry) {
     Database& db = Database::get_db();
     Transaction tx(db);
-    run_with_retry<OrderStatusTx>(tx);
+    Output out;
+    run_with_retry<OrderStatusTx>(tx, out);
 }

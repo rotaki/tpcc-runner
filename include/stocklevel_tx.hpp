@@ -7,13 +7,7 @@
 
 class StockLevelTx {
 public:
-    StockLevelTx(uint16_t w_id0, uint8_t d_id0) {
-        input.generate(w_id0, d_id0);
-        output = {};
-        output.w_id = input.w_id;
-        output.d_id = input.d_id;
-        output.threshold = input.threshold;
-    }
+    StockLevelTx(uint16_t w_id0, uint8_t d_id0) { input.generate(w_id0, d_id0); }
 
     struct Input {
         uint16_t w_id;
@@ -27,20 +21,15 @@ public:
         }
     } input;
 
-    struct Output {
-        uint16_t w_id;
-        uint8_t d_id;
-        uint8_t threshold;
-        uint16_t low_stock;
-    } output;
-
     template <typename Transaction>
-    Status run(Transaction& tx) {
+    Status run(Transaction& tx, Output& out) {
         typename Transaction::Result res;
 
         uint16_t w_id = input.w_id;
         uint8_t d_id = input.d_id;
         uint8_t threshold = input.threshold;
+
+        out << w_id << d_id << threshold;
 
         District d;
         res = tx.get_record(d, District::Key::create_key(w_id, d_id));
@@ -69,7 +58,7 @@ public:
             }
         }
 
-        output.low_stock = s_i_ids.size();
+        out << s_i_ids.size();
 
         if (tx.commit()) {
             LOG_TRACE("commit success");

@@ -10,17 +10,7 @@
 
 class PaymentTx {
 public:
-    PaymentTx(uint16_t w_id0) {
-        input.generate(w_id0);
-        output = {};
-        output.w_id = input.w_id;
-        output.d_id = input.d_id;
-        output.c_id = input.c_id;
-        output.c_w_id = input.c_w_id;
-        output.c_d_id = input.c_d_id;
-        output.h_amount = input.h_amount;
-        output.h_date = get_timestamp();
-    }
+    PaymentTx(uint16_t w_id0) { input.generate(w_id0); }
 
     struct Input {
         uint16_t w_id;
@@ -29,6 +19,7 @@ public:
         uint16_t c_w_id;
         uint8_t c_d_id;
         double h_amount;
+        Timestamp h_date;
         bool by_last_name;
         char c_last[Customer::MAX_LAST + 1];
 
@@ -38,6 +29,7 @@ public:
             w_id = w_id0;
             d_id = urand_int(1, District::DISTS_PER_WARE);
             h_amount = urand_double(100, 500000, 100);
+            h_date = get_timestamp();
             if (num_warehouses == 1 || urand_int(1, 100) <= 85) {
                 c_w_id = w_id;
                 c_d_id = d_id;
@@ -57,34 +49,8 @@ public:
         }
     } input;
 
-    struct Output {
-        uint16_t w_id;
-        uint8_t d_id;
-        uint32_t c_id;
-        uint16_t c_w_id;
-        uint8_t c_d_id;
-        double h_amount;
-        Timestamp h_date;
-
-        double c_credit_lim;
-        double c_discount;
-        double c_balance;
-        Timestamp c_since;
-
-        Address w_address;
-        Address d_address;
-        Address c_address;
-
-        char c_first[Customer::MAX_FIRST + 1];
-        char c_middle[Customer::MAX_MIDDLE + 1];
-        char c_last[Customer::MAX_LAST + 1];
-        char c_phone[Customer::PHONE + 1];
-        char c_credit[Customer::CREDIT + 1];
-        char c_data[Customer::MAX_DATA + 1];
-    } output;
-
     template <typename Transaction>
-    Status run(Transaction& tx) {
+    Status run(Transaction& tx, Output& out) {
         typename Transaction::Result res;
 
         uint16_t w_id = input.w_id;
@@ -93,16 +59,17 @@ public:
         uint16_t c_w_id = input.c_w_id;
         uint8_t c_d_id = input.c_d_id;
         double h_amount = input.h_amount;
+        Timestamp h_date = input.h_date;
         const char* c_last = input.c_last;
         bool by_last_name = input.by_last_name;
+
+        out << w_id << d_id;
 
         Warehouse w;
         Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
         res = tx.get_record(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
-
-        output.w_address.deep_copy_from(w.w_address);
 
         w.w_ytd += h_amount;
         res = tx.update_record(w_key, w);
@@ -114,8 +81,6 @@ public:
         res = tx.get_record(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
-
-        output.d_address.deep_copy_from(d.d_address);
 
         d.d_ytd += h_amount;
         res = tx.update_record(d_key, d);
@@ -136,21 +101,16 @@ public:
         }
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
-
         c_id = c.c_id;
-        copy_cstr(output.c_first, c.c_first, sizeof(output.c_first));
-        copy_cstr(output.c_middle, c.c_middle, sizeof(output.c_middle));
-        copy_cstr(output.c_last, c.c_last, sizeof(output.c_last));
-        output.c_address.deep_copy_from(c.c_address);
-        copy_cstr(output.c_phone, c.c_phone, sizeof(output.c_phone));
-        output.c_since = c.c_since;
-        copy_cstr(output.c_credit, c.c_credit, sizeof(output.c_credit));
-        output.c_credit_lim = c.c_credit_lim;
-        output.c_discount = c.c_discount;
-        output.c_balance = c.c_balance;
+
+        out << c_id << c_d_id << c_w_id << h_amount << h_date;
+        out << w.w_address << d.d_address;
+        out << c.c_first << c.c_middle << c.c_last << c.c_address;
+        out << c.c_phone << c.c_since << c.c_credit << c.c_credit_lim;
+        out << c.c_discount << c.c_balance;
 
         if (c.c_credit[0] == 'B' && c.c_credit[1] == 'C') {
-            copy_cstr(output.c_data, c.c_data, sizeof(output.c_data));
+            out << c.c_data;
             modify_customer(c, w_id, d_id, c_w_id, c_d_id, h_amount);
             res = tx.update_record(Customer::Key::create_key(c_w_id, c_d_id, c_id), c);
             LOG_TRACE("res: %d", static_cast<int>(res));

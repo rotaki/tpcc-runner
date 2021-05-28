@@ -23,5 +23,6 @@ protected:
 TEST_F(NewOrderTest, CheckRunWithRetry) {
     Database& db = Database::get_db();
     Transaction tx(db);
-    run_with_retry<NewOrderTx>(tx);
+    Output out;
+    run_with_retry<NewOrderTx>(tx, out);
 }

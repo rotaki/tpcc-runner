@@ -23,5 +23,6 @@ protected:
 TEST_F(DeliveryTest, CheckRunWithRetry) {
     Database& db = Database::get_db();
     Transaction tx(db);
-    run_with_retry<DeliveryTx>(tx);
+    Output out;
+    run_with_retry<DeliveryTx>(tx, out);
 }

@@ -24,5 +24,6 @@ protected:
 TEST_F(PaymentTest, CheckRunWithRetry) {
     Database& db = Database::get_db();
     Transaction tx(db);
-    run_with_retry<PaymentTx>(tx);
+    Output out;
+    run_with_retry<PaymentTx>(tx, out);
 }

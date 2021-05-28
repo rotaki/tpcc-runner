@@ -7,26 +7,14 @@
 
 class NewOrderTx {
 public:
-    NewOrderTx(uint16_t w_id0) {
-        input.generate(w_id0);
-        output = {};  // Initialize all elements to 0
-        output.w_id = input.w_id;
-        output.d_id = input.d_id;
-        output.c_id = input.c_id;
-        output.o_ol_cnt = input.ol_cnt;
-        output.o_entry_d = get_timestamp();
-        for (size_t i = 0; i < output.o_ol_cnt; i++) {
-            output.items[i].ol_supply_w_id = input.items[i].ol_supply_w_id;
-            output.items[i].ol_i_id = input.items[i].ol_i_id;
-            output.items[i].ol_quantity = input.items[i].ol_quantity;
-        }
-    }
+    NewOrderTx(uint16_t w_id0) { input.generate(w_id0); }
 
     struct Input {
         uint16_t w_id;
         uint8_t d_id;
         uint32_t c_id;
         uint8_t ol_cnt;
+        Timestamp o_entry_d;
         bool rbk;
         bool is_remote;
         struct {
@@ -41,9 +29,10 @@ public:
             w_id = w_id0;
             d_id = urand_int(1, District::DISTS_PER_WARE);
             c_id = nurand_int<1023>(1, Customer::CUSTS_PER_DIST);
+            ol_cnt = urand_int(OrderLine::MIN_ORDLINES_PER_ORD, OrderLine::MAX_ORDLINES_PER_ORD);
+            o_entry_d = get_timestamp();
             rbk = (urand_int(1, 100) == 1 ? 1 : 0);
             is_remote = (urand_int(1, 100) == 1 ? 1 : 0);
-            ol_cnt = urand_int(OrderLine::MIN_ORDLINES_PER_ORD, OrderLine::MAX_ORDLINES_PER_ORD);
             for (int i = 1; i <= ol_cnt; i++) {
                 if (i == ol_cnt && rbk) {
                     items[i - 1].ol_i_id = Item::UNUSED_ID; /* set to an unused value */
@@ -64,35 +53,8 @@ public:
         }
     } input;
 
-    struct Output {
-        uint16_t w_id;
-        uint8_t d_id;
-        uint32_t c_id;
-        double c_discount;
-        double w_tax;
-        double d_tax;
-        uint8_t o_ol_cnt;
-        uint32_t o_id;  // From district d_next_o_id;
-        Timestamp o_entry_d;
-        double total;
-
-        struct {
-            uint16_t ol_supply_w_id;
-            uint32_t ol_i_id;
-            uint8_t ol_quantity;
-            int16_t s_quantity;
-            char brand_generic;
-            double i_price;
-            double ol_amount;
-            char i_name[Item::MAX_NAME + 1];
-        } items[OrderLine::MAX_ORDLINES_PER_ORD];
-
-        char c_last[Customer::MAX_LAST + 1];
-        char c_credit[Customer::CREDIT + 1];
-    } output;
-
     template <typename Transaction>
-    Status run(Transaction& tx) {
+    Status run(Transaction& tx, Output& out) {
         typename Transaction::Result res;
 
         bool is_remote = input.is_remote;
@@ -100,22 +62,20 @@ public:
         uint8_t d_id = input.d_id;
         uint32_t c_id = input.c_id;
         uint8_t ol_cnt = input.ol_cnt;
+        Timestamp o_entry_d = input.o_entry_d;
+
+        out << w_id << d_id << c_id;
 
         Warehouse w;
         res = tx.get_record(w, Warehouse::Key::create_key(w_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
-        output.w_tax = w.w_tax;
-
         District d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.get_record(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
-
-        output.d_tax = d.d_tax;
-        output.o_id = d.d_next_o_id;
 
         uint32_t o_id = (d.d_next_o_id)++;
         res = tx.update_record(d_key, d);
@@ -127,9 +87,8 @@ public:
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
-        output.c_discount = c.c_discount;
-        copy_cstr(output.c_last, c.c_last, sizeof(output.c_last));
-        copy_cstr(output.c_credit, c.c_credit, sizeof(output.c_credit));
+        out << c.c_last << c.c_credit << c.c_discount << w.w_tax << d.d_tax << ol_cnt
+            << d.d_next_o_id << o_entry_d;
 
         NewOrder no;
         create_neworder(no, w_id, d_id, o_id);
@@ -143,6 +102,8 @@ public:
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
+        double total = 0;
+
         for (uint8_t ol_num = 1; ol_num <= ol_cnt; ol_num++) {
             uint16_t ol_supply_w_id = input.items[ol_num - 1].ol_supply_w_id;
             uint32_t ol_i_id = input.items[ol_num - 1].ol_i_id;
@@ -154,18 +115,11 @@ public:
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
-            output.items[ol_num - 1].i_price = i.i_price;
-            copy_cstr(
-                output.items[ol_num - 1].i_name, i.i_name, sizeof(output.items[ol_num - 1].i_name));
-
             Stock s;
             Stock::Key s_key = Stock::Key::create_key(ol_supply_w_id, ol_i_id);
             res = tx.get_record(s, s_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
-
-            output.items[ol_num - 1].s_quantity = s.s_quantity;
-            // todo brand generic
 
             modify_stock(s, ol_quantity, is_remote);
             res = tx.update_record(s_key, s);
@@ -173,7 +127,7 @@ public:
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
             double ol_amount = ol_quantity * i.i_price;
-            output.items[ol_num - 1].ol_amount = ol_amount;
+            total += ol_amount;
 
             OrderLine ol;
             create_orderline(
@@ -182,8 +136,13 @@ public:
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
-            output.total += ol_amount * (1 - output.c_discount) * (1 + output.w_tax + output.d_tax);
+            // todo brand generic
+            out << ol_supply_w_id << ol_i_id << i.i_name << ol_quantity << s.s_quantity << i.i_price
+                << ol_amount;
         }
+
+        total *= (1 - c.c_discount) * (1 + w.w_tax + d.d_tax);
+        out << total;
 
         if (tx.commit()) {
             LOG_TRACE("commit success");
