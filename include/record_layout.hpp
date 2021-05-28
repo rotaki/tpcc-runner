@@ -5,13 +5,37 @@
 #include <ctime>
 #include <string_view>
 
+struct Item;
+struct Warehouse;
+struct Stock;
+struct District;
+struct Customer;
+struct CustomerSecondary;
+struct History;
+struct Order;
+struct OrderSecondary;
+struct NewOrder;
+struct OrderLine;
+
+template <typename T, typename... Ts>
+struct is_any : std::disjunction<std::is_same<T, Ts>...> {};
+
+template <typename T>
+concept HasSecondary = is_any<T, Customer, Order>::value;
+
+template <typename T>
+concept IsSecondary = is_any<T, CustomerSecondary, OrderSecondary>::value;
+
+template <typename T>
+concept IsHistory = std::is_same<T, History>::value;
+
 using Timestamp = int64_t;
 inline Timestamp get_timestamp() {
     thread_local Timestamp i = 0;
     return i++;
 }
 
-// Keys defined in record_key.hpp
+// Keys are defined in record_key.hpp
 struct ItemKey;
 struct WarehouseKey;
 struct StockKey;

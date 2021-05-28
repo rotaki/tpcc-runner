@@ -11,18 +11,6 @@
 #include "record_key.hpp"
 #include "record_layout.hpp"
 
-template <typename T, typename... Ts>
-struct is_any : std::disjunction<std::is_same<T, Ts>...> {};
-
-template <typename T>
-concept HasSecondary = is_any<T, Customer, Order>::value;
-
-template <typename T>
-concept IsSecondary = is_any<T, CustomerSecondary, OrderSecondary>::value;
-
-template <typename T>
-concept IsHistory = std::is_same<T, History>::value;
-
 template <typename Record>
 struct RecordToTable {
     using Table = std::map<typename Record::Key, Record>;
