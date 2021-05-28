@@ -6,6 +6,7 @@
 #include "transaction.hpp"
 
 // TPCC
+#include "logger.hpp"
 #include "orderstatus_tx.hpp"
 #include "tx_runner.hpp"
 
@@ -20,7 +21,7 @@ protected:
     }
 };
 
-TEST(OrderStatusTest, CheckRunWithRetry) {
+TEST_F(OrderStatusTest, CheckRunWithRetry) {
     Database& db = Database::get_db();
     Transaction tx(db);
     run_with_retry<OrderStatusTx>(tx);

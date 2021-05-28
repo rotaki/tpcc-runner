@@ -7,7 +7,7 @@
 
 class DeliveryTx {
 public:
-    DeliveryTx() { input.generate(0); }
+    DeliveryTx(uint16_t w_id0) { input.generate(w_id0); }
 
     struct Input {
         uint16_t w_id;

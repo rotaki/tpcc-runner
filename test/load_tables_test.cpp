@@ -5,6 +5,7 @@
 #include "initializer.hpp"
 
 // TPCC code //////////////////////////////////////////////////////////////////
+#include "config.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
 #include "utils.hpp"

@@ -7,7 +7,7 @@
 
 class OrderStatusTx {
 public:
-    OrderStatusTx() { input.generate(0); }
+    OrderStatusTx(uint16_t w_id0) { input.generate(w_id0); }
 
     struct Input {
         uint16_t w_id;
@@ -45,7 +45,9 @@ public:
         bool by_last_name = input.by_last_name;
 
         Customer c;
+        LOG_TRACE("by_last_name %s", by_last_name ? "true" : "false");
         if (by_last_name) {
+            LOG_TRACE("c_last: %s", c_last);
             assert(c_id == Customer::UNUSED_ID);
             CustomerSecondary::Key c_last_key =
                 CustomerSecondary::Key::create_key(c_w_id, c_d_id, c_last);
@@ -56,6 +58,8 @@ public:
         }
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
+
+        c_id = c.c_id;
 
         Order o;
         res = tx.get_order_by_customer_id(o, OrderSecondary::Key::create_key(c_w_id, c_d_id, c_id));

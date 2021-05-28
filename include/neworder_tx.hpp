@@ -7,7 +7,7 @@
 
 class NewOrderTx {
 public:
-    NewOrderTx() { input.generate(1); }
+    NewOrderTx(uint16_t w_id0) { input.generate(w_id0); }
 
     struct Input {
         uint16_t w_id;

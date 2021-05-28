@@ -161,7 +161,7 @@ public:
 
     Result get_neworder_with_smallest_key_no_less_than(NewOrder& no, NewOrder::Key low) {
         LOG_TRACE("%c", cm.get_lock_type());
-        if (cm.slock()) {
+        if (!cm.slock()) {
             abort();
             return Result::ABORT;
         }
@@ -178,7 +178,7 @@ public:
     template <typename Record, typename Func>
     Result range_query(typename Record::Key low, typename Record::Key up, Func&& func) {
         LOG_TRACE("%c", cm.get_lock_type());
-        if (cm.slock()) {
+        if (!cm.slock()) {
             abort();
             return Result::ABORT;
         }
@@ -194,7 +194,7 @@ public:
     template <typename Record, typename Func>
     Result range_update(typename Record::Key low, typename Record::Key up, Func&& func) {
         LOG_TRACE("%c", cm.get_lock_type());
-        if (cm.xlock()) {
+        if (!cm.xlock()) {
             abort();
             return Result::ABORT;
         }

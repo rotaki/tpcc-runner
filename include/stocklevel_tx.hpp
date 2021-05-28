@@ -7,9 +7,9 @@
 
 class StockLevelTx {
 public:
-    StockLevelTx() {
+    StockLevelTx(uint16_t w_id0, uint8_t d_id0) {
         // initialize input
-        input.generate(0, 0);
+        input.generate(w_id0, d_id0);
     }
 
     struct Input {

@@ -6,6 +6,7 @@
 #include "transaction.hpp"
 
 // TPCC
+#include "logger.hpp"
 #include "payment_tx.hpp"
 #include "tx_runner.hpp"
 

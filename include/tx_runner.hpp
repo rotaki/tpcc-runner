@@ -14,9 +14,18 @@
 #include "tx_utils.hpp"
 #include "utils.hpp"
 
+template <typename T>
+concept IsStockLevelTx = std::is_same<T, StockLevelTx>::value;
+
+template <IsStockLevelTx TxProfile, typename Transaction>
+inline Status run(Transaction& tx) {
+    TxProfile p(1, 1);
+    return p.run(tx);
+}
+
 template <typename TxProfile, typename Transaction>
 inline Status run(Transaction& tx) {
-    TxProfile p;
+    TxProfile p(1);
     return p.run(tx);
 }
 

@@ -8,6 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "logger.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
 
@@ -151,7 +152,7 @@ public:
     template <IsSecondary Record>
     bool insert_record(const Record& rec) {
         typename RecordToTable<Record>::Table& t = get_table<Record>();
-        if (rec.ptr == nullptr) {
+        if (rec.ptr != nullptr) {
             typename Record::Key key = Record::Key::create_key(*(rec.ptr));
             t.insert(std::pair<typename Record::Key, Record>(key, rec));
             return true;

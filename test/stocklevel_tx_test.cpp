@@ -20,7 +20,7 @@ protected:
     }
 };
 
-TEST(StockLevelTest, CheckRunWithRetry) {
+TEST_F(StockLevelTest, CheckRunWithRetry) {
     Database& db = Database::get_db();
     Transaction tx(db);
     run_with_retry<StockLevelTx>(tx);

@@ -9,7 +9,6 @@
 #include "delivery_tx.hpp"
 #include "tx_runner.hpp"
 
-
 class DeliveryTest : public ::testing::Test {
 protected:
     void SetUp() override {
@@ -21,7 +20,7 @@ protected:
     }
 };
 
-TEST(DeliveryTest, CheckRunWithRetry) {
+TEST_F(DeliveryTest, CheckRunWithRetry) {
     Database& db = Database::get_db();
     Transaction tx(db);
     run_with_retry<DeliveryTx>(tx);
