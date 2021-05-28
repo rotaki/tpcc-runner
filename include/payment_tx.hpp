@@ -10,7 +10,17 @@
 
 class PaymentTx {
 public:
-    PaymentTx(uint16_t w_id0) { input.generate(w_id0); }
+    PaymentTx(uint16_t w_id0) {
+        input.generate(w_id0);
+        output = {};
+        output.w_id = input.w_id;
+        output.d_id = input.d_id;
+        output.c_id = input.c_id;
+        output.c_w_id = input.c_w_id;
+        output.c_d_id = input.c_d_id;
+        output.h_amount = input.h_amount;
+        output.h_date = get_timestamp();
+    }
 
     struct Input {
         uint16_t w_id;
@@ -45,12 +55,33 @@ public:
                 c_id = nurand_int<1023>(1, 3000);
             }
         }
-    };
+    } input;
 
-    struct Output {};
+    struct Output {
+        uint16_t w_id;
+        uint8_t d_id;
+        uint32_t c_id;
+        uint16_t c_w_id;
+        uint8_t c_d_id;
+        double h_amount;
+        Timestamp h_date;
 
-    Input input;
-    Output output;
+        double c_credit_lim;
+        double c_discount;
+        double c_balance;
+        Timestamp c_since;
+
+        Address w_address;
+        Address d_address;
+        Address c_address;
+
+        char c_first[Customer::MAX_FIRST + 1];
+        char c_middle[Customer::MAX_MIDDLE + 1];
+        char c_last[Customer::MAX_LAST + 1];
+        char c_phone[Customer::PHONE + 1];
+        char c_credit[Customer::CREDIT + 1];
+        char c_data[Customer::MAX_DATA + 1];
+    } output;
 
     template <typename Transaction>
     Status run(Transaction& tx) {
@@ -70,6 +101,9 @@ public:
         res = tx.get_record(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
+
+        output.w_address.deep_copy_from(w.w_address);
+
         w.w_ytd += h_amount;
         res = tx.update_record(w_key, w);
         LOG_TRACE("res: %d", static_cast<int>(res));
@@ -80,6 +114,9 @@ public:
         res = tx.get_record(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
+
+        output.d_address.deep_copy_from(d.d_address);
+
         d.d_ytd += h_amount;
         res = tx.update_record(d_key, d);
         LOG_TRACE("res: %d", static_cast<int>(res));
@@ -99,13 +136,29 @@ public:
         }
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
-        modify_customer(c, w_id, d_id, c_w_id, c_d_id, h_amount);
-        res = tx.update_record(Customer::Key::create_key(c_w_id, c_d_id, c.c_id), c);
-        LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+
+        c_id = c.c_id;
+        copy_cstr(output.c_first, c.c_first, sizeof(output.c_first));
+        copy_cstr(output.c_middle, c.c_middle, sizeof(output.c_middle));
+        copy_cstr(output.c_last, c.c_last, sizeof(output.c_last));
+        output.c_address.deep_copy_from(c.c_address);
+        copy_cstr(output.c_phone, c.c_phone, sizeof(output.c_phone));
+        output.c_since = c.c_since;
+        copy_cstr(output.c_credit, c.c_credit, sizeof(output.c_credit));
+        output.c_credit_lim = c.c_credit_lim;
+        output.c_discount = c.c_discount;
+        output.c_balance = c.c_balance;
+
+        if (c.c_credit[0] == 'B' && c.c_credit[1] == 'C') {
+            copy_cstr(output.c_data, c.c_data, sizeof(output.c_data));
+            modify_customer(c, w_id, d_id, c_w_id, c_d_id, h_amount);
+            res = tx.update_record(Customer::Key::create_key(c_w_id, c_d_id, c_id), c);
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        }
 
         History h;
-        create_history(h, w_id, d_id, c.c_id, c_w_id, c_d_id, h_amount, w.w_name, d.d_name);
+        create_history(h, w_id, d_id, c_id, c_w_id, c_d_id, h_amount, w.w_name, d.d_name);
         res = tx.insert_record(h);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
@@ -128,15 +181,13 @@ private:
         c.c_payment_cnt += 1;
 
         char new_data[Customer::MAX_DATA + 1];
-        if (c.c_credit[0] == 'B' && c.c_credit[1] == 'C') {
-            size_t len = snprintf(
-                &new_data[0], Customer::MAX_DATA + 1,
-                "| %4" PRIu32 " %2" PRIu8 " %4" PRIu16 " %2" PRIu16 " %4" PRIu16 " $%7.2f", c.c_id,
-                c_d_id, c_w_id, d_id, w_id, h_amount);
-            assert(len <= Customer::MAX_DATA);
-            copy_cstr(&new_data[len], &c.c_data[0], sizeof(new_data) - len);
-            copy_cstr(c.c_data, new_data, sizeof(c.c_data));
-        }
+        size_t len = snprintf(
+            &new_data[0], Customer::MAX_DATA + 1,
+            "| %4" PRIu32 " %2" PRIu8 " %4" PRIu16 " %2" PRIu16 " %4" PRIu16 " $%7.2f", c.c_id,
+            c_d_id, c_w_id, d_id, w_id, h_amount);
+        assert(len <= Customer::MAX_DATA);
+        copy_cstr(&new_data[len], &c.c_data[0], sizeof(new_data) - len);
+        copy_cstr(c.c_data, new_data, sizeof(c.c_data));
     }
 
     void create_history(

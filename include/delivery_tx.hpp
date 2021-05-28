@@ -7,7 +7,12 @@
 
 class DeliveryTx {
 public:
-    DeliveryTx(uint16_t w_id0) { input.generate(w_id0); }
+    DeliveryTx(uint16_t w_id0) {
+        input.generate(w_id0);
+        output = {};
+        output.w_id = input.w_id;
+        output.o_carrier_id = input.o_carrier_id;
+    }
 
     struct Input {
         uint16_t w_id;
@@ -19,12 +24,12 @@ public:
             o_carrier_id = urand_int(1, 10);
             ol_delivery_d = get_timestamp();
         }
-    };
+    } input;
 
-    struct Output {};
-
-    Input input;
-    Output output;
+    struct Output {
+        uint16_t w_id;
+        uint8_t o_carrier_id;
+    } output;
 
     template <typename Transaction>
     Status run(Transaction& tx) {

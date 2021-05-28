@@ -7,7 +7,20 @@
 
 class NewOrderTx {
 public:
-    NewOrderTx(uint16_t w_id0) { input.generate(w_id0); }
+    NewOrderTx(uint16_t w_id0) {
+        input.generate(w_id0);
+        output = {};  // Initialize all elements to 0
+        output.w_id = input.w_id;
+        output.d_id = input.d_id;
+        output.c_id = input.c_id;
+        output.o_ol_cnt = input.ol_cnt;
+        output.o_entry_d = get_timestamp();
+        for (size_t i = 0; i < output.o_ol_cnt; i++) {
+            output.items[i].ol_supply_w_id = input.items[i].ol_supply_w_id;
+            output.items[i].ol_i_id = input.items[i].ol_i_id;
+            output.items[i].ol_quantity = input.items[i].ol_quantity;
+        }
+    }
 
     struct Input {
         uint16_t w_id;
@@ -17,8 +30,8 @@ public:
         bool rbk;
         bool is_remote;
         struct {
-            uint32_t ol_i_id;
             uint16_t ol_supply_w_id;
+            uint32_t ol_i_id;
             uint8_t ol_quantity;
         } items[OrderLine::MAX_ORDLINES_PER_ORD];
 
@@ -49,12 +62,34 @@ public:
                 items[i - 1].ol_quantity = urand_int(1, 10);
             }
         }
-    };
+    } input;
 
-    struct Output {};
+    struct Output {
+        uint16_t w_id;
+        uint8_t d_id;
+        uint32_t c_id;
+        double c_discount;
+        double w_tax;
+        double d_tax;
+        uint8_t o_ol_cnt;
+        uint32_t o_id;  // From district d_next_o_id;
+        Timestamp o_entry_d;
+        double total;
 
-    Input input;
-    Output output;
+        struct {
+            uint16_t ol_supply_w_id;
+            uint32_t ol_i_id;
+            uint8_t ol_quantity;
+            int16_t s_quantity;
+            char brand_generic;
+            double i_price;
+            double ol_amount;
+            char i_name[Item::MAX_NAME + 1];
+        } items[OrderLine::MAX_ORDLINES_PER_ORD];
+
+        char c_last[Customer::MAX_LAST + 1];
+        char c_credit[Customer::CREDIT + 1];
+    } output;
 
     template <typename Transaction>
     Status run(Transaction& tx) {
@@ -71,11 +106,17 @@ public:
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
+        output.w_tax = w.w_tax;
+
         District d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.get_record(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
+
+        output.d_tax = d.d_tax;
+        output.o_id = d.d_next_o_id;
+
         uint32_t o_id = (d.d_next_o_id)++;
         res = tx.update_record(d_key, d);
         LOG_TRACE("res: %d", static_cast<int>(res));
@@ -85,6 +126,10 @@ public:
         res = tx.get_record(c, Customer::Key::create_key(w_id, d_id, c_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
+
+        output.c_discount = c.c_discount;
+        copy_cstr(output.c_last, c.c_last, sizeof(output.c_last));
+        copy_cstr(output.c_credit, c.c_credit, sizeof(output.c_credit));
 
         NewOrder no;
         create_neworder(no, w_id, d_id, o_id);
@@ -99,8 +144,8 @@ public:
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
         for (uint8_t ol_num = 1; ol_num <= ol_cnt; ol_num++) {
-            uint32_t ol_i_id = input.items[ol_num - 1].ol_i_id;
             uint16_t ol_supply_w_id = input.items[ol_num - 1].ol_supply_w_id;
+            uint32_t ol_i_id = input.items[ol_num - 1].ol_i_id;
             uint8_t ol_quantity = input.items[ol_num - 1].ol_quantity;
 
             Item i;
@@ -109,24 +154,35 @@ public:
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
+            output.items[ol_num - 1].i_price = i.i_price;
+            copy_cstr(
+                output.items[ol_num - 1].i_name, i.i_name, sizeof(output.items[ol_num - 1].i_name));
+
             Stock s;
             Stock::Key s_key = Stock::Key::create_key(ol_supply_w_id, ol_i_id);
             res = tx.get_record(s, s_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
-            modify_stock(s, ol_quantity, is_remote);
 
+            output.items[ol_num - 1].s_quantity = s.s_quantity;
+            // todo brand generic
+
+            modify_stock(s, ol_quantity, is_remote);
             res = tx.update_record(s_key, s);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
             double ol_amount = ol_quantity * i.i_price;
+            output.items[ol_num - 1].ol_amount = ol_amount;
+
             OrderLine ol;
             create_orderline(
                 ol, w_id, d_id, o_id, ol_num, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, s);
             res = tx.insert_record(ol);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
+
+            output.total += ol_amount * (1 - output.c_discount) * (1 + output.w_tax + output.d_tax);
         }
 
         if (tx.commit()) {

@@ -66,9 +66,6 @@ struct Item {
 };
 
 struct Address {
-    friend struct Warehouse;
-    friend struct District;
-    friend struct Customer;
     static const int MIN_STREET = 10;
     static const int MAX_STREET = 20;
     static const int MIN_CITY = 10;
@@ -80,8 +77,6 @@ struct Address {
     char city[MAX_CITY + 1];
     char state[STATE + 1];
     char zip[ZIP + 1];
-
-private:
     void deep_copy_from(const Address& src);
 };
 
