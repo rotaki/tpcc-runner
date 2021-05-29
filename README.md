@@ -10,7 +10,7 @@ tpcc-runner is yet another implementation of [TPC-C](http://www.tpc.org/tpcc/) w
 TPC-C executes a mix of five different concurrent transactions of different types and complexity to measure the various performance of transaction engines.
 Although TPC-C has its own problems, it is still one of the standard benchmark used in academia along with the [YCSB](https://github.com/brianfrankcooper/YCSB) for concurrency control protocols.
 
-__tpcc-runner__ aims to provide a C++ implementation of TPC-C which __separates the implementation of transaction profiles with the transaction engine__.
+__tpcc-runner__ aims to provide a Open Source C++ implementation of TPC-C which __separates the implementation of transaction profiles with the transaction engine__.
 As mentioned, TPC-C will run transactions of five diffrent profiles (e.g. NewOrder) and these should be independent from the backend transction engine in the implementation level.
 This will allow users to port tpcc-runner to different kinds of backend engines just by implementing the nessesary interfaces, which is easier and fairer as a benchmark.
 There are already some implementation of TPC-C in C++ such as [tpccbench](https://github.com/evanj/tpccbench). 
