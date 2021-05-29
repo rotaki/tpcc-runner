@@ -55,30 +55,30 @@ file(GLOB_RECURSE
   ${PROJECT_SOURCE_DIR}/app/include/*.hpp
   )
 
-add_library(TPCCRUNNER_objlib OBJECT ${TPCCRUNNER_SRCS})
+add_library(tpccrunner_objlib OBJECT ${TPCCRUNNER_SRCS})
 
-target_compile_definitions(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_COMPILE_DEFINITIONS})
-target_compile_options(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_COMPILE_OPTIONS})
-target_compile_features(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_COMPILE_FEATURES})
-target_link_options(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_LINK_OPTIONS})
-target_include_directories(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_INCLUDE_DIRECTORIES})
+target_compile_definitions(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_DEFINITIONS})
+target_compile_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_OPTIONS})
+target_compile_features(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_FEATURES})
+target_link_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_LINK_OPTIONS})
+target_include_directories(tpccrunner_objlib PUBLIC ${TPCCRUNNER_INCLUDE_DIRECTORIES})
 
-target_compile_options(TPCCRUNNER_objlib PRIVATE "-fPIC" "-Werror" "-Wall")
+target_compile_options(tpccrunner_objlib PRIVATE "-fPIC" "-Werror" "-Wall")
 
 # create static library
-add_library(TPCCRUNNER_static STATIC $<TARGET_OBJECTS:TPCCRUNNER_objlib>)
+add_library(tpccrunner_static STATIC $<TARGET_OBJECTS:tpccrunner_objlib>)
 
-target_link_libraries(TPCCRUNNER_static PUBLIC TPCCRUNNER_objlib)
+target_link_libraries(tpccrunner_static PUBLIC tpccrunner_objlib)
 
 set_target_properties(
-  TPCCRUNNER_static
+  tpccrunner_static
   PROPERTIES
   ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
   )
 
-message(STATUS "TPCCRUNNER_static created!")
+message(STATUS "[ADDED] tpccrunner_static")
 
 ###############################################################################
 #                                 Test binaries                                #
@@ -108,7 +108,7 @@ foreach (TPCC_TEST ${TPCC_TESTS})
     gtest_discover_tests(${FILENAME})
     target_compile_options(${FILENAME} PRIVATE "-Werror" "-Wall")
     target_include_directories(${FILENAME} PRIVATE "${PROJECT_SOURCE_DIR}/test")
-    target_link_libraries(${FILENAME} TPCCRUNNER_static gtest_main)
+    target_link_libraries(${FILENAME} tpccrunner_static gtest_main)
     set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
     set_target_properties(
       ${FILENAME}
@@ -118,7 +118,7 @@ foreach (TPCC_TEST ${TPCC_TESTS})
   endif ()
 endforeach (TPCC_TEST ${TPCC_TESTS})
 
-set(STATUS "TPCCRUNNER tests created!")
+set(STATUS "[ADDED] tpccrunner tests")
 
 ###############################################################################
 #                                 Clang-format                                #
