@@ -32,7 +32,8 @@ cmake ..
 make
 ```
 
-To format code
+To format code, 
+
 ```sh
 cd build
 cmake ..
@@ -40,7 +41,8 @@ make
 make format
 ```
 
-To set differnt log level
+To set to a different log level, 
+
 ```sh
 cd build
 ccmake .. ## set log level in GUI
