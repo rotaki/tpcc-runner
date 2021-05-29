@@ -17,8 +17,8 @@ set(TPCCRUNNER_COMPILE_DEFINITIONS "")
 set(TPCCRUNNER_COMPILE_OPTIONS "-fconcepts")
 set(TPCCRUNNER_COMPILE_FEATURES "cxx_std_20")
 set(TPCCRUNNER_LINK_OPTIONS "")
-set(TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include")
-list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/app/include")
+set(TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/tpcc/include")
+list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/tx_engine/include")
 
 set(LOG_LEVEL
   "1"
@@ -49,10 +49,10 @@ endif ()
 # Create an objectlib, which can be used for creating both static and dynamic library
 file(GLOB_RECURSE
   TPCCRUNNER_SRCS
-  ${PROJECT_SOURCE_DIR}/src/*.cpp
-  ${PROJECT_SORUCE_DIR}/include/*.hpp
-  ${PROJECT_SOURCE_DIR}/app/src/*.cpp
-  ${PROJECT_SOURCE_DIR}/app/include/*.hpp
+  ${PROJECT_SOURCE_DIR}/tpcc/src/*.cpp
+  ${PROJECT_SORUCE_DIR}/tpcc/include/*.hpp
+  ${PROJECT_SOURCE_DIR}/tx_engine/src/*.cpp
+  ${PROJECT_SOURCE_DIR}/tx_engine/include/*.hpp
   )
 
 add_library(tpccrunner_objlib OBJECT ${TPCCRUNNER_SRCS})
@@ -136,9 +136,10 @@ else()
     COMMENT "Running: format"
     COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
     --clang-format-executable ${CLANG_FORMAT_BIN}
-    -r ${CMAKE_CURRENT_SOURCE_DIR}/app
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    -r ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/include
     ${CMAKE_CURRENT_SOURCE_DIR}/test
     -i                          # format file instead of printing diff
     -q
@@ -149,9 +150,10 @@ else()
     COMMENT "Running: check-format"
     COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
     --clang-format-executable ${CLANG_FORMAT_BIN}
-    -r ${CMAKE_CURRENT_SOURCE_DIR}/app
-    ${CMAKE_CURRENT_SOURCE_DIR}/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    -r ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/include
     ${CMAKE_CURRENT_SOURCE_DIR}/test
     USES_TERMINAL
     )

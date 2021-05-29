@@ -13,7 +13,7 @@ Although TPC-C has its own problems, it is still one of the standard benchmark u
 __tpcc-runner__ aims to provide a Open Source C++ implementation of TPC-C which __separates the implementation of transaction profiles with the transaction engine__.
 As mentioned, TPC-C will run transactions of five diffrent profiles (e.g. NewOrder) and these should be independent from the backend transction engine in the implementation level.
 This will allow users to port tpcc-runner to different kinds of backend engines just by implementing the nessesary interfaces, which is easier and fairer as a benchmark.
-There are already some implementation of TPC-C in C++ such as [tpccbench](https://github.com/evanj/tpccbench). 
+There are already some implementations of TPC-C in C++ such as [tpccbench](https://github.com/evanj/tpccbench). 
 However, these implementations are based on a dense connection between the transaction profile and the backend so that it takes a lot of effort to customize them for uses in different backends.
 
 # Getting Started
@@ -67,7 +67,7 @@ cd test/
 ./test_name
 ```
 
-## Author
+# Author
 
 Riki Otaki
 
