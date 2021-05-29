@@ -1,5 +1,7 @@
 #pragma once
 
+#include <inttypes.h>
+
 #include <cstdint>
 
 #include "record_layout.hpp"
@@ -7,7 +9,10 @@
 
 class NewOrderTx {
 public:
-    NewOrderTx(uint16_t w_id0) { input.generate(w_id0); }
+    NewOrderTx(uint16_t w_id0) {
+        input.generate(w_id0);
+        input.print();
+    }
 
     struct Input {
         uint16_t w_id;
@@ -51,6 +56,19 @@ public:
                 items[i - 1].ol_quantity = urand_int(1, 10);
             }
         }
+
+        void print() {
+            LOG_TRACE(
+                "nod: w_id=%" PRIu16 " d_id=%" PRIu8 " c_id=%" PRIu32 " rbk=%" PRIu8
+                " remote=%s ol_cnt=%" PRIu8,
+                w_id, d_id, c_id, rbk, is_remote ? "t" : "f", ol_cnt);
+            for (unsigned int i = 1; i <= ol_cnt; i++) {
+                LOG_TRACE(
+                    " [%d]: ol_i_id=%" PRIu32 " ol_supply_w_id=%" PRIu16 " c_quantity=%" PRIu8, i,
+                    items[i - 1].ol_i_id, items[i - 1].ol_supply_w_id, items[i - 1].ol_quantity);
+            }
+        }
+
     } input;
 
     template <typename Transaction>
@@ -144,7 +162,7 @@ public:
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
             // todo brand generic
-            out << ol_supply_w_id << ol_i_id << i.i_name << ol_quantity << s.s_quantity 
+            out << ol_supply_w_id << ol_i_id << i.i_name << ol_quantity << s.s_quantity
                 << brand_generic << i.i_price << ol_amount;
         }
 

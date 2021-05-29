@@ -10,7 +10,10 @@
 
 class PaymentTx {
 public:
-    PaymentTx(uint16_t w_id0) { input.generate(w_id0); }
+    PaymentTx(uint16_t w_id0) {
+        input.generate(w_id0);
+        input.print();
+    }
 
     struct Input {
         uint16_t w_id;
@@ -47,6 +50,21 @@ public:
                 c_id = nurand_int<1023>(1, 3000);
             }
         }
+
+        void print() {
+            if (by_last_name) {
+                LOG_TRACE(
+                    "pay: w_id=%" PRIu16 " d_id=%" PRIu8 " c_w_id=%" PRIu16 " c_d_id=%" PRIu8
+                    " h_amount=%.2f h_date=%ld by_last_name=t c_last=%s",
+                    w_id, d_id, c_w_id, c_d_id, h_amount, h_date, c_last);
+            } else {
+                LOG_TRACE(
+                    "pay: w_id=%" PRIu16 " d_id=%" PRIu8 " c_w_id=%" PRIu16 " c_d_id=%" PRIu8
+                    " h_amount=%.2f h_date=%ld by_last_name=f c_id=%" PRIu32,
+                    w_id, d_id, c_w_id, c_d_id, h_amount, h_date, c_id);
+            }
+        }
+
     } input;
 
     template <typename Transaction>

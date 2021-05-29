@@ -1,5 +1,7 @@
 #pragma once
 
+#include <inttypes.h>
+
 #include <cstdint>
 #include <deque>
 
@@ -8,7 +10,10 @@
 
 class OrderStatusTx {
 public:
-    OrderStatusTx(uint16_t w_id0) { input.generate(w_id0); }
+    OrderStatusTx(uint16_t w_id0) {
+        input.generate(w_id0);
+        input.print();
+    }
 
     struct Input {
         uint16_t w_id;
@@ -28,6 +33,19 @@ public:
                 c_id = nurand_int<1023>(1, 3000);
             }
         }
+
+        void print() {
+            if (by_last_name) {
+                LOG_TRACE(
+                    "ordstts: w_id=%" PRIu16 " d_id=%" PRIu8 " by_last_name=t c_last=%s", w_id,
+                    d_id, c_last);
+            } else {
+                LOG_TRACE(
+                    "ordstts: w_id=%" PRIu16 " d_id=%" PRIu8 " by_last_name=f c_id=%" PRIu32, w_id,
+                    d_id, c_id);
+            }
+        }
+
     } input;
 
     template <typename Transaction>

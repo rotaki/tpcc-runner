@@ -1,5 +1,7 @@
 #pragma once
 
+#include <inttypes.h>
+
 #include <cstdint>
 
 #include "record_layout.hpp"
@@ -7,7 +9,10 @@
 
 class StockLevelTx {
 public:
-    StockLevelTx(uint16_t w_id0, uint8_t d_id0) { input.generate(w_id0, d_id0); }
+    StockLevelTx(uint16_t w_id0, uint8_t d_id0) {
+        input.generate(w_id0, d_id0);
+        input.print();
+    }
 
     struct Input {
         uint16_t w_id;
@@ -19,6 +24,13 @@ public:
             d_id = d_id0;
             threshold = urand_int(10, 20);
         }
+
+        void print() {
+            LOG_TRACE(
+                "stklvl: w_id=%" PRIu16 " d_id=%" PRIu8 " threshold=%" PRIu8, w_id, d_id,
+                threshold);
+        }
+
     } input;
 
     template <typename Transaction>

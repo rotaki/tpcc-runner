@@ -1,5 +1,7 @@
 #pragma once
 
+#include <inttypes.h>
+
 #include <cstdint>
 
 #include "record_layout.hpp"
@@ -7,7 +9,10 @@
 
 class DeliveryTx {
 public:
-    DeliveryTx(uint16_t w_id0) { input.generate(w_id0); }
+    DeliveryTx(uint16_t w_id0) {
+        input.generate(w_id0);
+        input.print();
+    }
 
     struct Input {
         uint16_t w_id;
@@ -18,6 +23,12 @@ public:
             w_id = w_id0;
             o_carrier_id = urand_int(1, 10);
             ol_delivery_d = get_timestamp();
+        }
+
+        void print() {
+            LOG_TRACE(
+                "del: w_id=%" PRIu16 " o_carrier_id=%" PRIu8 " ol_delivery_d=%ld", w_id,
+                o_carrier_id, ol_delivery_d);
         }
     } input;
 
