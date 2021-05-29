@@ -1,30 +1,30 @@
 cmake_minimum_required(VERSION 3.16)
-set(TPCCBENCH_DESCRIPTION "tpcc-bench is a portable tpcc benchmark framework for various transaction engines")
+set(TPCCRUNNER_DESCRIPTION " is a portable tpcc benchmark framework for various transaction engines")
 project(
-  tpcc-bench
+  tpcc-runner
   VERSION 1.0.0.0
-  DESCRIPTION "${TPCCBENCH_DESCRIPTION}"
+  DESCRIPTION "${TPCCRUNNER_DESCRIPTION}"
   )
 
-message(STATUS "Welcome to tpcc-bench, Version: ${PROJECT_VERSION}")
+message(STATUS "Welcome to tpcc-runner, Version: ${PROJECT_VERSION}")
 
 
 ###############################################################################
 #                            Static library of tpcc                           #
 ###############################################################################
 
-set(TPCCBENCH_COMPILE_DEFINITIONS "")
-set(TPCCBENCH_COMPILE_OPTIONS "-fconcepts")
-set(TPCCBENCH_COMPILE_FEATURES "cxx_std_20")
-set(TPCCBENCH_LINK_OPTIONS "")
-set(TPCCBENCH_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include")
-list(APPEND TPCCBENCH_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/app/include")
+set(TPCCRUNNER_COMPILE_DEFINITIONS "")
+set(TPCCRUNNER_COMPILE_OPTIONS "-fconcepts")
+set(TPCCRUNNER_COMPILE_FEATURES "cxx_std_20")
+set(TPCCRUNNER_LINK_OPTIONS "")
+set(TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/include")
+list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/app/include")
 
 set(LOG_LEVEL
   "1"
   CACHE STRING "Log level. 0(off) 1(error) 2(warn) 3(into) 4(debug) 5(trace)")
 
-list(APPEND TPCCBENCH_COMPILE_DEFINITIONS "-DLOG_LEVEL=${LOG_LEVEL}")
+list(APPEND TPCCRUNNER_COMPILE_DEFINITIONS "-DLOG_LEVEL=${LOG_LEVEL}")
 if ("${LOG_LEVEL}" STREQUAL "0")
   message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (NONE)")
 elseif ("${LOG_LEVEL}" STREQUAL "1")
@@ -42,43 +42,43 @@ else()
 endif()
 
 if (APPLE)
-  list(APPEND TPCCBENCH_COMPILE_OPTIONS "-fvisibility=hidden")
-  list(APPEND TPCCBENCH_LINK_OPTIONS "-fvisibility=hidden")
+  list(APPEND TPCCRUNNER_COMPILE_OPTIONS "-fvisibility=hidden")
+  list(APPEND TPCCRUNNER_LINK_OPTIONS "-fvisibility=hidden")
 endif ()
 
 # Create an objectlib, which can be used for creating both static and dynamic library
 file(GLOB_RECURSE
-  TPCCBENCH_SRCS
+  TPCCRUNNER_SRCS
   ${PROJECT_SOURCE_DIR}/src/*.cpp
   ${PROJECT_SORUCE_DIR}/include/*.hpp
   ${PROJECT_SOURCE_DIR}/app/src/*.cpp
   ${PROJECT_SOURCE_DIR}/app/include/*.hpp
   )
 
-add_library(tpccbench_objlib OBJECT ${TPCCBENCH_SRCS})
+add_library(TPCCRUNNER_objlib OBJECT ${TPCCRUNNER_SRCS})
 
-target_compile_definitions(tpccbench_objlib PUBLIC ${TPCCBENCH_COMPILE_DEFINITIONS})
-target_compile_options(tpccbench_objlib PUBLIC ${TPCCBENCH_COMPILE_OPTIONS})
-target_compile_features(tpccbench_objlib PUBLIC ${TPCCBENCH_COMPILE_FEATURES})
-target_link_options(tpccbench_objlib PUBLIC ${TPCCBENCH_LINK_OPTIONS})
-target_include_directories(tpccbench_objlib PUBLIC ${TPCCBENCH_INCLUDE_DIRECTORIES})
+target_compile_definitions(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_COMPILE_DEFINITIONS})
+target_compile_options(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_COMPILE_OPTIONS})
+target_compile_features(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_COMPILE_FEATURES})
+target_link_options(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_LINK_OPTIONS})
+target_include_directories(TPCCRUNNER_objlib PUBLIC ${TPCCRUNNER_INCLUDE_DIRECTORIES})
 
-target_compile_options(tpccbench_objlib PRIVATE "-fPIC" "-Werror" "-Wall")
+target_compile_options(TPCCRUNNER_objlib PRIVATE "-fPIC" "-Werror" "-Wall")
 
 # create static library
-add_library(tpccbench_static STATIC $<TARGET_OBJECTS:tpccbench_objlib>)
+add_library(TPCCRUNNER_static STATIC $<TARGET_OBJECTS:TPCCRUNNER_objlib>)
 
-target_link_libraries(tpccbench_static PUBLIC tpccbench_objlib)
+target_link_libraries(TPCCRUNNER_static PUBLIC TPCCRUNNER_objlib)
 
 set_target_properties(
-  tpccbench_static
+  TPCCRUNNER_static
   PROPERTIES
   ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
   )
 
-message(STATUS "tpccbench_static created!")
+message(STATUS "TPCCRUNNER_static created!")
 
 ###############################################################################
 #                                 Test binaries                                #
@@ -108,7 +108,7 @@ foreach (TPCC_TEST ${TPCC_TESTS})
     gtest_discover_tests(${FILENAME})
     target_compile_options(${FILENAME} PRIVATE "-Werror" "-Wall")
     target_include_directories(${FILENAME} PRIVATE "${PROJECT_SOURCE_DIR}/test")
-    target_link_libraries(${FILENAME} tpccbench_static gtest_main)
+    target_link_libraries(${FILENAME} TPCCRUNNER_static gtest_main)
     set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
     set_target_properties(
       ${FILENAME}
@@ -118,7 +118,7 @@ foreach (TPCC_TEST ${TPCC_TESTS})
   endif ()
 endforeach (TPCC_TEST ${TPCC_TESTS})
 
-set(STATUS "tpccbench tests created!")
+set(STATUS "TPCCRUNNER tests created!")
 
 ###############################################################################
 #                                 Clang-format                                #
