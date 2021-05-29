@@ -121,6 +121,13 @@ public:
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
+            char brand_generic;
+            if (strstr(i.i_data, "ORIGINAL") && strstr(s.s_data, "ORIGINAL")) {
+                brand_generic = 'B';
+            } else {
+                brand_generic = 'G';
+            }
+
             modify_stock(s, ol_quantity, is_remote);
             res = tx.update_record(s_key, s);
             LOG_TRACE("res: %d", static_cast<int>(res));
@@ -137,8 +144,8 @@ public:
             if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
             // todo brand generic
-            out << ol_supply_w_id << ol_i_id << i.i_name << ol_quantity << s.s_quantity << i.i_price
-                << ol_amount;
+            out << ol_supply_w_id << ol_i_id << i.i_name << ol_quantity << s.s_quantity 
+                << brand_generic << i.i_price << ol_amount;
         }
 
         total *= (1 - c.c_discount) * (1 + w.w_tax + d.d_tax);
