@@ -127,13 +127,18 @@ public:
         out << c.c_phone << c.c_since << c.c_credit << c.c_credit_lim;
         out << c.c_discount << c.c_balance;
 
+        c.c_balance -= h_amount;
+        c.c_ytd_payment += h_amount;
+        c.c_payment_cnt += 1;
+
         if (c.c_credit[0] == 'B' && c.c_credit[1] == 'C') {
             out << c.c_data;
-            modify_customer(c, w_id, d_id, c_w_id, c_d_id, h_amount);
-            res = tx.update_record(Customer::Key::create_key(c_w_id, c_d_id, c_id), c);
-            LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res);
+            modify_customer_data(c, w_id, d_id, c_w_id, c_d_id, h_amount);
         }
+
+        res = tx.update_record(Customer::Key::create_key(c_w_id, c_d_id, c_id), c);
+        LOG_TRACE("res: %d", static_cast<int>(res));
+        if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
         History h;
         create_history(h, w_id, d_id, c_id, c_w_id, c_d_id, h_amount, w.w_name, d.d_name);
@@ -151,13 +156,9 @@ public:
     }
 
 private:
-    void modify_customer(
+    void modify_customer_data(
         Customer& c, uint16_t w_id, uint8_t d_id, uint16_t c_w_id, uint8_t c_d_id,
         double h_amount) {
-        c.c_balance -= h_amount;
-        c.c_ytd_payment += h_amount;
-        c.c_payment_cnt += 1;
-
         char new_data[Customer::MAX_DATA + 1];
         size_t len = snprintf(
             &new_data[0], Customer::MAX_DATA + 1,
