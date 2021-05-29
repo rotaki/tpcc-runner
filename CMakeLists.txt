@@ -24,7 +24,7 @@ set(LOG_LEVEL
   "1"
   CACHE STRING "Log level. 0(off) 1(error) 2(warn) 3(into) 4(debug) 5(trace)")
 
-list(APPEND SIMPLEDB_COMPILE_DEFINITIONS "-DLOG_LEVEL=${LOG_LEVEL}")
+list(APPEND TPCCBENCH_COMPILE_DEFINITIONS "-DLOG_LEVEL=${LOG_LEVEL}")
 if ("${LOG_LEVEL}" STREQUAL "0")
   message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (NONE)")
 elseif ("${LOG_LEVEL}" STREQUAL "1")

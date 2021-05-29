@@ -6,8 +6,6 @@
 #define LOG_LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
 #define LOG_OUTPUT_STREAM stderr
 
-#define LOG_LEVEL 5
-
 // Log levels
 #define LOG_LEVEL_OFF 0
 #define LOG_LEVEL_ERROR 1
