@@ -11,7 +11,7 @@
 #include "record_layout.hpp"
 #include "tx_runner.hpp"
 
-class PaymentTest : public ::testing::Test {
+class AtomicityTest : public ::testing::Test {
 protected:
     static void SetUpTestSuite() {
         Config& c = get_mutable_config();
@@ -22,14 +22,7 @@ protected:
     static constexpr uint16_t num_warehouse = 1;
 };
 
-TEST_F(PaymentTest, CheckRunWithRetry) {
-    Database& db = Database::get_db();
-    Transaction tx(db);
-    Output out;
-    run_with_retry<PaymentTx>(tx, out);
-}
-
-TEST_F(PaymentTest, AtomicityTest1) {
+TEST_F(AtomicityTest, Test1) {
     Database& db = Database::get_db();
     Transaction tx(db);
     Output out;
@@ -81,7 +74,7 @@ TEST_F(PaymentTest, AtomicityTest1) {
     }
 }
 
-TEST_F(PaymentTest, AtomicityTest2) {
+TEST_F(AtomicityTest, Test2) {
     Database& db = Database::get_db();
     Transaction tx(db);
     Output out;
