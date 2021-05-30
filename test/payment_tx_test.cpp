@@ -11,14 +11,15 @@
 #include "record_layout.hpp"
 #include "tx_runner.hpp"
 
-
 class PaymentTest : public ::testing::Test {
 protected:
-    void SetUp() override {
+    static void SetUpTestSuite() {
         Config& c = get_mutable_config();
-        c.set_num_warehouses(1);
+        c.set_num_warehouses(num_warehouse);
         Initializer::load_warehouses_table();
     }
+
+    static constexpr uint16_t num_warehouse = 1;
 };
 
 TEST_F(PaymentTest, CheckRunWithRetry) {
