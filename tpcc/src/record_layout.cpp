@@ -13,9 +13,9 @@ void Item::deep_copy_from(const Item& src) {
 }
 
 void Item::generate(uint32_t i_id_) {
-    i_id = i_id_;                           // 200000 unique ids
-    i_im_id = urand_int(1, 10000);          // 200000 unique ids
-    i_price = urand_double(1, 10000, 100);  // numeric(5, 2)
+    i_id = i_id_;                             // 200000 unique ids
+    i_im_id = urand_int(1, 10000);            // 200000 unique ids
+    i_price = urand_double(100, 10000, 100);  // numeric(5, 2)
     make_random_astring(i_name, Item::MIN_NAME, Item::MAX_NAME);
     make_random_astring(i_data, Item::MIN_DATA, Item::MAX_DATA);
     if (urand_int(0, 99) < 10) make_original(i_data);
@@ -200,8 +200,9 @@ void Order::generate(uint16_t o_w_id_, uint8_t o_d_id_, uint32_t o_c_id_, uint32
     o_w_id = o_w_id_;
     o_c_id = o_c_id_;
     o_carrier_id = (o_id < 2101 ? urand_int(1, 10) : 0);  // 10 unique ids or null
-    o_ol_cnt = urand_int(5, 15);                          // numeric(2)
-    o_all_local = 1;                                      // numeric(1)
+    o_ol_cnt =
+        urand_int(OrderLine::MIN_ORDLINES_PER_ORD, OrderLine::MAX_ORDLINES_PER_ORD);  // numeric(2)
+    o_all_local = 1;                                                                  // numeric(1)
     o_entry_d = get_timestamp();
 }
 

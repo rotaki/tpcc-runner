@@ -1,3 +1,7 @@
+#include <inttypes.h>
+
+#include <algorithm>
+
 #include "gtest/gtest.h"
 
 // Glue code //////////////////////////////////////////////////////////////////
@@ -112,13 +116,13 @@ void check_stocks_table(uint16_t num_warehouse) {
     Stock s;
     uint16_t w_id = 1;
     uint32_t i_id = 1;
-    StockKey s_key = StockKey::create_key(w_id, i_id);
+    Stock::Key s_key = Stock::Key::create_key(w_id, i_id);
     ASSERT_TRUE(Database::get_db().get_record<Stock>(s, s_key));
     check_stock_record(num_warehouse, s);
 
     w_id = num_warehouse;
     i_id = 100000;
-    s_key = StockKey::create_key(w_id, i_id);
+    s_key = Stock::Key::create_key(w_id, i_id);
     ASSERT_TRUE(Database::get_db().get_record<Stock>(s, s_key));
     check_stock_record(num_warehouse, s);
 }
@@ -141,13 +145,13 @@ void check_districts_table(uint16_t num_warehouse) {
     District d;
     uint16_t w_id = 1;
     uint8_t d_id = 1;
-    DistrictKey d_key = DistrictKey::create_key(w_id, d_id);
+    District::Key d_key = District::Key::create_key(w_id, d_id);
     ASSERT_TRUE(Database::get_db().get_record<District>(d, d_key));
     check_district_record(num_warehouse, d);
 
     w_id = num_warehouse;
     d_id = 10;
-    d_key = DistrictKey::create_key(w_id, d_id);
+    d_key = District::Key::create_key(w_id, d_id);
     ASSERT_TRUE(Database::get_db().get_record<District>(d, d_key));
     check_district_record(num_warehouse, d);
 }
@@ -189,14 +193,14 @@ void check_customers_table(uint16_t num_warehouse) {
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     uint32_t c_id = 1;
-    CustomerKey c_key = CustomerKey::create_key(w_id, d_id, c_id);
+    Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
     ASSERT_TRUE(Database::get_db().get_record<Customer>(c, c_key));
     check_customer_record(num_warehouse, c);
 
     w_id = num_warehouse;
     d_id = 10;
     c_id = 3000;
-    c_key = CustomerKey::create_key(w_id, d_id, c_id);
+    c_key = Customer::Key::create_key(w_id, d_id, c_id);
     ASSERT_TRUE(Database::get_db().get_record<Customer>(c, c_key));
     check_customer_record(num_warehouse, c);
 }
@@ -259,14 +263,14 @@ void check_orders_table(uint16_t num_warehouse) {
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     uint32_t o_id = 1;
-    OrderKey o_key = OrderKey::create_key(w_id, d_id, o_id);
+    Order::Key o_key = Order::Key::create_key(w_id, d_id, o_id);
     ASSERT_TRUE(Database::get_db().get_record<Order>(o, o_key));
     check_order_record(num_warehouse, o);
 
     w_id = num_warehouse;
     d_id = 10;
     o_id = 3000;
-    o_key = OrderKey::create_key(w_id, d_id, o_id);
+    o_key = Order::Key::create_key(w_id, d_id, o_id);
     ASSERT_TRUE(Database::get_db().get_record<Order>(o, o_key));
     check_order_record(num_warehouse, o);
 }
@@ -304,7 +308,7 @@ void check_orderlines_table(uint16_t num_warehouse) {
     uint8_t d_id = 1;
     uint32_t o_id = 1;
     uint8_t ol_number = 1;
-    OrderLineKey ol_key = OrderLineKey::create_key(w_id, d_id, o_id, ol_number);
+    OrderLine::Key ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_number);
     ASSERT_TRUE(Database::get_db().get_record<OrderLine>(ol, ol_key));
     check_orderline_record(num_warehouse, ol);
 
@@ -312,7 +316,7 @@ void check_orderlines_table(uint16_t num_warehouse) {
     d_id = 10;
     o_id = 3000;
     ol_number = 5;
-    ol_key = OrderLineKey::create_key(w_id, d_id, o_id, ol_number);
+    ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_number);
     ASSERT_TRUE(Database::get_db().get_record<OrderLine>(ol, ol_key));
     check_orderline_record(num_warehouse, ol);
 }
@@ -331,29 +335,113 @@ void check_neworders_table(uint16_t num_warehouse) {
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     uint32_t o_id = 2101;
-    NewOrderKey no_key = NewOrderKey::create_key(w_id, d_id, o_id);
+    NewOrder::Key no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
     ASSERT_TRUE(Database::get_db().get_record<NewOrder>(no, no_key));
     check_neworder_record(num_warehouse, no);
 
     w_id = num_warehouse;
     d_id = 10;
     o_id = 3000;
-    no_key = NewOrderKey::create_key(w_id, d_id, o_id);
+    no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
     ASSERT_TRUE(Database::get_db().get_record<NewOrder>(no, no_key));
     check_neworder_record(num_warehouse, no);
 }
 
-TEST(LoadTablesSuit, CheckItemValidity) {
-    Initializer::load_items_table();
-    check_items_table();
+double get_sum_of_district_ytd_in_warehouse(uint16_t w_id) {
+    Database& db = Database::get_db();
+    District::Key d_key_low = District::Key::create_key(w_id, 0);
+    District::Key d_key_high = District::Key::create_key(w_id + 1, 0);
+    auto iter_low = db.get_lower_bound_iter<District>(d_key_low);
+    auto iter_high = db.get_lower_bound_iter<District>(d_key_high);
+    double total_d_ytd = 0;
+    for (auto it = iter_low; it != iter_high; it++) {
+        total_d_ytd += it->second.d_ytd;
+    }
+    return total_d_ytd;
 }
 
-TEST(LoadTableSuit, CheckOtherValidity) {
-    int num_warehouse = 5;
-    Config& c = get_mutable_config();
-    c.set_num_warehouses(num_warehouse);
-    Initializer::load_warehouses_table();
+uint32_t get_max_order_id_from_order(uint16_t w_id, uint8_t d_id) {
+    Database& db = Database::get_db();
+    Order::Key o_key_low = Order::Key::create_key(w_id, d_id, 0);
+    Order::Key o_key_high = Order::Key::create_key(w_id, d_id + 1, 0);
+    auto iter_low = db.get_lower_bound_iter<Order>(o_key_low);
+    auto iter_high = db.get_lower_bound_iter<Order>(o_key_high);
+    uint32_t max_o_id = 0;
+    for (auto it = iter_low; it != iter_high; it++) {
+        max_o_id = std::max(max_o_id, it->second.o_id);
+    }
+    return max_o_id;
+}
 
+uint32_t get_max_order_id_from_neworder(uint16_t w_id, uint8_t d_id) {
+    Database& db = Database::get_db();
+    NewOrder::Key no_key_low = NewOrder::Key::create_key(w_id, d_id, 0);
+    NewOrder::Key no_key_high = NewOrder::Key::create_key(w_id, d_id + 1, 0);
+    auto iter_low = db.get_lower_bound_iter<NewOrder>(no_key_low);
+    auto iter_high = db.get_lower_bound_iter<NewOrder>(no_key_high);
+    uint32_t max_o_id = 0;
+    for (auto it = iter_low; it != iter_high; it++) {
+        max_o_id = std::max(max_o_id, it->second.no_o_id);
+    }
+    return max_o_id;
+}
+
+void check_min_max_order_id_in_neworder(uint16_t w_id, uint8_t d_id) {
+    Database& db = Database::get_db();
+    NewOrder::Key no_key_low = NewOrder::Key::create_key(w_id, d_id, 0);
+    NewOrder::Key no_key_high = NewOrder::Key::create_key(w_id, d_id + 1, 0);
+    auto iter_low = db.get_lower_bound_iter<NewOrder>(no_key_low);
+    auto iter_high = db.get_lower_bound_iter<NewOrder>(no_key_high);
+    uint32_t max_o_id = 0;
+    uint32_t min_o_id = Order::ORDS_PER_DIST + 1;
+    uint32_t cnt = 0;
+    for (auto it = iter_low; it != iter_high; it++) {
+        cnt++;
+        max_o_id = std::max(max_o_id, it->second.no_o_id);
+        min_o_id = std::min(min_o_id, it->second.no_o_id);
+    }
+    ASSERT_GE(max_o_id, min_o_id);
+    ASSERT_GE(max_o_id, 1);
+    ASSERT_GE(min_o_id, 1);
+    ASSERT_EQ(cnt, max_o_id - min_o_id + 1);
+}
+
+
+void check_order_orderline_relationship(uint16_t w_id, uint8_t d_id) {
+    Database& db = Database::get_db();
+    Order::Key o_key_low = Order::Key::create_key(w_id, d_id, 0);
+    Order::Key o_key_high = Order::Key::create_key(w_id, d_id + 1, 0);
+    auto o_iter_low = db.get_lower_bound_iter<Order>(o_key_low);
+    auto o_iter_high = db.get_lower_bound_iter<Order>(o_key_high);
+
+    int sum_ol_cnt = 0;
+    for (auto it = o_iter_low; it != o_iter_high; it++) {
+        sum_ol_cnt += it->second.o_ol_cnt;
+    }
+
+    OrderLine::Key ol_key_low = OrderLine::Key::create_key(w_id, d_id, 0, 0);
+    OrderLine::Key ol_key_high = OrderLine::Key::create_key(w_id, d_id + 1, 0, 0);
+    auto ol_iter_low = db.get_lower_bound_iter<OrderLine>(ol_key_low);
+    auto ol_iter_high = db.get_lower_bound_iter<OrderLine>(ol_key_high);
+
+    int n = std::distance(ol_iter_low, ol_iter_high);
+    ASSERT_EQ(sum_ol_cnt, n);
+}
+
+class InitialPopulationTest : public ::testing::Test {
+protected:
+    static void SetUpTestSuite() {
+        Config& c = get_mutable_config();
+        c.set_num_warehouses(num_warehouse);
+        Initializer::load_items_table();
+        Initializer::load_warehouses_table();
+    }
+
+    static constexpr uint16_t num_warehouse = 1;
+};
+
+TEST_F(InitialPopulationTest, RecordValidityTest) {
+    check_items_table();
     check_warehouses_table(num_warehouse);
     check_stocks_table(num_warehouse);
     check_districts_table(num_warehouse);
@@ -362,4 +450,43 @@ TEST(LoadTableSuit, CheckOtherValidity) {
     check_orders_table(num_warehouse);
     check_orderlines_table(num_warehouse);
     check_neworders_table(num_warehouse);
+}
+
+TEST_F(InitialPopulationTest, ConsistencyTest1) {
+    Database& db = Database::get_db();
+    Warehouse w;
+    for (uint16_t w_id = 1; w_id <= num_warehouse; w_id++) {
+        ASSERT_TRUE(db.get_record(w, Warehouse::Key::create_key(w_id)));
+        ASSERT_EQ(w.w_ytd, get_sum_of_district_ytd_in_warehouse(w_id));
+    }
+}
+
+TEST_F(InitialPopulationTest, ConsistencyTest2) {
+    Database& db = Database::get_db();
+    District d;
+    for (uint16_t w_id = 1; w_id <= num_warehouse; w_id++) {
+        for (uint8_t d_id = 1; d_id <= District::DISTS_PER_WARE; d_id++) {
+            District::Key d_key = District::Key::create_key(w_id, d_id);
+            db.get_record<District>(d, d_key);
+            uint32_t d_next_o_id = d.d_next_o_id;
+            ASSERT_EQ(d_next_o_id - 1, get_max_order_id_from_order(w_id, d_id));
+            ASSERT_EQ(d_next_o_id - 1, get_max_order_id_from_neworder(w_id, d_id));
+        }
+    }
+}
+
+TEST_F(InitialPopulationTest, ConsistencyTest3) {
+    for (uint16_t w_id = 1; w_id <= num_warehouse; w_id++) {
+        for (uint8_t d_id = 1; d_id <= District::DISTS_PER_WARE; d_id++) {
+            check_min_max_order_id_in_neworder(w_id, d_id);
+        }
+    }
+}
+
+TEST_F(InitialPopulationTest, ConsistencyTest4) {
+    for (uint16_t w_id = 1; w_id <= num_warehouse; w_id++) {
+        for (uint8_t d_id = 1; d_id <= District::DISTS_PER_WARE; d_id++) {
+            check_order_orderline_relationship(w_id, w_id);
+        }
+    }
 }
