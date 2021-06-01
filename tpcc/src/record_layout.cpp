@@ -1,5 +1,8 @@
 #include "record_layout.hpp"
 
+#include <inttypes.h>
+
+#include "logger.hpp"
 #include "utils.hpp"
 
 void Item::deep_copy_from(const Item& src) {
@@ -19,6 +22,12 @@ void Item::generate(uint32_t i_id_) {
     make_random_astring(i_name, Item::MIN_NAME, Item::MAX_NAME);
     make_random_astring(i_data, Item::MIN_DATA, Item::MAX_DATA);
     if (urand_int(0, 99) < 10) make_original(i_data);
+}
+
+void Item::print() {
+    LOG_TRACE(
+        "[ITEM] i_id:%" PRIu32 " i_im_id:%" PRIu32 " i_price:%lf i_name:%s i_data:%s", i_id,
+        i_im_id, i_price, i_name, i_data);
 }
 
 void Address::deep_copy_from(const Address& src) {
@@ -48,6 +57,14 @@ void Warehouse::generate(uint16_t w_id_) {
     make_random_address(w_address);
 }
 
+void Warehouse::print() {
+    LOG_TRACE(
+        "[WARE] w_id:%" PRIu16
+        " w_tax:%lf w_ytd:%lf w_name:%s street_1:%s street_2:%s city:%s state:%s zip:%s",
+        w_id, w_tax, w_ytd, w_name, w_address.street_1, w_address.street_2, w_address.city,
+        w_address.state, w_address.zip);
+}
+
 void Stock::deep_copy_from(const Stock& src) {
     if (this != &src) {
         s_i_id = src.s_i_id;
@@ -69,6 +86,7 @@ void Stock::deep_copy_from(const Stock& src) {
         copy_cstr(s_data, src.s_data, sizeof(s_data));
     }
 }
+
 void Stock::generate(uint16_t s_w_id_, uint32_t s_i_id_) {
     s_i_id = s_i_id_;  // 200000 unique ids
     s_w_id = s_w_id_;
@@ -88,6 +106,15 @@ void Stock::generate(uint16_t s_w_id_, uint32_t s_i_id_) {
     make_random_astring(s_dist_10, Stock::DIST, Stock::DIST);
     make_random_astring(s_data, Stock::MIN_DATA, Stock::MAX_DATA);
     if (urand_int(0, 99) < 10) make_original(s_data);
+}
+
+void Stock::print() {
+    LOG_TRACE(
+        "[STO] s_w_id:%" PRIu16 " s_i_id:%" PRIu32 " s_quantity:%" PRIu32 " s_ytd:%" PRIu32
+        " s_order_cnt:%" PRIu16 " s_remote:%" PRIu16
+        " s_dist_01:%s s_dist_02:%s s_dist_03:%s s_dist_04:%s s_dist_05:%s s_dist_06:%s s_dist_07:%s s_dist_08:%s s_dist_09:%s s_dist_10:%s",
+        s_w_id, s_i_id, s_quantity, s_ytd, s_order_cnt, s_remote_cnt, s_dist_01, s_dist_02,
+        s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10);
 }
 
 void District::deep_copy_from(const District& src) {
@@ -110,6 +137,14 @@ void District::generate(uint16_t d_w_id_, uint8_t d_id_) {
     d_ytd = 30000.00;                      // signed numeric(12, 2)
     make_random_astring(d_name, District::MIN_NAME, District::MAX_NAME);
     make_random_address(d_address);
+}
+
+void District::print() {
+    LOG_TRACE(
+        "[DIST] d_w_id:%" PRIu16 " d_id:%" PRIu8 " d_next_o_id:%" PRIu32
+        " d_tax:%lf d_ytd:%lf d_name:%s street_1:%s street_2:%s city:%s state:%s zip:%s",
+        d_w_id, d_id, d_next_o_id, d_tax, d_ytd, d_name, d_address.street_1, d_address.street_2,
+        d_address.city, d_address.state, d_address.zip);
 }
 
 void Customer::deep_copy_from(const Customer& src) {
@@ -156,6 +191,16 @@ void Customer::generate(uint16_t c_w_id_, uint8_t c_d_id_, uint32_t c_id_, Times
     make_random_address(c_address);
 }
 
+void Customer::print() {
+    LOG_TRACE(
+        "[CUST] c_w_id:%" PRIu16 " c_d_id:%" PRIu8 " c_id:%" PRIu32 " c_payment_cnt:%" PRIu16
+        " c_delivery_cnt:%" PRIu16 " c_since:%" PRId64
+        " c_credit_lim:%lf c_discount:%lf c_balance:%lf c_ytd_payment:%lf c_first:%s c_middle:%s c_last:%s c_phone:%s c_credit:%s c_data:%s street_1:%s street_2:%s city:%s state:%s zip:%s",
+        c_w_id, c_d_id, c_id, c_payment_cnt, c_delivery_cnt, c_since, c_credit_lim, c_discount,
+        c_balance, c_ytd_payment, c_first, c_middle, c_last, c_phone, c_credit, c_data,
+        c_address.street_1, c_address.street_2, c_address.city, c_address.state, c_address.zip);
+}
+
 void History::deep_copy_from(const History& src) {
     if (this != &src) {
         h_c_id = src.h_c_id;
@@ -181,6 +226,13 @@ void History::generate(
     make_random_astring(h_data, History::MIN_DATA, History::MAX_DATA);
 }
 
+void History::print() {
+    LOG_TRACE(
+        "[HIST] h_c_w_id:%" PRIu16 " h_c_d_id:%" PRIu8 " h_c_id:%" PRIu32 " h_w_id:%" PRIu16
+        " h_d_id:%" PRIu8 " h_date:%" PRId64,
+        h_c_w_id, h_c_d_id, h_c_id, h_w_id, h_d_id, h_date);
+}
+
 void Order::deep_copy_from(const Order& src) {
     if (this != &src) {
         o_id = src.o_id;
@@ -194,7 +246,7 @@ void Order::deep_copy_from(const Order& src) {
     }
 }
 
-void Order::generate(uint16_t o_w_id_, uint8_t o_d_id_, uint32_t o_c_id_, uint32_t o_id_) {
+void Order::generate(uint16_t o_w_id_, uint8_t o_d_id_, uint32_t o_id_, uint32_t o_c_id_) {
     o_id = o_id_;  // 10000000 unique ids
     o_d_id = o_d_id_;
     o_w_id = o_w_id_;
@@ -204,6 +256,13 @@ void Order::generate(uint16_t o_w_id_, uint8_t o_d_id_, uint32_t o_c_id_, uint32
         urand_int(OrderLine::MIN_ORDLINES_PER_ORD, OrderLine::MAX_ORDLINES_PER_ORD);  // numeric(2)
     o_all_local = 1;                                                                  // numeric(1)
     o_entry_d = get_timestamp();
+}
+
+void Order::print() {
+    LOG_TRACE(
+        "[ORD] o_w_id:%" PRIu16 " o_d_id:%" PRIu8 " o_id:%" PRIu32 " o_c_id:%" PRIu32
+        " o_carrier_id:%" PRIu8 " o_ol_cnt:%" PRIu8 " o_all_local:%" PRIu8 " o_entry_d:%" PRId64,
+        o_w_id, o_d_id, o_id, o_c_id, o_carrier_id, o_ol_cnt, o_all_local, o_entry_d);
 }
 
 void NewOrder::deep_copy_from(const NewOrder& src) {
@@ -217,6 +276,12 @@ void NewOrder::generate(uint16_t no_w_id_, uint8_t no_d_id_, uint32_t no_o_id_) 
     no_o_id = no_o_id_;
     no_d_id = no_d_id_;
     no_w_id = no_w_id_;
+}
+
+void NewOrder::print() {
+    LOG_TRACE(
+        "[NORD] no_w_id:%" PRIu16 " no_d_id:%" PRIu8 " no_o_id:%" PRIu32, no_w_id, no_d_id,
+        no_o_id);
 }
 
 void OrderLine::deep_copy_from(const OrderLine& src) {
@@ -235,11 +300,11 @@ void OrderLine::deep_copy_from(const OrderLine& src) {
 }
 
 void OrderLine::generate(
-    uint16_t ol_w_id_, uint8_t ol_d_id_, uint32_t ol_o_id_, uint16_t ol_supply_w_id_,
-    uint32_t ol_i_id_, uint8_t ol_number_, int64_t o_entry_d_) {
-    ol_o_id = ol_o_id_;
-    ol_d_id = ol_d_id_;
+    uint16_t ol_w_id_, uint8_t ol_d_id_, uint32_t ol_o_id_, uint8_t ol_number_,
+    uint16_t ol_supply_w_id_, uint32_t ol_i_id_, int64_t o_entry_d_) {
     ol_w_id = ol_w_id_;
+    ol_d_id = ol_d_id_;
+    ol_o_id = ol_o_id_;
     ol_number = ol_number_;  // 15 unique ids
     ol_i_id = ol_i_id_;      // 200000 unique ids
     ol_supply_w_id = ol_supply_w_id_;
@@ -247,4 +312,13 @@ void OrderLine::generate(
     ol_quantity = 5;                                                     // numeric(2)
     ol_amount = (ol_o_id < 2101 ? 0.00 : urand_double(1, 999999, 100));  // signed numeric(6, 2)
     make_random_astring(ol_dist_info, OrderLine::DIST_INFO, OrderLine::DIST_INFO);
+}
+
+void OrderLine::print() {
+    LOG_TRACE(
+        "[ORDL] ol_w_id:%" PRIu16 " ol_d_id:%" PRIu8 " ol_o_id:%" PRIu32 " ol_number:%" PRIu8
+        " ol_i_id:%" PRIu32 " ol_supply_w_id:%" PRIu16 " ol_deliery_d:%" PRId64
+        " ol_quantity:%" PRIu8 " ol_amount:%lf ol_dist_info:%s",
+        ol_w_id, ol_d_id, ol_o_id, ol_number, ol_i_id, ol_supply_w_id, ol_delivery_d, ol_quantity,
+        ol_amount, ol_dist_info);
 }

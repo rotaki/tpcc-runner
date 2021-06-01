@@ -45,17 +45,17 @@ inline void create_and_insert_customer_record(
 }
 
 inline void create_and_insert_history_record(
-    uint16_t h_c_w_id, uint8_t h_c_d_id, uint32_t h_c_id, uint16_t d_w_id, uint8_t h_d_id) {
+    uint16_t h_c_w_id, uint8_t h_c_d_id, uint32_t h_c_id, uint16_t h_w_id, uint8_t h_d_id) {
     History h;
-    h.generate(h_c_w_id, h_c_d_id, h_c_id, d_w_id, h_d_id);
+    h.generate(h_c_w_id, h_c_d_id, h_c_id, h_w_id, h_d_id);
     Database::get_db().insert_record<History>(h);
 }
 
 inline std::pair<Timestamp, uint8_t> create_and_insert_order_record(
-    uint16_t o_w_id, uint8_t o_d_id, uint32_t o_c_id, uint32_t o_id) {
+    uint16_t o_w_id, uint8_t o_d_id, uint32_t o_id, uint32_t o_c_id) {
     Order::Key key = Order::Key::create_key(o_w_id, o_d_id, o_id);
     Order& o = Database::get_db().allocate_record<Order>(key);
-    o.generate(o_w_id, o_d_id, o_c_id, o_id);
+    o.generate(o_w_id, o_d_id, o_id, o_c_id);
     OrderSecondary os;
     os.ptr = &o;
     Database::get_db().insert_record(os);
@@ -69,11 +69,11 @@ inline void create_and_insert_neworder_record(uint16_t no_w_id, uint8_t no_d_id,
 }
 
 inline void create_and_insert_orderline_record(
-    uint16_t ol_w_id, uint8_t ol_d_id, uint32_t ol_o_id, uint16_t ol_supply_w_id, uint32_t ol_i_id,
-    uint8_t ol_number, Timestamp o_entry_d) {
+    uint16_t ol_w_id, uint8_t ol_d_id, uint32_t ol_o_id, uint8_t ol_number, uint16_t ol_supply_w_id,
+    uint32_t ol_i_id, Timestamp o_entry_d) {
     OrderLine::Key key = OrderLine::Key::create_key(ol_w_id, ol_d_id, ol_o_id, ol_number);
     OrderLine& ol = Database::get_db().allocate_record<OrderLine>(key);
-    ol.generate(ol_w_id, ol_d_id, ol_o_id, ol_supply_w_id, ol_i_id, ol_number, o_entry_d);
+    ol.generate(ol_w_id, ol_d_id, ol_o_id, ol_number, ol_supply_w_id, ol_i_id, o_entry_d);
 };
 
 inline void load_items_table() {
@@ -99,7 +99,7 @@ inline void load_orderlines_table(
     for (uint8_t ol_number = 1; ol_number <= ol_cnt; ol_number++) {
         uint32_t ol_i_id = urand_int(1, 100000);
         create_and_insert_orderline_record(
-            ol_w_id, ol_d_id, ol_o_id, ol_w_id, ol_i_id, ol_number, o_entry_d);
+            ol_w_id, ol_d_id, ol_o_id, ol_number, ol_w_id, ol_i_id, o_entry_d);
     }
 }
 
@@ -112,7 +112,7 @@ inline void load_orders_table(uint16_t o_w_id, uint8_t o_d_id) {
     for (uint32_t o_id = 1; o_id <= Order::ORDS_PER_DIST; o_id++) {
         uint32_t o_c_id = p[o_id - 1];
         std::pair<Timestamp, uint8_t> out =
-            create_and_insert_order_record(o_w_id, o_d_id, o_c_id, o_id);
+            create_and_insert_order_record(o_w_id, o_d_id, o_id, o_c_id);
         Timestamp o_entry_d = out.first;
         uint8_t ol_cnt = out.second;
         load_orderlines_table(ol_cnt, o_w_id, o_d_id, o_id, o_entry_d);

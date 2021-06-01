@@ -63,6 +63,7 @@ struct Item {
     char i_data[MAX_DATA + 1];
     void deep_copy_from(const Item& src);
     void generate(uint32_t i_id_);
+    void print();
 };
 
 struct Address {
@@ -92,6 +93,7 @@ struct Warehouse {
     Address w_address;
     void deep_copy_from(const Warehouse& src);
     void generate(uint16_t w_id_);
+    void print();
 };
 
 // Primary Key (s_w_id, s_i_id)
@@ -102,8 +104,8 @@ struct Stock {
     static const int DIST = 24;
     static const int MIN_DATA = 26;
     static const int MAX_DATA = 50;
-    uint32_t s_i_id;  // 200000 unique ids
     uint16_t s_w_id;
+    uint32_t s_i_id;        // 200000 unique ids
     int16_t s_quantity;     // signed numeric(4)
     uint32_t s_ytd;         // numeric(8)
     uint16_t s_order_cnt;   // numeric(4)
@@ -119,9 +121,9 @@ struct Stock {
     char s_dist_09[DIST + 1];
     char s_dist_10[DIST + 1];
     char s_data[MAX_DATA + 1];
-
     void deep_copy_from(const Stock& src);
     void generate(uint16_t s_w_id_, uint32_t s_i_id_);
+    void print();
 };
 
 
@@ -132,8 +134,8 @@ struct District {
     static const int DISTS_PER_WARE = 10;
     static const int MIN_NAME = 6;
     static const int MAX_NAME = 10;
-    uint8_t d_id;  // 20 unique ids
     uint16_t d_w_id;
+    uint8_t d_id;          // 20 unique ids
     uint32_t d_next_o_id;  // 10000000 unique ids
     double d_tax;          // signed numeric(4, 4)
     double d_ytd;          // signed numeric(12, 2)
@@ -141,6 +143,7 @@ struct District {
     Address d_address;
     void deep_copy_from(const District& src);
     void generate(uint16_t d_w_id_, uint8_t d_id_);
+    void print();
 };
 
 struct CustomerSecondary;
@@ -160,9 +163,9 @@ struct Customer {
     static const int MIN_DATA = 300;
     static const int MAX_DATA = 500;
     static const int UNUSED_ID = 0;
-    uint32_t c_id;  // 96000 unique ids
-    uint8_t c_d_id;
     uint16_t c_w_id;
+    uint8_t c_d_id;
+    uint32_t c_id;            // 96000 unique ids
     uint16_t c_payment_cnt;   // numeric(4)
     uint16_t c_delivery_cnt;  // numeric(4)
     Timestamp c_since;        // date and time
@@ -179,6 +182,7 @@ struct Customer {
     Address c_address;
     void deep_copy_from(const Customer& src);
     void generate(uint16_t c_w_id_, uint8_t c_d_id_, uint32_t c_id_, Timestamp t_);
+    void print();
 };
 
 struct CustomerSecondary {
@@ -196,17 +200,18 @@ struct History {
     static const int HISTS_PER_CUST = 1;
     static const int MIN_DATA = 12;
     static const int MAX_DATA = 24;
-    uint32_t h_c_id;
-    uint8_t h_c_d_id;
     uint16_t h_c_w_id;
-    uint8_t h_d_id;
+    uint8_t h_c_d_id;
+    uint32_t h_c_id;
     uint16_t h_w_id;
+    uint8_t h_d_id;
     Timestamp h_date;  // date and time
     double h_amount;   // signed numeric(6, 2)
     char h_data[MAX_DATA + 1];
     void deep_copy_from(const History& src);
     void generate(
         uint16_t h_c_w_id_, uint8_t h_c_d_id_, uint32_t h_c_id_, uint16_t h_w_id_, uint8_t h_d_id_);
+    void print();
 };
 
 struct OrderSecondary;
@@ -217,16 +222,17 @@ struct Order {
     using Key = OrderKey;
     using Secondary = OrderSecondary;
     static const int ORDS_PER_DIST = 3000;
-    uint32_t o_id;  // 10000000 unique ids
-    uint8_t o_d_id;
     uint16_t o_w_id;
+    uint8_t o_d_id;
+    uint32_t o_id;  // 10000000 unique ids
     uint32_t o_c_id;
     uint8_t o_carrier_id;  // 10 unique ids or null
     uint8_t o_ol_cnt;      // numeric(2)
     uint8_t o_all_local;   // numeric(1)
     Timestamp o_entry_d;   // date and time
     void deep_copy_from(const Order& src);
-    void generate(uint16_t o_w_id_, uint8_t o_d_id_, uint32_t o_c_id_, uint32_t o_id_);
+    void generate(uint16_t o_w_id_, uint8_t o_d_id_, uint32_t o_id_, uint32_t o_c_id_);
+    void print();
 };
 
 struct OrderSecondary {
@@ -241,11 +247,12 @@ struct OrderSecondary {
 // Foreign Key (no_w_id, no_d_id, no_o_id) references (o_w_id, o_d_id, o_id)
 struct NewOrder {
     using Key = NewOrderKey;
-    uint32_t no_o_id;
-    uint8_t no_d_id;
     uint16_t no_w_id;
+    uint8_t no_d_id;
+    uint32_t no_o_id;
     void deep_copy_from(const NewOrder& src);
     void generate(uint16_t no_w_id_, uint8_t no_d_id_, uint32_t no_o_id_);
+    void print();
 };
 
 // Primary Key (ol_w_id, ol_d_id, ol_o_id, ol_number)
@@ -256,9 +263,9 @@ struct OrderLine {
     static const int MIN_ORDLINES_PER_ORD = 5;
     static const int MAX_ORDLINES_PER_ORD = 15;
     static const int DIST_INFO = 24;
-    uint32_t ol_o_id;
-    uint8_t ol_d_id;
     uint16_t ol_w_id;
+    uint8_t ol_d_id;
+    uint32_t ol_o_id;
     uint8_t ol_number;  // 15 unique ids
     uint32_t ol_i_id;   // 200000 unique ids
     uint16_t ol_supply_w_id;
@@ -268,6 +275,7 @@ struct OrderLine {
     char ol_dist_info[DIST_INFO + 1];
     void deep_copy_from(const OrderLine& src);
     void generate(
-        uint16_t ol_w_id_, uint8_t ol_d_id_, uint32_t ol_o_id_, uint16_t ol_supply_w_id_,
-        uint32_t ol_i_id_, uint8_t ol_number_, int64_t o_entry_d_);
+        uint16_t ol_w_id_, uint8_t ol_d_id_, uint32_t ol_o_id_, uint8_t ol_number_,
+        uint16_t ol_supply_w_id_, uint32_t ol_i_id_, int64_t o_entry_d_);
+    void print();
 };
