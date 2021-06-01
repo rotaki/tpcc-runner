@@ -151,5 +151,4 @@ inline void load_all_tables() {
     load_items_table();
     load_warehouses_table();
 }
-
 }  // namespace Initializer

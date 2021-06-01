@@ -25,6 +25,7 @@ protected:
 TEST_F(AtomicityTest, Test1) {
     Database& db = Database::get_db();
     Transaction tx(db);
+    Stat stat;
     Output out;
     PaymentTx payment(1);
     while (payment.input.by_last_name == true) payment.input.generate(1);
@@ -56,7 +57,7 @@ TEST_F(AtomicityTest, Test1) {
         LOG_TRACE("c_data before: %s", c.c_data);
     }
 
-    payment.run(tx, out);
+    payment.run(tx, stat, out);
 
     ASSERT_TRUE(db.get_record(w, w_key));
     ASSERT_EQ(w_ytd + h_amount, w.w_ytd);

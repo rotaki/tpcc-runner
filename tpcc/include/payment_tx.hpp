@@ -5,6 +5,7 @@
 #include <cassert>
 #include <cstdint>
 
+#include "record_key.hpp"
 #include "record_layout.hpp"
 #include "tx_utils.hpp"
 
@@ -68,7 +69,7 @@ public:
     } input;
 
     template <typename Transaction>
-    Status run(Transaction& tx, Output& out) {
+    Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
 
         uint16_t w_id = input.w_id;
@@ -87,23 +88,23 @@ public:
         Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
         res = tx.get_record(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         w.w_ytd += h_amount;
         res = tx.update_record(w_key, w);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         District d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.get_record(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         d.d_ytd += h_amount;
         res = tx.update_record(d_key, d);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         Customer c;
         LOG_TRACE("by_last_name %s", by_last_name ? "true" : "false");
@@ -118,7 +119,7 @@ public:
             res = tx.get_record(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
         }
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
         c_id = c.c_id;
 
         out << c_id << c_d_id << c_w_id << h_amount << h_date;
@@ -138,19 +139,21 @@ public:
 
         res = tx.update_record(Customer::Key::create_key(c_w_id, c_d_id, c_id), c);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         History h;
         create_history(h, w_id, d_id, c_id, c_w_id, c_d_id, h_amount, w.w_name, d.d_name);
         res = tx.insert_record(h);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         if (tx.commit()) {
             LOG_TRACE("commit success");
+            stat.num_commits++;
             return Status::SUCCESS;
         } else {
             LOG_TRACE("commit fail");
+            stat.num_sys_aborts++;
             return Status::SYSTEM_ABORT;
         }
     }

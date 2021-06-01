@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <deque>
 
+#include "record_key.hpp"
 #include "record_layout.hpp"
 #include "tx_utils.hpp"
 
@@ -49,7 +50,7 @@ public:
     } input;
 
     template <typename Transaction>
-    Status run(Transaction& tx, Output& out) {
+    Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
 
         uint16_t c_w_id = input.w_id;
@@ -73,7 +74,7 @@ public:
             res = tx.get_record(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
         }
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         c_id = c.c_id;
         out << c.c_first << c.c_middle << c.c_last << c.c_balance;
@@ -81,7 +82,7 @@ public:
         Order o;
         res = tx.get_order_by_customer_id(o, OrderSecondary::Key::create_key(c_w_id, c_d_id, c_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         out << o.o_id << o.o_entry_d << o.o_carrier_id;
 
@@ -94,13 +95,15 @@ public:
         });
 
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         if (tx.commit()) {
             LOG_TRACE("commit success");
+            stat.num_commits++;
             return Status::SUCCESS;
         } else {
             LOG_TRACE("commit fail");
+            stat.num_sys_aborts++;
             return Status::SYSTEM_ABORT;
         }
     }

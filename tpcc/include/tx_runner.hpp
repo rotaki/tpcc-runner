@@ -18,21 +18,21 @@ template <typename T>
 concept IsStockLevelTx = std::is_same<T, StockLevelTx>::value;
 
 template <IsStockLevelTx TxProfile, typename Transaction>
-inline Status run(Transaction& tx, Output& out) {
+inline Status run(Transaction& tx, Stat& stat, Output& out) {
     TxProfile p(1, 1);
-    return p.run(tx, out);
+    return p.run(tx, stat, out);
 }
 
 template <typename TxProfile, typename Transaction>
-inline Status run(Transaction& tx, Output& out) {
+inline Status run(Transaction& tx, Stat& stat, Output& out) {
     TxProfile p(1);
-    return p.run(tx, out);
+    return p.run(tx, stat, out);
 }
 
 template <typename TxProfile, typename Transaction>
-inline bool run_with_retry(Transaction& tx, Output& out) {
+inline bool run_with_retry(Transaction& tx, Stat& stat, Output& out) {
     for (;;) {
-        Status res = run<TxProfile>(tx, out);
+        Status res = run<TxProfile>(tx, stat, out);
         switch (res) {
         case SUCCESS: LOG_TRACE("success"); return true;
         case USER_ABORT:

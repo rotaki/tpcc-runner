@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "record_key.hpp"
 #include "record_layout.hpp"
 #include "tx_utils.hpp"
 
@@ -34,7 +35,7 @@ public:
     } input;
 
     template <typename Transaction>
-    Status run(Transaction& tx, Output& out) {
+    Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
 
         uint16_t w_id = input.w_id;
@@ -46,7 +47,7 @@ public:
         District d;
         res = tx.get_record(d, District::Key::create_key(w_id, d_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         std::set<uint32_t> s_i_ids;
         OrderLine::Key low = OrderLine::Key::create_key(w_id, d_id, d.d_next_o_id - 20, 0);
@@ -55,14 +56,14 @@ public:
             if (ol.ol_i_id != Item::UNUSED_ID) s_i_ids.insert(ol.ol_i_id);
         });
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) kill_tx(tx, res);
+        if (not_succeeded(tx, res)) kill_tx(tx, res, stat);
 
         auto it = s_i_ids.begin();
         Stock s;
         while (it != s_i_ids.end()) {
             res = tx.get_record(s, Stock::Key::create_key(w_id, *it));
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res);
+            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
             if (s.s_quantity >= threshold) {
                 it = s_i_ids.erase(it);
             } else {
@@ -74,9 +75,11 @@ public:
 
         if (tx.commit()) {
             LOG_TRACE("commit success");
+            stat.num_commits++;
             return Status::SUCCESS;
         } else {
             LOG_TRACE("commit fail");
+            stat.num_sys_aborts++;
             return Status::SYSTEM_ABORT;
         }
     }

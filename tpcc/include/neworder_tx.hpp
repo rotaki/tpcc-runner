@@ -4,6 +4,7 @@
 
 #include <cstdint>
 
+#include "record_key.hpp"
 #include "record_layout.hpp"
 #include "tx_utils.hpp"
 
@@ -72,7 +73,7 @@ public:
     } input;
 
     template <typename Transaction>
-    Status run(Transaction& tx, Output& out) {
+    Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
 
         bool is_remote = input.is_remote;
@@ -87,23 +88,23 @@ public:
         Warehouse w;
         res = tx.get_record(w, Warehouse::Key::create_key(w_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         District d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.get_record(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         uint32_t o_id = (d.d_next_o_id)++;
         res = tx.update_record(d_key, d);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         Customer c;
         res = tx.get_record(c, Customer::Key::create_key(w_id, d_id, c_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         out << c.c_last << c.c_credit << c.c_discount << w.w_tax << d.d_tax << ol_cnt
             << d.d_next_o_id << o_entry_d;
@@ -112,13 +113,13 @@ public:
         create_neworder(no, w_id, d_id, o_id);
         res = tx.insert_record(no);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         Order o;
         create_order(o, w_id, d_id, c_id, o_id, ol_cnt, is_remote);
         res = tx.insert_record(o);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res);
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         double total = 0;
 
@@ -128,16 +129,19 @@ public:
             uint8_t ol_quantity = input.items[ol_num - 1].ol_quantity;
 
             Item i;
-            if (ol_i_id == Item::UNUSED_ID) return Status::USER_ABORT;
+            if (ol_i_id == Item::UNUSED_ID) {
+                stat.num_usr_aborts++;
+                return Status::USER_ABORT;
+            }
             res = tx.get_record(i, Item::Key::create_key(ol_i_id));
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res);
+            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
             Stock s;
             Stock::Key s_key = Stock::Key::create_key(ol_supply_w_id, ol_i_id);
             res = tx.get_record(s, s_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res);
+            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
             char brand_generic;
             if (strstr(i.i_data, "ORIGINAL") && strstr(s.s_data, "ORIGINAL")) {
@@ -149,7 +153,7 @@ public:
             modify_stock(s, ol_quantity, is_remote);
             res = tx.update_record(s_key, s);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res);
+            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
             double ol_amount = ol_quantity * i.i_price;
             total += ol_amount;
@@ -159,9 +163,8 @@ public:
                 ol, w_id, d_id, o_id, ol_num, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, s);
             res = tx.insert_record(ol);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res);
+            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
-            // todo brand generic
             out << ol_supply_w_id << ol_i_id << i.i_name << ol_quantity << s.s_quantity
                 << brand_generic << i.i_price << ol_amount;
         }
@@ -171,9 +174,11 @@ public:
 
         if (tx.commit()) {
             LOG_TRACE("commit success");
+            stat.num_commits++;
             return Status::SUCCESS;
         } else {
             LOG_TRACE("commit fail");
+            stat.num_sys_aborts++;
             return Status::SYSTEM_ABORT;
         }
     }

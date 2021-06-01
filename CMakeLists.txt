@@ -81,6 +81,28 @@ set_target_properties(
 message(STATUS "[ADDED] tpccrunner_static")
 
 ###############################################################################
+#                                Main binaries                                #
+###############################################################################
+
+file(GLOB_RECURSE EXECUTABLES "${PROJECT_SOURCE_DIR}/executables/*.cpp")
+foreach (EXECUTABLE ${EXECUTABLES})
+  get_filename_component(FILENAME ${EXECUTABLE} NAME_WE)
+  add_executable(${FILENAME} ${EXECUTABLE})
+  target_link_options(${FILENAME} PUBLIC "-pthread")
+  target_compile_options(${FILENAME} PUBLIC "-pthread")
+  target_compile_options(${FILENAME} PRIVATE "-Werror" "-Wall")
+  target_link_libraries(${FILENAME} tpccrunner_static)
+  set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
+  set_target_properties(
+    ${FILENAME}
+    PROPERTIES
+    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+  )
+endforeach (EXECUTABLE ${EXECUTABLES})
+
+###############################################################################
 #                                 Test binaries                                #
 ###############################################################################
 
