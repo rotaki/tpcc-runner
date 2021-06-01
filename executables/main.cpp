@@ -67,4 +67,20 @@ int main(int argc, const char* argv[]) {
     for (int i = 0; i < num_threads; i++) {
         threads[i].join();
     }
+
+    int total_commits = 0;
+    int total_usr_aborts = 0;
+    int total_sys_aborts = 0;
+
+    for (int i = 0; i < num_threads; i++) {
+        total_commits += t_data[i].stat.num_commits;
+        total_usr_aborts += t_data[i].stat.num_usr_aborts;
+        total_sys_aborts += t_data[i].stat.num_sys_aborts;
+    }
+
+    printf("In %d seconds\n", seconds);
+    printf("    num commits: %d\n", total_commits);
+    printf("    num sys aborts: %d\n", total_sys_aborts);
+    printf("    num usr aborts: %d\n", total_usr_aborts);
+    printf("Throughput: %d\n", total_commits / seconds);
 }
