@@ -25,7 +25,6 @@ public:
         Timestamp h_date;
         bool by_last_name;
         char c_last[Customer::MAX_LAST + 1];
-        bool ROLLBACK_MODE_FOR_TEST = 0;
 
         void generate(uint16_t w_id0) {
             const Config& c = get_config();
@@ -147,18 +146,12 @@ public:
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res);
 
-        if (input.ROLLBACK_MODE_FOR_TEST) {
-            LOG_TRACE("rollback mode for testing");
-            tx.abort();
-            return Status::SYSTEM_ABORT;
+        if (tx.commit()) {
+            LOG_TRACE("commit success");
+            return Status::SUCCESS;
         } else {
-            if (tx.commit()) {
-                LOG_TRACE("commit success");
-                return Status::SUCCESS;
-            } else {
-                LOG_TRACE("commit fail");
-                return Status::SYSTEM_ABORT;
-            }
+            LOG_TRACE("commit fail");
+            return Status::SYSTEM_ABORT;
         }
     }
 

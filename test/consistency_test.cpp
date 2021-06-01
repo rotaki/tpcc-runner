@@ -13,13 +13,12 @@
 #include "utils.hpp"
 
 
-class InitialPopulationTest : public ::testing::Test {
+class ConsistencyTest : public ::testing::Test {
 protected:
     static void SetUpTestSuite() {
         Config& c = get_mutable_config();
         c.set_num_warehouses(num_warehouse);
-        Initializer::load_items_table();
-        Initializer::load_warehouses_table();
+        Initializer::load_all_tables();
     }
 
     static constexpr uint16_t num_warehouse = 1;
@@ -106,7 +105,7 @@ void check_order_orderline_relationship(uint16_t w_id, uint8_t d_id) {
     ASSERT_EQ(sum_ol_cnt, n);
 }
 
-TEST_F(InitialPopulationTest, ConsistencyTest1) {
+TEST_F(ConsistencyTest, Test1) {
     Database& db = Database::get_db();
     Warehouse w;
     for (uint16_t w_id = 1; w_id <= num_warehouse; w_id++) {
@@ -115,7 +114,7 @@ TEST_F(InitialPopulationTest, ConsistencyTest1) {
     }
 }
 
-TEST_F(InitialPopulationTest, ConsistencyTest2) {
+TEST_F(ConsistencyTest, Test2) {
     Database& db = Database::get_db();
     District d;
     for (uint16_t w_id = 1; w_id <= num_warehouse; w_id++) {
@@ -129,7 +128,7 @@ TEST_F(InitialPopulationTest, ConsistencyTest2) {
     }
 }
 
-TEST_F(InitialPopulationTest, ConsistencyTest3) {
+TEST_F(ConsistencyTest, Test3) {
     for (uint16_t w_id = 1; w_id <= num_warehouse; w_id++) {
         for (uint8_t d_id = 1; d_id <= District::DISTS_PER_WARE; d_id++) {
             check_min_max_order_id_in_neworder(w_id, d_id);
@@ -137,7 +136,7 @@ TEST_F(InitialPopulationTest, ConsistencyTest3) {
     }
 }
 
-TEST_F(InitialPopulationTest, ConsistencyTest4) {
+TEST_F(ConsistencyTest, Test4) {
     for (uint16_t w_id = 1; w_id <= num_warehouse; w_id++) {
         for (uint8_t d_id = 1; d_id <= District::DISTS_PER_WARE; d_id++) {
             check_order_orderline_relationship(w_id, w_id);

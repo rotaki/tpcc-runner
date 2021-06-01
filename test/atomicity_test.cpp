@@ -16,7 +16,7 @@ protected:
     static void SetUpTestSuite() {
         Config& c = get_mutable_config();
         c.set_num_warehouses(num_warehouse);
-        Initializer::load_warehouses_table();
+        Initializer::load_all_tables();
     }
 
     static constexpr uint16_t num_warehouse = 1;
@@ -74,7 +74,7 @@ TEST_F(AtomicityTest, Test1) {
     }
 }
 
-TEST_F(AtomicityTest, Test2) {
+/* TEST_F(AtomicityTest, Test2) {
     Database& db = Database::get_db();
     Transaction tx(db);
     Output out;
@@ -124,4 +124,4 @@ TEST_F(AtomicityTest, Test2) {
     if (c.c_credit[0] == 'B' && c.c_credit[1] == 'C') {
         LOG_TRACE("c_data after: %s", c.c_data);
     }
-}
+} */
