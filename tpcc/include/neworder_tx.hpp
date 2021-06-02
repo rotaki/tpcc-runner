@@ -133,7 +133,7 @@ public:
 
             Item i;
             if (ol_i_id == Item::UNUSED_ID) {
-                stat.num_usr_aborts++;
+                stat.num_usr_aborts[0]++;
                 return Status::USER_ABORT;
             }
             res = tx.get_record(i, Item::Key::create_key(ol_i_id));
@@ -178,11 +178,11 @@ public:
 
         if (tx.commit()) {
             LOG_TRACE("commit success");
-            stat.num_commits++;
+            stat.num_commits[0]++;
             return Status::SUCCESS;
         } else {
             LOG_TRACE("commit fail");
-            stat.num_sys_aborts++;
+            stat.num_sys_aborts[0]++;
             return Status::SYSTEM_ABORT;
         }
     }
@@ -244,5 +244,10 @@ private:
             s.s_quantity = (s.s_quantity - ol_quantity) + 91;
         s.s_order_cnt += 1;
         if (is_remote) s.s_remote_cnt += 1;
+    }
+
+    template <typename Transaction>
+    Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat) {
+        return ::kill_tx(tx, res, stat, 0);
     }
 };

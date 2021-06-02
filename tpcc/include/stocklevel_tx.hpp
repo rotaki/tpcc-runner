@@ -75,12 +75,18 @@ public:
 
         if (tx.commit()) {
             LOG_TRACE("commit success");
-            stat.num_commits++;
+            stat.num_commits[4]++;
             return Status::SUCCESS;
         } else {
             LOG_TRACE("commit fail");
-            stat.num_sys_aborts++;
+            stat.num_sys_aborts[4]++;
             return Status::SYSTEM_ABORT;
         }
+    }
+
+private:
+    template <typename Transaction>
+    Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat) {
+        return ::kill_tx(tx, res, stat, 4);
     }
 };

@@ -149,11 +149,11 @@ public:
 
         if (tx.commit()) {
             LOG_TRACE("commit success");
-            stat.num_commits++;
+            stat.num_commits[1]++;
             return Status::SUCCESS;
         } else {
             LOG_TRACE("commit fail");
-            stat.num_sys_aborts++;
+            stat.num_sys_aborts[1]++;
             return Status::SYSTEM_ABORT;
         }
     }
@@ -183,5 +183,10 @@ private:
         h.h_date = get_timestamp();
         h.h_amount = h_amount;
         snprintf(h.h_data, sizeof(h.h_data), "%-10.10s    %.10s", w_name, d_name);
+    }
+
+    template <typename Transaction>
+    Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat) {
+        return ::kill_tx(tx, res, stat, 1);
     }
 };

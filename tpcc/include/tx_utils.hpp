@@ -41,9 +41,9 @@ private:
 };
 
 struct Stat {
-    size_t num_commits = 0;
-    size_t num_usr_aborts = 0;
-    size_t num_sys_aborts = 0;
+    size_t num_commits[5] = {};
+    size_t num_usr_aborts[5] = {};
+    size_t num_sys_aborts[5] = {};
 };
 
 struct ThreadLocalData {
@@ -63,12 +63,14 @@ inline bool not_succeeded(Transaction& tx, typename Transaction::Result& res) {
 }
 
 template <typename Transaction>
-inline Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat) {
+inline Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat, int n) {
     assert(not_succeeded(tx, res));
     if (res == Transaction::Result::FAIL) {
         return Status::BUG;
     } else {
-        stat.num_sys_aborts++;
+        assert(n >= 0);
+        assert(n <= 4);
+        stat.num_sys_aborts[n]++;
         return Status::SYSTEM_ABORT;
     }
 }
