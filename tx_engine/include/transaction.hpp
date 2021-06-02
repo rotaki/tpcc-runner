@@ -12,16 +12,16 @@ class Transaction {
 public:
     Transaction(Database& db)
         : db(db)
-        , ws(db) {}
-
-    void abort() {
-        cm.release();
-        ws.clear_all();
+        , ws(db) {
+        cm.lock();
     }
+
+    ~Transaction() { cm.release(); }
+
+    void abort() { ws.clear_all(); }
 
     bool commit() {
         if (ws.apply_to_database()) {
-            cm.release();
             return true;
         } else {
             abort();
@@ -37,11 +37,6 @@ public:
 
     template <typename Record>
     Result get_record(Record& rec, typename Record::Key key) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.slock()) {
-            abort();
-            return Result::ABORT;
-        }
         if (db.get_record<Record>(rec, key)) {
             return Result::SUCCESS;
         } else {
@@ -51,11 +46,6 @@ public:
 
     template <IsHistory Record>
     Result insert_record(const Record& rec) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.xlock()) {
-            abort();
-            return Result::ABORT;
-        }
         if (ws.insert_logrecord(LogType::INSERT, &(rec))) {
             return Result::SUCCESS;
         } else {
@@ -65,11 +55,6 @@ public:
 
     template <typename Record>
     Result insert_record(const Record& rec) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.xlock()) {
-            abort();
-            return Result::ABORT;
-        }
         if (ws.insert_logrecord(LogType::INSERT, Record::Key::create_key(rec), &rec)) {
             return Result::SUCCESS;
         } else {
@@ -79,11 +64,6 @@ public:
 
     template <typename Record>
     Result update_record(typename Record::Key key, const Record& rec) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.xlock()) {
-            abort();
-            return Result::ABORT;
-        }
         if (ws.insert_logrecord(LogType::UPDATE, key, &rec)) {
             return Result::SUCCESS;
         } else {
@@ -93,11 +73,6 @@ public:
 
     template <typename Record>
     Result delete_record(typename Record::Key key) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.xlock()) {
-            abort();
-            return Result::ABORT;
-        }
         Record* rec_ptr = nullptr;
         if (ws.insert_logrecord(LogType::DELETE, key, rec_ptr)) {
             return Result::SUCCESS;
@@ -107,11 +82,6 @@ public:
     }
 
     Result get_customer_by_last_name(Customer& c, CustomerSecondary::Key c_sec_key) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.slock()) {
-            abort();
-            return Result::ABORT;
-        }
         auto low_iter = db.get_lower_bound_iter<CustomerSecondary>(c_sec_key);
         auto up_iter = db.get_upper_bound_iter<CustomerSecondary>(c_sec_key);
 
@@ -136,11 +106,6 @@ public:
     }
 
     Result get_order_by_customer_id(Order& o, OrderSecondary::Key o_sec_key) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.slock()) {
-            abort();
-            return Result::ABORT;
-        }
         auto low_iter = db.get_lower_bound_iter<OrderSecondary>(o_sec_key);
         auto up_iter = db.get_upper_bound_iter<OrderSecondary>(o_sec_key);
         if (low_iter == up_iter) return Result::FAIL;
@@ -160,11 +125,6 @@ public:
     }
 
     Result get_neworder_with_smallest_key_no_less_than(NewOrder& no, NewOrder::Key low) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.slock()) {
-            abort();
-            return Result::ABORT;
-        }
         auto low_iter = db.get_lower_bound_iter<NewOrder>(low);
         if (low_iter->first.w_id == low.w_id && low_iter->first.d_id == low.d_id) {
             no.deep_copy_from(low_iter->second);
@@ -177,11 +137,6 @@ public:
     // [low ,up)
     template <typename Record, typename Func>
     Result range_query(typename Record::Key low, typename Record::Key up, Func&& func) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.slock()) {
-            abort();
-            return Result::ABORT;
-        }
         auto low_iter = db.get_lower_bound_iter<Record>(low);
         auto up_iter = db.get_lower_bound_iter<Record>(up);
         for (auto it = low_iter; it != up_iter; it++) {
@@ -193,11 +148,6 @@ public:
     // [low ,up)
     template <typename Record, typename Func>
     Result range_update(typename Record::Key low, typename Record::Key up, Func&& func) {
-        LOG_TRACE("%c", cm.get_lock_type());
-        if (!cm.xlock()) {
-            abort();
-            return Result::ABORT;
-        }
         auto low_iter = db.get_lower_bound_iter<Record>(low);
         auto up_iter = db.get_lower_bound_iter<Record>(up);
 

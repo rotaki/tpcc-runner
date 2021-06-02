@@ -36,7 +36,7 @@ void run_tx(int* flag, ThreadLocalData& t_data) {
 
 int main(int argc, const char* argv[]) {
     if (argc != 4) {
-        LOG_ERROR("num_warehouses num_threads seconds\n");
+        printf("num_warehouses num_threads seconds\n");
         exit(1);
     }
 
@@ -47,9 +47,9 @@ int main(int argc, const char* argv[]) {
     Config& c = get_mutable_config();
     c.set_num_warehouses(num_warehouse);
 
-    LOG_INFO("Loading all tables with %" PRIu16 " warehouses", num_warehouse);
+    printf("Loading all tables with %" PRIu16 " warehouses\n", num_warehouse);
     Initializer::load_all_tables();
-    LOG_INFO("Loaded");
+    printf("Loaded\n");
 
     std::vector<std::thread> threads;
 
