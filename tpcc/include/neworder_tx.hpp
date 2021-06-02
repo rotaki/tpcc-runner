@@ -87,14 +87,12 @@ public:
 
         Warehouse w;
         res = tx.get_record(w, Warehouse::Key::create_key(w_id));
-        w.print();
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
         District d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.get_record(d, d_key);
-        d.print();
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
@@ -164,7 +162,6 @@ public:
             OrderLine ol;
             create_orderline(
                 ol, w_id, d_id, o_id, ol_num, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, s);
-            ol.print();
             res = tx.insert_record(ol);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
