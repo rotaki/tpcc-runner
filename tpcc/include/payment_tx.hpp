@@ -84,68 +84,56 @@ public:
 
         out << w_id << d_id;
 
-        Warehouse w;
+        Warehouse* w;
         Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
-        res = tx.get_record(w, w_key);
+        res = tx.prepare_record_for_update(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        w->w_ytd += h_amount;
 
-        w.w_ytd += h_amount;
-        res = tx.update_record(w_key, w);
-        LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
-
-        District d;
+        District* d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
-        res = tx.get_record(d, d_key);
+        res = tx.prepare_record_for_update(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        d->d_ytd += h_amount;
 
-        d.d_ytd += h_amount;
-        res = tx.update_record(d_key, d);
-        LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
-
-        Customer c;
+        Customer* c = nullptr;
         LOG_TRACE("by_last_name %s", by_last_name ? "true" : "false");
         if (by_last_name) {
             LOG_TRACE("c_last: %s", c_last);
             assert(c_id == Customer::UNUSED_ID);
             CustomerSecondary::Key c_last_key =
                 CustomerSecondary::Key::create_key(c_w_id, c_d_id, c_last);
-            res = tx.get_customer_by_last_name(c, c_last_key);
+            res = tx.get_customer_by_last_name_and_prepare_for_update(c, c_last_key);
         } else {
             assert(c_id != Customer::UNUSED_ID);
-            res = tx.get_record(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
+            res = tx.prepare_record_for_update(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
         }
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
-        c_id = c.c_id;
+        c_id = c->c_id;
 
         out << c_id << c_d_id << c_w_id << h_amount << h_date;
-        out << w.w_address << d.d_address;
-        out << c.c_first << c.c_middle << c.c_last << c.c_address;
-        out << c.c_phone << c.c_since << c.c_credit << c.c_credit_lim;
-        out << c.c_discount << c.c_balance;
+        out << w->w_address << d->d_address;
+        out << c->c_first << c->c_middle << c->c_last << c->c_address;
+        out << c->c_phone << c->c_since << c->c_credit << c->c_credit_lim;
+        out << c->c_discount << c->c_balance;
 
-        c.c_balance -= h_amount;
-        c.c_ytd_payment += h_amount;
-        c.c_payment_cnt += 1;
+        c->c_balance -= h_amount;
+        c->c_ytd_payment += h_amount;
+        c->c_payment_cnt += 1;
 
-        if (c.c_credit[0] == 'B' && c.c_credit[1] == 'C') {
-            out << c.c_data;
-            modify_customer_data(c, w_id, d_id, c_w_id, c_d_id, h_amount);
+        if (c->c_credit[0] == 'B' && c->c_credit[1] == 'C') {
+            out << c->c_data;
+            modify_customer_data(*c, w_id, d_id, c_w_id, c_d_id, h_amount);
         }
 
-        res = tx.update_record(Customer::Key::create_key(c_w_id, c_d_id, c_id), c);
+        History* h;
+        res = tx.prepare_record_for_insert(h);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
-
-        History h;
-        create_history(h, w_id, d_id, c_id, c_w_id, c_d_id, h_amount, w.w_name, d.d_name);
-        res = tx.insert_record(h);
-        LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        create_history(*h, w_id, d_id, c_id, c_w_id, c_d_id, h_amount, w->w_name, d->d_name);
 
         if (tx.commit()) {
             LOG_TRACE("commit success");

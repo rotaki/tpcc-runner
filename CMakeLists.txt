@@ -8,6 +8,45 @@ project(
 
 message(STATUS "Welcome to tpcc-runner, Version: ${PROJECT_VERSION}")
 
+message(STATUS "Compiler: ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "System: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION} ${CMAKE_SYSTEM_PROCESSOR}")
+
+function(print_sys_info QUERY_TARGET)
+    cmake_host_system_information(RESULT SYS_INFO QUERY ${QUERY_TARGET})
+    message(STATUS "  System ${QUERY_TARGET}: ${SYS_INFO}")
+endfunction()
+print_sys_info("NUMBER_OF_LOGICAL_CORES;NUMBER_OF_PHYSICAL_CORES")
+print_sys_info("HOSTNAME;FQDN")
+print_sys_info("AVAILABLE_VIRTUAL_MEMORY;TOTAL_VIRTUAL_MEMORY")
+print_sys_info("AVAILABLE_PHYSICAL_MEMORY;TOTAL_PHYSICAL_MEMORY")
+print_sys_info("IS_64BIT;HAS_IA64")
+print_sys_info("HAS_FPU;HAS_MMX;HAS_MMX_PLUS")
+print_sys_info("HAS_SSE;HAS_SSE2;HAS_SSE_FP;HAS_SSE_MMX")
+print_sys_info("HAS_AMD_3DNOW;HAS_AMD_3DNOW_PLUS")
+print_sys_info("HAS_SERIAL_NUMBER;PROCESSOR_SERIAL_NUMBER")
+print_sys_info("PROCESSOR_NAME;PROCESSOR_DESCRIPTION")
+print_sys_info("OS_NAME;OS_RELEASE;OS_VERSION;OS_PLATFORM")
+
+# Set a default build type if none was specified
+set(default_build_type "Release")
+if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
+  set(default_build_type "Debug")
+endif()
+ 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
+  set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
+      STRING "Choose the type of build." FORCE)
+  # Set the possible values of build type for cmake-gui
+  set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
+    "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
+endif()
+
+set(CMAKE_CXX_FLAGS_DEBUG          "-O0 -g")
+set(CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE        "-Ofast -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Ofast -DNDEBUG -g")
+message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
 ###############################################################################
 #                            Static library of tpcc                           #
@@ -22,7 +61,7 @@ list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/tx_engine/incl
 
 set(LOG_LEVEL
   "1"
-  CACHE STRING "Log level. 0(off) 1(error) 2(warn) 3(into) 4(debug) 5(trace)")
+  CACHE STRING "0(off) 1(error) 2(warn) 3(into) 4(debug) 5(trace)")
 
 list(APPEND TPCCRUNNER_COMPILE_DEFINITIONS "-DLOG_LEVEL=${LOG_LEVEL}")
 if ("${LOG_LEVEL}" STREQUAL "0")
@@ -158,8 +197,7 @@ else()
     COMMENT "Running: format"
     COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
     --clang-format-executable ${CLANG_FORMAT_BIN}
-    -r ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/include
+    -r ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/include
     ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/src
     ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/include
     ${CMAKE_CURRENT_SOURCE_DIR}/test
@@ -172,8 +210,7 @@ else()
     COMMENT "Running: check-format"
     COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
     --clang-format-executable ${CLANG_FORMAT_BIN}
-    -r ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/include
+    -r ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/include
     ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/src
     ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/include
     ${CMAKE_CURRENT_SOURCE_DIR}/test

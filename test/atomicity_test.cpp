@@ -22,6 +22,7 @@ protected:
     static constexpr uint16_t num_warehouse = 1;
 };
 
+
 TEST_F(AtomicityTest, Test1) {
     Database& db = Database::get_db();
     Transaction tx(db);
@@ -36,42 +37,42 @@ TEST_F(AtomicityTest, Test1) {
 
     ASSERT_GE(c_id, 1);
 
-    Warehouse w;
+    const Warehouse* w;
     Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
     ASSERT_TRUE(db.get_record(w, w_key));
-    double w_ytd = w.w_ytd;
+    double w_ytd = w->w_ytd;
 
-    District d;
+    const District* d;
     District::Key d_key = District::Key::create_key(w_id, d_id);
     ASSERT_TRUE(db.get_record(d, d_key));
-    double d_ytd = d.d_ytd;
+    double d_ytd = d->d_ytd;
 
-    Customer c;
+    const Customer* c;
     Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
     ASSERT_TRUE(db.get_record(c, c_key));
-    double c_balance = c.c_balance;
-    double c_ytd_payment = c.c_ytd_payment;
-    uint16_t c_payment_cnt = c.c_payment_cnt;
+    double c_balance = c->c_balance;
+    double c_ytd_payment = c->c_ytd_payment;
+    uint16_t c_payment_cnt = c->c_payment_cnt;
 
-    if (c.c_credit[0] == 'B' && c.c_credit[1] == 'C') {
-        LOG_TRACE("c_data before: %s", c.c_data);
+    if (c->c_credit[0] == 'B' && c->c_credit[1] == 'C') {
+        LOG_TRACE("c_data before: %s", c->c_data);
     }
 
     payment.run(tx, stat, out);
 
     ASSERT_TRUE(db.get_record(w, w_key));
-    ASSERT_EQ(w_ytd + h_amount, w.w_ytd);
+    ASSERT_EQ(w_ytd + h_amount, w->w_ytd);
 
     ASSERT_TRUE(db.get_record(d, d_key));
-    ASSERT_EQ(d_ytd + h_amount, d.d_ytd);
+    ASSERT_EQ(d_ytd + h_amount, d->d_ytd);
 
     ASSERT_TRUE(db.get_record(c, c_key));
-    ASSERT_EQ(c_ytd_payment + h_amount, c.c_ytd_payment);
-    ASSERT_EQ(c_balance - h_amount, c.c_balance);
-    ASSERT_EQ(c_payment_cnt + 1, c.c_payment_cnt);
+    ASSERT_EQ(c_ytd_payment + h_amount, c->c_ytd_payment);
+    ASSERT_EQ(c_balance - h_amount, c->c_balance);
+    ASSERT_EQ(c_payment_cnt + 1, c->c_payment_cnt);
 
-    if (c.c_credit[0] == 'B' && c.c_credit[1] == 'C') {
-        LOG_TRACE("c_data after: %s", c.c_data);
+    if (c->c_credit[0] == 'B' && c->c_credit[1] == 'C') {
+        LOG_TRACE("c_data after: %s", c->c_data);
     }
 }
 

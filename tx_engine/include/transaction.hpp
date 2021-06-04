@@ -36,8 +36,9 @@ public:
     };
 
     template <typename Record>
-    Result get_record(Record& rec, typename Record::Key key) {
-        if (db.get_record<Record>(rec, key)) {
+    Result get_record(const Record*& rec_ptr, typename Record::Key rec_key) {
+        // rec_ptr points to data in db
+        if (db.get_record<Record>(rec_ptr, rec_key)) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -45,8 +46,9 @@ public:
     }
 
     template <IsHistory Record>
-    Result insert_record(const Record& rec) {
-        if (ws.insert_logrecord(LogType::INSERT, &(rec))) {
+    Result prepare_record_for_insert(Record*& rec_ptr) {
+        rec_ptr = ws.apply_insert_to_writeset<Record>();
+        if (rec_ptr) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -54,8 +56,10 @@ public:
     }
 
     template <typename Record>
-    Result insert_record(const Record& rec) {
-        if (ws.insert_logrecord(LogType::INSERT, Record::Key::create_key(rec), &rec)) {
+    Result prepare_record_for_insert(Record*& rec_ptr, typename Record::Key rec_key) {
+        // rec_ptr points to data in writeset
+        rec_ptr = ws.apply_insert_to_writeset<Record>(rec_key);
+        if (rec_ptr) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -63,8 +67,10 @@ public:
     }
 
     template <typename Record>
-    Result update_record(typename Record::Key key, const Record& rec) {
-        if (ws.insert_logrecord(LogType::UPDATE, key, &rec)) {
+    Result prepare_record_for_update(Record*& rec_ptr, typename Record::Key rec_key) {
+        // rec_ptr points to data in writeset copied from db
+        rec_ptr = ws.apply_update_to_writeset<Record>(rec_key);
+        if (rec_ptr) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -72,16 +78,15 @@ public:
     }
 
     template <typename Record>
-    Result delete_record(typename Record::Key key) {
-        Record* rec_ptr = nullptr;
-        if (ws.insert_logrecord(LogType::DELETE, key, rec_ptr)) {
+    Result delete_record(typename Record::Key rec_key) {
+        if (ws.apply_delete_to_writeset<Record>(rec_key)) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
         }
     }
 
-    Result get_customer_by_last_name(Customer& c, CustomerSecondary::Key c_sec_key) {
+    Result get_customer_by_last_name(const Customer*& c, CustomerSecondary::Key c_sec_key) {
         auto low_iter = db.get_lower_bound_iter<CustomerSecondary>(c_sec_key);
         auto up_iter = db.get_upper_bound_iter<CustomerSecondary>(c_sec_key);
 
@@ -101,11 +106,35 @@ public:
                 return strncmp(lhs.ptr->c_first, rhs.ptr->c_first, Customer::MAX_FIRST) < 0;
             });
 
-        c.deep_copy_from(*(temp[(n + 1) / 2 - 1].ptr));
-        return Result::SUCCESS;
+        c = temp[(n + 1) / 2 - 1].ptr;
+        if (c) {
+            return Result::SUCCESS;
+        } else {
+            return Result::FAIL;
+        }
     }
 
-    Result get_order_by_customer_id(Order& o, OrderSecondary::Key o_sec_key) {
+    Result get_customer_by_last_name_and_prepare_for_update(
+        Customer*& c, CustomerSecondary::Key c_sec_key) {
+        const Customer* c_temp;
+        get_customer_by_last_name(c_temp, c_sec_key);
+
+        if (!c_temp) {
+            return Result::FAIL;
+        }
+
+        // create update record in writeset
+        Customer::Key c_key = Customer::Key::create_key(*c_temp);
+        c = ws.apply_update_to_writeset<Customer>(c_key);
+
+        if (c) {
+            return Result::SUCCESS;
+        } else {
+            return Result::FAIL;
+        }
+    }
+
+    Result get_order_by_customer_id(const Order*& o, OrderSecondary::Key o_sec_key) {
         auto low_iter = db.get_lower_bound_iter<OrderSecondary>(o_sec_key);
         auto up_iter = db.get_upper_bound_iter<OrderSecondary>(o_sec_key);
         if (low_iter == up_iter) return Result::FAIL;
@@ -119,15 +148,18 @@ public:
                 o_ptr = it->second.ptr;
             }
         }
-        assert(o_ptr != nullptr);
-        o.deep_copy_from(*o_ptr);
-        return Result::SUCCESS;
+        o = o_ptr;
+        if (o) {
+            return Result::SUCCESS;
+        } else {
+            return Result::FAIL;
+        }
     }
 
-    Result get_neworder_with_smallest_key_no_less_than(NewOrder& no, NewOrder::Key low) {
+    Result get_neworder_with_smallest_key_no_less_than(const NewOrder*& no, NewOrder::Key low) {
         auto low_iter = db.get_lower_bound_iter<NewOrder>(low);
         if (low_iter->first.w_id == low.w_id && low_iter->first.d_id == low.d_id) {
-            no.deep_copy_from(low_iter->second);
+            no = low_iter->second.get();
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
@@ -140,7 +172,7 @@ public:
         auto low_iter = db.get_lower_bound_iter<Record>(low);
         auto up_iter = db.get_lower_bound_iter<Record>(up);
         for (auto it = low_iter; it != up_iter; it++) {
-            func(it->second);
+            func(*(it->second));
         }
         return Result::SUCCESS;
     }
@@ -152,13 +184,9 @@ public:
         auto up_iter = db.get_lower_bound_iter<Record>(up);
 
         for (auto it = low_iter; it != up_iter; it++) {
-            if (!ws.insert_logrecord<Record>(LogType::UPDATE, it->first, &(it->second)))
-                return Result::FAIL;
-            LogRecord<Record>* logrec_ptr = ws.lookup_logrecord<Record>(it->first);
-            if (logrec_ptr)
-                func(logrec_ptr->rec);
-            else
-                return Result::FAIL;
+            Record* rec_ptr = ws.apply_update_to_writeset<Record>(it->first);
+            assert(rec_ptr != nullptr);
+            func(*(rec_ptr));
         }
         return Result::SUCCESS;
     }

@@ -61,7 +61,7 @@ public:
 
         out << c_w_id << c_d_id << c_id;
 
-        Customer c;
+        const Customer* c;
         LOG_TRACE("by_last_name %s", by_last_name ? "true" : "false");
         if (by_last_name) {
             LOG_TRACE("c_last: %s", c_last);
@@ -76,20 +76,20 @@ public:
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
-        c_id = c.c_id;
-        out << c.c_first << c.c_middle << c.c_last << c.c_balance;
+        c_id = c->c_id;
+        out << c->c_first << c->c_middle << c->c_last << c->c_balance;
 
-        Order o;
+        const Order* o;
         res = tx.get_order_by_customer_id(o, OrderSecondary::Key::create_key(c_w_id, c_d_id, c_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
-        out << o.o_id << o.o_entry_d << o.o_carrier_id;
+        out << o->o_id << o->o_entry_d << o->o_carrier_id;
 
-        OrderLine::Key low = OrderLine::Key::create_key(o.o_w_id, o.o_d_id, o.o_c_id, 0);
-        OrderLine::Key up = OrderLine::Key::create_key(o.o_w_id, o.o_d_id, o.o_c_id + 1, 0);
+        OrderLine::Key low = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_c_id, 0);
+        OrderLine::Key up = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_c_id + 1, 0);
 
-        res = tx.template range_query<OrderLine>(low, up, [&out](OrderLine& ol) {
+        res = tx.template range_query<OrderLine>(low, up, [&out](const OrderLine& ol) {
             out << ol.ol_supply_w_id << ol.ol_i_id << ol.ol_quantity << ol.ol_amount
                 << ol.ol_delivery_d;
         });

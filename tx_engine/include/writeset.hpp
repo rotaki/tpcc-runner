@@ -1,3 +1,4 @@
+#include "cache.hpp"
 #include "database.hpp"
 #include "logger.hpp"
 #include "record_layout.hpp"
@@ -6,9 +7,12 @@ enum LogType { INSERT, UPDATE, DELETE };
 
 template <typename Record>
 struct LogRecord {
-    LogType lt;
-    Record rec;
     LogRecord() = default;
+    LogRecord(LogType lt, std::unique_ptr<Record> rec_ptr)
+        : lt(lt)
+        , rec_ptr(std::move(rec_ptr)) {}
+    LogType lt;
+    std::unique_ptr<Record> rec_ptr;
 };
 
 template <typename Record>
@@ -21,70 +25,120 @@ struct RecordToWS<History> {
     using WS = std::deque<LogRecord<History>>;
 };
 
-struct WriteSet {
-    Database& db;
 
+class WriteSet {
+public:
     WriteSet(Database& db)
         : db(db) {}
+
+    ~WriteSet() { clear_all(); }
 
     template <typename Record>
     typename RecordToWS<Record>::WS& get_ws() {
         if constexpr (std::is_same<Record, Item>::value) {
-            return items;
+            return ws_i;
         } else if constexpr (std::is_same<Record, Warehouse>::value) {
-            return warehouses;
+            return ws_w;
         } else if constexpr (std::is_same<Record, Stock>::value) {
-            return stocks;
+            return ws_s;
         } else if constexpr (std::is_same<Record, District>::value) {
-            return districts;
+            return ws_d;
         } else if constexpr (std::is_same<Record, Customer>::value) {
-            return customers;
+            return ws_c;
         } else if constexpr (std::is_same<Record, History>::value) {
-            return histories;
+            return ws_h;
         } else if constexpr (std::is_same<Record, Order>::value) {
-            return orders;
+            return ws_o;
         } else if constexpr (std::is_same<Record, NewOrder>::value) {
-            return neworders;
+            return ws_no;
         } else if constexpr (std::is_same<Record, OrderLine>::value) {
-            return orderlines;
+            return ws_ol;
         } else {
-            assert(false);
+            throw std::runtime_error("Undefined Record");
         }
     }
 
     template <typename Record>
-    LogRecord<Record>* lookup_logrecord(typename Record::Key rec_key) {
-        typename RecordToWS<Record>::WS& t = get_ws<Record>();
-        if (t.find(rec_key) == t.end()) {
-            return nullptr;
+    Record* apply_update_to_writeset(typename Record::Key rec_key) {
+        // search into writeset
+        LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
+        if (current_logrec_ptr) {
+            switch (current_logrec_ptr->lt) {
+            case INSERT: return current_logrec_ptr->rec_ptr.get();
+            case UPDATE: return current_logrec_ptr->rec_ptr.get();
+            case DELETE: throw std::runtime_error("Record already deleted");
+            default: throw std::runtime_error("Invalid LogType");
+            }
+        }
+
+        const Record* rec_ptr_in_db;
+        // search into database
+        if (db.get_record<Record>(rec_ptr_in_db, rec_key)) {
+            // allocate memory in writeset
+            Record* rec_ptr_in_ws =
+                create_logrecord(LogType::UPDATE, rec_key, std::move(Cache::allocate<Record>()));
+            // copy from database
+            rec_ptr_in_ws->deep_copy_from(*rec_ptr_in_db);
+            return rec_ptr_in_ws;
         } else {
-            return &(t[rec_key]);
+            throw std::runtime_error("No record to update in db");
         }
     }
 
     template <IsHistory Record>
-    bool insert_logrecord(LogType lt, const Record* rec) {
-        assert(lt == LogType::INSERT);
-        typename RecordToWS<Record>::WS& t = get_ws<Record>();
-        t.emplace_back();
-        t.back().lt = lt;
-        t.back().rec.deep_copy_from(*rec);
-        return true;
+    Record* apply_insert_to_writeset() {
+        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        ws.emplace_back(LogType::INSERT, std::move(Cache::allocate<Record>()));
+        return ws.back().rec_ptr.get();
     }
 
     template <typename Record>
-    bool insert_logrecord(LogType lt, typename Record::Key rec_key, const Record* rec_ptr) {
-        switch (lt) {
-        case LogType::INSERT:
-            assert(rec_ptr != nullptr);
-            return apply_insert_to_writeset(rec_key, *rec_ptr);
-        case LogType::UPDATE:
-            assert(rec_ptr != nullptr);
-            return apply_update_to_writeset(rec_key, *rec_ptr);
-        case LogType::DELETE:
-            assert(rec_ptr == nullptr);
-            return apply_delete_to_writeset<Record>(rec_key);
-        default: assert(false);
+    Record* apply_insert_to_writeset(typename Record::Key rec_key) {
+        // Search into writeset
+        LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
+        if (current_logrec_ptr) {
+            switch (current_logrec_ptr->lt) {
+            case INSERT: throw std::runtime_error("Record already inserted");
+            case UPDATE: throw std::runtime_error("Record already updated");
+            case DELETE:
+                current_logrec_ptr->lt = LogType::UPDATE;
+                return current_logrec_ptr->rec_ptr.get();
+            default: throw std::runtime_error("Invalid LogType");
+            }
+        }
+
+        // Search into db
+        const Record* rec_ptr_in_db;
+        if (!db.get_record<Record>(rec_ptr_in_db, rec_key)) {
+            // allocate memory in writeset
+            return create_logrecord(LogType::INSERT, rec_key, std::move(Cache::allocate<Record>()));
+        } else {
+            throw std::runtime_error("Record already exists in db");
+        }
+    }
+
+    template <typename Record>
+    bool apply_delete_to_writeset(typename Record::Key rec_key) {
+        // search into writeset
+        LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
+        if (current_logrec_ptr) {
+            switch (current_logrec_ptr->lt) {
+            case INSERT:
+                remove_logrecord_with_logtype<Record>(rec_key, LogType::INSERT);
+                return true;
+            case UPDATE: current_logrec_ptr->lt = LogType::DELETE; return true;
+            case DELETE: throw std::runtime_error("Record already deleted");
+            default: throw std::runtime_error("Invalid LogType");
+            }
+        }
+
+        // Search into db
+        const Record* rec_ptr_in_db;
+        if (db.get_record<Record>(rec_ptr_in_db, rec_key)) {
+            create_logrecord(LogType::DELETE, rec_key, std::move(Cache::allocate<Record>()));
+            return true;
+        } else {
+            throw std::runtime_error("Record not found in db");
         }
     }
 
@@ -114,129 +168,99 @@ struct WriteSet {
     }
 
 private:
-    RecordToWS<Item>::WS items;
-    RecordToWS<Warehouse>::WS warehouses;
-    RecordToWS<Stock>::WS stocks;
-    RecordToWS<District>::WS districts;
-    RecordToWS<Customer>::WS customers;
-    RecordToWS<History>::WS histories;
-    RecordToWS<Order>::WS orders;
-    RecordToWS<NewOrder>::WS neworders;
-    RecordToWS<OrderLine>::WS orderlines;
+    Database& db;
+
+    RecordToWS<Item>::WS ws_i;
+    RecordToWS<Warehouse>::WS ws_w;
+    RecordToWS<Stock>::WS ws_s;
+    RecordToWS<District>::WS ws_d;
+    RecordToWS<Customer>::WS ws_c;
+    RecordToWS<History>::WS ws_h;
+    RecordToWS<Order>::WS ws_o;
+    RecordToWS<NewOrder>::WS ws_no;
+    RecordToWS<OrderLine>::WS ws_ol;
 
     template <typename Record>
-    bool apply_insert_to_writeset(typename Record::Key rec_key, const Record& rec) {
-        LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
-        if (current_logrec_ptr) {
-            switch (current_logrec_ptr->lt) {
-            case INSERT: return false;
-            case UPDATE: return false;
-            case DELETE:
-                current_logrec_ptr->lt = LogType::UPDATE;
-                current_logrec_ptr->rec.deep_copy_from(rec);
-                return true;
-            default: assert(false);
-            }
-        }
-
-        if (!db.lookup_record<Record>(rec_key)) {
-            create_logrecord(LogType::INSERT, rec_key, &rec);
-            return true;
+    LogRecord<Record>* lookup_logrecord(typename Record::Key rec_key) {
+        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        if (ws.find(rec_key) == ws.end()) {
+            return nullptr;
         } else {
-            return false;
+            return &(ws[rec_key]);
         }
     }
 
     template <typename Record>
-    bool apply_update_to_writeset(typename Record::Key rec_key, const Record& rec) {
-        LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
-        if (current_logrec_ptr) {
-            switch (current_logrec_ptr->lt) {
-            case INSERT: current_logrec_ptr->rec.deep_copy_from(rec); return true;
-            case UPDATE: current_logrec_ptr->rec.deep_copy_from(rec); return true;
-            case DELETE: return false;
-            default: assert(false);
-            }
-        }
-
-        if (db.lookup_record<Record>(rec_key)) {
-            create_logrecord(LogType::UPDATE, rec_key, &rec);
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    template <typename Record>
-    bool apply_delete_to_writeset(typename Record::Key rec_key) {
-        LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
-        if (current_logrec_ptr) {
-            switch (current_logrec_ptr->lt) {
-            case INSERT:
-                remove_logrecord_with_logtype<Record>(rec_key, LogType::INSERT);
-                return true;
-            case UPDATE: current_logrec_ptr->lt = LogType::DELETE; return true;
-            case DELETE: return false;
-            default: assert(false);
-            }
-        }
-
-        if (db.lookup_record<Record>(rec_key)) {
-            Record* rec_ptr = nullptr;
-            create_logrecord(LogType::DELETE, rec_key, rec_ptr);
-            return true;
-        } else {
-            return false;
-        }
-    }
-
-    template <typename Record>
-    void create_logrecord(LogType lt, typename Record::Key rec_key, const Record* rec_ptr) {
-        typename RecordToWS<Record>::WS& t = get_ws<Record>();
-        if (rec_ptr) {
-            assert(lt == LogType::INSERT || lt == LogType::UPDATE);
-            t[rec_key].lt = lt;
-            t[rec_key].rec.deep_copy_from(*rec_ptr);
-        } else {
-            assert(lt == LogType::DELETE);
-            t[rec_key].lt = lt;
-        }
+    Record* create_logrecord(
+        LogType lt, typename Record::Key rec_key, std::unique_ptr<Record> rec_ptr) {
+        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        ws[rec_key].lt = lt;
+        ws[rec_key].rec_ptr = std::move(rec_ptr);
+        return ws[rec_key].rec_ptr.get();
     }
 
     template <typename Record>
     void remove_logrecord_with_logtype(typename Record::Key rec_key, LogType lt) {
-        typename RecordToWS<Record>::WS& t = get_ws<Record>();
-        if (t[rec_key].lt == lt) {
-            t.erase(rec_key);
+        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        if (ws[rec_key].lt == lt) {
+            Cache::deallocate<Record>(std::move(ws[rec_key].rec_ptr));
+            ws.erase(rec_key);
+        }
+    }
+
+    template <IsHistory Record>
+    void apply_writeset_to_database() {
+        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        for (auto it = ws.begin(); it != ws.end();) {
+            db.insert_record<Record>(std::move(it->rec_ptr));
+            it = ws.erase(it);
+        }
+    }
+
+    template <typename Record>
+    void apply_writeset_to_database() {
+        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        for (auto it = ws.begin(); it != ws.end();) {
+            switch (it->second.lt) {
+            case LogType::INSERT:
+                db.insert_record<Record>(it->first, std::move(it->second.rec_ptr));
+                break;
+            case LogType::UPDATE:
+                db.update_record<Record>(it->first, std::move(it->second.rec_ptr));
+                break;
+            case LogType::DELETE:
+                db.delete_record<Record>(it->first);
+                Cache::deallocate<Record>(std::move(it->second.rec_ptr));
+                break;
+            }
+            it = ws.erase(it);
+        }
+    }
+
+    template <IsHistory Record>
+    void clear_writeset() {
+        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        for (auto it = ws.begin(); it != ws.end();) {
+            if (it->rec_ptr) {
+                Cache::deallocate<Record>(std::move(it->rec_ptr));
+                it = ws.erase(it);
+            } else {
+                throw std::runtime_error("Null pointer found in writeset");
+                it++;
+            }
         }
     }
 
     template <typename Record>
     void clear_writeset() {
-        typename RecordToWS<Record>::WS& t = get_ws<Record>();
-        t.clear();
-    }
-
-    template <IsHistory Record>
-    void apply_writeset_to_database() {
-        typename RecordToWS<Record>::WS& t = get_ws<Record>();
-        for (const auto& logrecord: t) {
-            switch (logrecord.lt) {
-            case INSERT: db.insert_record(logrecord.rec); break;
-            default: assert(false);
-            }
-        }
-    }
-
-    template <typename Record>
-    void apply_writeset_to_database() {
-        typename RecordToWS<Record>::WS& t = get_ws<Record>();
-        for (const auto& [rec_key, logrecord]: t) {
-            switch (logrecord.lt) {
-            case LogType::INSERT: db.insert_record<Record>(logrecord.rec); break;
-            case LogType::UPDATE: db.update_record<Record>(rec_key, logrecord.rec); break;
-            case LogType::DELETE: db.delete_record<Record>(rec_key); break;
-            default: LOG_TRACE("%d", static_cast<int>(logrecord.lt)); assert(false);
+        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        for (auto it = ws.begin(); it != ws.end();) {
+            if (it->second.rec_ptr) {
+                Cache::deallocate<Record>(std::move(it->second.rec_ptr));
+                it = ws.erase(it);
+            } else {
+                throw std::runtime_error("Null poitner found in writeset");
+                it++;
             }
         }
     }

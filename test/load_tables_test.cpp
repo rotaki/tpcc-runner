@@ -10,6 +10,7 @@
 #include "record_layout.hpp"
 #include "utils.hpp"
 
+
 class InitialPopulationTest : public ::testing::Test {
 protected:
     static void SetUpTestSuite() {
@@ -43,17 +44,18 @@ void check_item_record(const Item& i) {
 }
 
 void check_items_table() {
-    Item i;
+    const Item* i;
     uint32_t i_id = 1;
     Item::Key i_key = Item::Key::create_key(i_id);
     ASSERT_TRUE(Database::get_db().get_record<Item>(i, i_key));
-    check_item_record(i);
+    check_item_record(*i);
 
     i_id = 100000;
     i_key = Item::Key::create_key(i_id);
     ASSERT_TRUE(Database::get_db().get_record<Item>(i, i_key));
-    check_item_record(i);
+    check_item_record(*i);
 }
+
 
 void check_address(const Address& a) {
     EXPECT_GE(strlen(a.street_1), 10);
@@ -70,7 +72,8 @@ void check_address(const Address& a) {
     EXPECT_EQ(a.zip[8], '1');
 }
 
-void check_warehouse_record(uint16_t num_warehouse, const Warehouse& w) {
+void check_warehouse_record(const Warehouse& w) {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
     EXPECT_GE(w.w_id, 1);
     EXPECT_LE(w.w_id, num_warehouse);
     EXPECT_GE(strlen(w.w_name), 6);
@@ -81,21 +84,22 @@ void check_warehouse_record(uint16_t num_warehouse, const Warehouse& w) {
     EXPECT_EQ(w.w_ytd, 300000.00);
 }
 
-void check_warehouses_table(uint16_t num_warehouse) {
-    Warehouse w;
+void check_warehouses_table() {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
+    const Warehouse* w;
     uint16_t w_id = 1;
     Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
     ASSERT_TRUE(Database::get_db().get_record<Warehouse>(w, w_key));
-    check_warehouse_record(num_warehouse, w);
+    check_warehouse_record(*w);
 
     w_id = num_warehouse;
     w_key = Warehouse::Key::create_key(w_id);
     ASSERT_TRUE(Database::get_db().get_record<Warehouse>(w, w_key));
-    check_warehouse_record(num_warehouse, w);
+    check_warehouse_record(*w);
 }
 
-
-void check_stock_record(uint16_t num_warehouse, const Stock& s) {
+void check_stock_record(const Stock& s) {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
     EXPECT_GE(s.s_i_id, 1);
     EXPECT_LE(s.s_i_id, 100000);
     EXPECT_GE(s.s_w_id, 1);
@@ -119,22 +123,25 @@ void check_stock_record(uint16_t num_warehouse, const Stock& s) {
     EXPECT_LE(strlen(s.s_data), 50);
 }
 
-void check_stocks_table(uint16_t num_warehouse) {
-    Stock s;
+void check_stocks_table() {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
+    const Stock* s;
     uint16_t w_id = 1;
     uint32_t i_id = 1;
     Stock::Key s_key = Stock::Key::create_key(w_id, i_id);
     ASSERT_TRUE(Database::get_db().get_record<Stock>(s, s_key));
-    check_stock_record(num_warehouse, s);
+    check_stock_record(*s);
 
     w_id = num_warehouse;
     i_id = 100000;
     s_key = Stock::Key::create_key(w_id, i_id);
     ASSERT_TRUE(Database::get_db().get_record<Stock>(s, s_key));
-    check_stock_record(num_warehouse, s);
+    check_stock_record(*s);
 }
 
-void check_district_record(uint16_t num_warehouse, const District& d) {
+
+void check_district_record(const District& d) {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
     EXPECT_GE(d.d_id, 1);
     EXPECT_LE(d.d_id, 10);
     EXPECT_GE(d.d_w_id, 1);
@@ -148,22 +155,24 @@ void check_district_record(uint16_t num_warehouse, const District& d) {
     EXPECT_EQ(d.d_next_o_id, 3001);
 }
 
-void check_districts_table(uint16_t num_warehouse) {
-    District d;
+void check_districts_table() {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
+    const District* d;
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     District::Key d_key = District::Key::create_key(w_id, d_id);
     ASSERT_TRUE(Database::get_db().get_record<District>(d, d_key));
-    check_district_record(num_warehouse, d);
+    check_district_record(*d);
 
     w_id = num_warehouse;
     d_id = 10;
     d_key = District::Key::create_key(w_id, d_id);
     ASSERT_TRUE(Database::get_db().get_record<District>(d, d_key));
-    check_district_record(num_warehouse, d);
+    check_district_record(*d);
 }
 
-void check_customer_record(uint16_t num_warehouse, const Customer& c) {
+void check_customer_record(const Customer& c) {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
     EXPECT_GE(c.c_id, 1);
     EXPECT_LE(c.c_id, 3000);
     EXPECT_GE(c.c_d_id, 1);
@@ -195,24 +204,27 @@ void check_customer_record(uint16_t num_warehouse, const Customer& c) {
     EXPECT_LE(strlen(c.c_data), 500);
 }
 
-void check_customers_table(uint16_t num_warehouse) {
-    Customer c;
+void check_customers_table() {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
+    const Customer* c;
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     uint32_t c_id = 1;
     Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
     ASSERT_TRUE(Database::get_db().get_record<Customer>(c, c_key));
-    check_customer_record(num_warehouse, c);
+    check_customer_record(*c);
 
     w_id = num_warehouse;
     d_id = 10;
     c_id = 3000;
     c_key = Customer::Key::create_key(w_id, d_id, c_id);
     ASSERT_TRUE(Database::get_db().get_record<Customer>(c, c_key));
-    check_customer_record(num_warehouse, c);
+    check_customer_record(*c);
 }
 
-void check_history_record(uint16_t num_warehouse, const History& h) {
+
+void check_history_record(const History& h) {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
     EXPECT_GE(h.h_c_id, 1);
     EXPECT_LE(h.h_c_id, 3000);
     EXPECT_GE(h.h_d_id, 1);
@@ -227,7 +239,8 @@ void check_history_record(uint16_t num_warehouse, const History& h) {
     EXPECT_LE(strlen(h.h_data), 24);
 }
 
-void check_histories_table(uint16_t num_warehouse) {
+void check_histories_table() {
+    // uint16_t num_warehouse = get_config().get_num_warehouses();
     // History h;
     // uint16_t w_id = 1;
     // uint8_t d_id = 1;
@@ -244,7 +257,9 @@ void check_histories_table(uint16_t num_warehouse) {
     // check_history_record(num_warehouse, h);
 }
 
-void check_order_record(uint16_t num_warehouse, const Order& o) {
+
+void check_order_record(const Order& o) {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
     EXPECT_GE(o.o_id, 1);
     EXPECT_LE(o.o_id, 3000);
     EXPECT_GE(o.o_c_id, 1);
@@ -265,24 +280,26 @@ void check_order_record(uint16_t num_warehouse, const Order& o) {
     EXPECT_EQ(o.o_all_local, 1);
 }
 
-void check_orders_table(uint16_t num_warehouse) {
-    Order o;
+void check_orders_table() {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
+    const Order* o;
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     uint32_t o_id = 1;
     Order::Key o_key = Order::Key::create_key(w_id, d_id, o_id);
     ASSERT_TRUE(Database::get_db().get_record<Order>(o, o_key));
-    check_order_record(num_warehouse, o);
+    check_order_record(*o);
 
     w_id = num_warehouse;
     d_id = 10;
     o_id = 3000;
     o_key = Order::Key::create_key(w_id, d_id, o_id);
     ASSERT_TRUE(Database::get_db().get_record<Order>(o, o_key));
-    check_order_record(num_warehouse, o);
+    check_order_record(*o);
 }
 
-void check_orderline_record(uint16_t num_warehouse, const OrderLine& ol) {
+void check_orderline_record(const OrderLine& ol) {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
     EXPECT_GE(ol.ol_o_id, 1);
     EXPECT_LE(ol.ol_o_id, 3000);
     EXPECT_GE(ol.ol_d_id, 1);
@@ -309,15 +326,16 @@ void check_orderline_record(uint16_t num_warehouse, const OrderLine& ol) {
     EXPECT_EQ(strlen(ol.ol_dist_info), 24);
 }
 
-void check_orderlines_table(uint16_t num_warehouse) {
-    OrderLine ol;
+void check_orderlines_table() {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
+    const OrderLine* ol;
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     uint32_t o_id = 1;
     uint8_t ol_number = 1;
     OrderLine::Key ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_number);
     ASSERT_TRUE(Database::get_db().get_record<OrderLine>(ol, ol_key));
-    check_orderline_record(num_warehouse, ol);
+    check_orderline_record(*ol);
 
     w_id = num_warehouse;
     d_id = 10;
@@ -325,10 +343,11 @@ void check_orderlines_table(uint16_t num_warehouse) {
     ol_number = 5;
     ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_number);
     ASSERT_TRUE(Database::get_db().get_record<OrderLine>(ol, ol_key));
-    check_orderline_record(num_warehouse, ol);
+    check_orderline_record(*ol);
 }
 
-void check_neworder_record(uint16_t num_warehouse, const NewOrder& no) {
+void check_neworder_record(const NewOrder& no) {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
     EXPECT_GE(no.no_o_id, 2101);
     EXPECT_LE(no.no_o_id, 3000);
     EXPECT_GE(no.no_d_id, 1);
@@ -337,31 +356,32 @@ void check_neworder_record(uint16_t num_warehouse, const NewOrder& no) {
     EXPECT_LE(no.no_w_id, num_warehouse);
 }
 
-void check_neworders_table(uint16_t num_warehouse) {
-    NewOrder no;
+void check_neworders_table() {
+    uint16_t num_warehouse = get_config().get_num_warehouses();
+    const NewOrder* no;
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     uint32_t o_id = 2101;
     NewOrder::Key no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
     ASSERT_TRUE(Database::get_db().get_record<NewOrder>(no, no_key));
-    check_neworder_record(num_warehouse, no);
+    check_neworder_record(*no);
 
     w_id = num_warehouse;
     d_id = 10;
     o_id = 3000;
     no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
     ASSERT_TRUE(Database::get_db().get_record<NewOrder>(no, no_key));
-    check_neworder_record(num_warehouse, no);
+    check_neworder_record(*no);
 }
 
 TEST_F(InitialPopulationTest, RecordValidityTest) {
     check_items_table();
-    check_warehouses_table(num_warehouse);
-    check_stocks_table(num_warehouse);
-    check_districts_table(num_warehouse);
-    check_customers_table(num_warehouse);
-    check_histories_table(num_warehouse);
-    check_orders_table(num_warehouse);
-    check_orderlines_table(num_warehouse);
-    check_neworders_table(num_warehouse);
+    check_warehouses_table();
+    check_stocks_table();
+    check_districts_table();
+    check_customers_table();
+    check_histories_table();
+    check_orders_table();
+    check_orderlines_table();
+    check_neworders_table();
 }

@@ -85,42 +85,42 @@ public:
 
         out << w_id << d_id << c_id;
 
-        Warehouse w;
-        res = tx.get_record(w, Warehouse::Key::create_key(w_id));
+        const Warehouse* w;
+        Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
+        res = tx.get_record(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
-        District d;
+        District* d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
-        res = tx.get_record(d, d_key);
+        res = tx.prepare_record_for_update(d, d_key);
+        LOG_TRACE("res: %d", static_cast<int>(res));
+        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        uint32_t o_id = d->d_next_o_id;
+        d->d_next_o_id++;
+
+        const Customer* c;
+        Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
+        res = tx.get_record(c, c_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
-        uint32_t o_id = d.d_next_o_id;
-        d.d_next_o_id++;
-        res = tx.update_record(d_key, d);
+        out << c->c_last << c->c_credit << c->c_discount << w->w_tax << d->d_tax << ol_cnt
+            << d->d_next_o_id << o_entry_d;
+
+        NewOrder* no;
+        NewOrder::Key no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
+        res = tx.prepare_record_for_insert(no, no_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        create_neworder(*no, w_id, d_id, o_id);
 
-        Customer c;
-        res = tx.get_record(c, Customer::Key::create_key(w_id, d_id, c_id));
+        Order* o;
+        Order::Key o_key = Order::Key::create_key(w_id, d_id, o_id);
+        res = tx.prepare_record_for_insert(o, o_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
-
-        out << c.c_last << c.c_credit << c.c_discount << w.w_tax << d.d_tax << ol_cnt
-            << d.d_next_o_id << o_entry_d;
-
-        NewOrder no;
-        create_neworder(no, w_id, d_id, o_id);
-        res = tx.insert_record(no);
-        LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
-
-        Order o;
-        create_order(o, w_id, d_id, c_id, o_id, ol_cnt, is_remote);
-        res = tx.insert_record(o);
-        LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        create_order(*o, w_id, d_id, c_id, o_id, ol_cnt, is_remote);
 
         double total = 0;
 
@@ -129,48 +129,46 @@ public:
             uint32_t ol_i_id = input.items[ol_num - 1].ol_i_id;
             uint8_t ol_quantity = input.items[ol_num - 1].ol_quantity;
 
-            Item i;
             if (ol_i_id == Item::UNUSED_ID) {
                 stat.num_usr_aborts[0]++;
                 return Status::USER_ABORT;
             }
-            res = tx.get_record(i, Item::Key::create_key(ol_i_id));
+
+            const Item* i;
+            Item::Key i_key = Item::Key::create_key(ol_i_id);
+            res = tx.get_record(i, i_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
 
-            Stock s;
+            Stock* s;
             Stock::Key s_key = Stock::Key::create_key(ol_supply_w_id, ol_i_id);
-            res = tx.get_record(s, s_key);
+            res = tx.prepare_record_for_update(s, s_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
-
             char brand_generic;
-            if (strstr(i.i_data, "ORIGINAL") && strstr(s.s_data, "ORIGINAL")) {
+            if (strstr(i->i_data, "ORIGINAL") && strstr(s->s_data, "ORIGINAL")) {
                 brand_generic = 'B';
             } else {
                 brand_generic = 'G';
             }
+            modify_stock(*s, ol_quantity, is_remote);
 
-            modify_stock(s, ol_quantity, is_remote);
-            res = tx.update_record(s_key, s);
-            LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
-
-            double ol_amount = ol_quantity * i.i_price;
+            double ol_amount = ol_quantity * i->i_price;
             total += ol_amount;
 
-            OrderLine ol;
-            create_orderline(
-                ol, w_id, d_id, o_id, ol_num, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, s);
-            res = tx.insert_record(ol);
+            OrderLine* ol;
+            OrderLine::Key ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_num);
+            res = tx.prepare_record_for_insert(ol, ol_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+            create_orderline(
+                *ol, w_id, d_id, o_id, ol_num, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, *s);
 
-            out << ol_supply_w_id << ol_i_id << i.i_name << ol_quantity << s.s_quantity
-                << brand_generic << i.i_price << ol_amount;
+            out << ol_supply_w_id << ol_i_id << i->i_name << ol_quantity << s->s_quantity
+                << brand_generic << i->i_price << ol_amount;
         }
 
-        total *= (1 - c.c_discount) * (1 + w.w_tax + d.d_tax);
+        total *= (1 - c->c_discount) * (1 + w->w_tax + d->d_tax);
         out << total;
 
         if (tx.commit()) {

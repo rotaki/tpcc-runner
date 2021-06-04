@@ -12,68 +12,70 @@ namespace Initializer {
 
 inline void create_and_insert_item_record(uint32_t i_id) {
     Item::Key key = Item::Key::create_key(i_id);
-    Item& i = Database::get_db().allocate_record<Item>(key);
-    i.generate(i_id);
+    Item* i = Database::get_db().allocate_record<Item>(key);
+    i->generate(i_id);
 }
 
 inline void create_and_insert_warehouse_record(uint16_t w_id) {
     Warehouse::Key key = Warehouse::Key::create_key(w_id);
-    Warehouse& w = Database::get_db().allocate_record<Warehouse>(key);
-    w.generate(w_id);
+    Warehouse* w = Database::get_db().allocate_record<Warehouse>(key);
+    w->generate(w_id);
 }
 
 inline void create_and_insert_stock_record(uint16_t s_w_id, uint32_t s_i_id) {
     Stock::Key key = Stock::Key::create_key(s_w_id, s_i_id);
-    Stock& s = Database::get_db().allocate_record<Stock>(key);
-    s.generate(s_w_id, s_i_id);
+    Stock* s = Database::get_db().allocate_record<Stock>(key);
+    s->generate(s_w_id, s_i_id);
 }
 
 inline void create_and_insert_district_record(uint16_t d_w_id, uint8_t d_id) {
     District::Key key = District::Key::create_key(d_w_id, d_id);
-    District& d = Database::get_db().allocate_record<District>(key);
-    d.generate(d_w_id, d_id);
+    District* d = Database::get_db().allocate_record<District>(key);
+    d->generate(d_w_id, d_id);
 }
 
 inline void create_and_insert_customer_record(
     uint16_t c_w_id, uint8_t c_d_id, uint32_t c_id, Timestamp t) {
     Customer::Key key = Customer::Key::create_key(c_w_id, c_d_id, c_id);
-    Customer& c = Database::get_db().allocate_record<Customer>(key);
-    c.generate(c_w_id, c_d_id, c_id, t);
+    Customer* c = Database::get_db().allocate_record<Customer>(key);
+    c->generate(c_w_id, c_d_id, c_id, t);
     CustomerSecondary cs;
-    cs.ptr = &c;
-    Database::get_db().insert_record(cs);
+    cs.ptr = c;
+    CustomerSecondaryKey cs_key = CustomerSecondaryKey::create_key(*c);
+    Database::get_db().insert_record(cs_key, cs);
 }
 
 inline void create_and_insert_history_record(
     uint16_t h_c_w_id, uint8_t h_c_d_id, uint32_t h_c_id, uint16_t h_w_id, uint8_t h_d_id) {
-    History h;
-    h.generate(h_c_w_id, h_c_d_id, h_c_id, h_w_id, h_d_id);
-    Database::get_db().insert_record<History>(h);
+    auto h = std::make_unique<History>();
+    h->generate(h_c_w_id, h_c_d_id, h_c_id, h_w_id, h_d_id);
+    Database::get_db().insert_record<History>(std::move(h));
 }
 
 inline std::pair<Timestamp, uint8_t> create_and_insert_order_record(
     uint16_t o_w_id, uint8_t o_d_id, uint32_t o_id, uint32_t o_c_id) {
     Order::Key key = Order::Key::create_key(o_w_id, o_d_id, o_id);
-    Order& o = Database::get_db().allocate_record<Order>(key);
-    o.generate(o_w_id, o_d_id, o_id, o_c_id);
+    Order* o = Database::get_db().allocate_record<Order>(key);
+    o->generate(o_w_id, o_d_id, o_id, o_c_id);
     OrderSecondary os;
-    os.ptr = &o;
-    Database::get_db().insert_record(os);
-    return std::make_pair(o.o_entry_d, o.o_ol_cnt);
+    os.ptr = o;
+    OrderSecondaryKey os_key = OrderSecondaryKey::create_key(*o);
+    Database::get_db().insert_record(os_key, os);
+    return std::make_pair(o->o_entry_d, o->o_ol_cnt);
 }
 
 inline void create_and_insert_neworder_record(uint16_t no_w_id, uint8_t no_d_id, uint32_t no_o_id) {
     NewOrder::Key key = NewOrder::Key::create_key(no_w_id, no_d_id, no_o_id);
-    NewOrder& no = Database::get_db().allocate_record<NewOrder>(key);
-    no.generate(no_w_id, no_d_id, no_o_id);
+    NewOrder* no = Database::get_db().allocate_record<NewOrder>(key);
+    no->generate(no_w_id, no_d_id, no_o_id);
 }
 
 inline void create_and_insert_orderline_record(
     uint16_t ol_w_id, uint8_t ol_d_id, uint32_t ol_o_id, uint8_t ol_number, uint16_t ol_supply_w_id,
     uint32_t ol_i_id, Timestamp o_entry_d) {
     OrderLine::Key key = OrderLine::Key::create_key(ol_w_id, ol_d_id, ol_o_id, ol_number);
-    OrderLine& ol = Database::get_db().allocate_record<OrderLine>(key);
-    ol.generate(ol_w_id, ol_d_id, ol_o_id, ol_number, ol_supply_w_id, ol_i_id, o_entry_d);
+    OrderLine* ol = Database::get_db().allocate_record<OrderLine>(key);
+    ol->generate(ol_w_id, ol_d_id, ol_o_id, ol_number, ol_supply_w_id, ol_i_id, o_entry_d);
 };
 
 inline void load_items_table() {
