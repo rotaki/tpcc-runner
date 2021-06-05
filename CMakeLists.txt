@@ -7,7 +7,8 @@ project(
   )
 
 message(STATUS "Welcome to tpcc-runner, Version: ${PROJECT_VERSION}")
-
+set(CMAKE_C_COMPILER /usr/bin/gcc CACHE PATH "")
+set(CMAKE_CXX_COMPILER /usr/bin/g++ CACHE PATH "")
 message(STATUS "Compiler: ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "System: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION} ${CMAKE_SYSTEM_PROCESSOR}")
 
@@ -65,7 +66,7 @@ function(add_dep NAME GIT_URL GIT_TAG)
     endif ()
 
     execute_process(COMMAND git log -1 --format=%cd --date=short                        
-            WORKING_DIRECTORY ${${NAME_LOWER}_SOURCE_DIR}                               
+            WORKING_DIRECTORY ${${NAME}_SOURCE_DIR}                               
             OUTPUT_VARIABLE GIT_LAST_COMMIT)                                            
     string(STRIP "${GIT_LAST_COMMIT}" GIT_LAST_COMMIT)                                  
 

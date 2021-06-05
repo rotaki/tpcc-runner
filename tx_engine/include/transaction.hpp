@@ -116,7 +116,7 @@ public:
 
     Result get_customer_by_last_name_and_prepare_for_update(
         Customer*& c, CustomerSecondary::Key c_sec_key) {
-        const Customer* c_temp;
+        const Customer* c_temp = nullptr;
         get_customer_by_last_name(c_temp, c_sec_key);
 
         if (!c_temp) {
