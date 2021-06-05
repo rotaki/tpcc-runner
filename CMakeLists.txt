@@ -50,7 +50,6 @@ message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
 include(FetchContent)
 function(add_dep NAME GIT_URL GIT_TAG)
-    string(TOLOWER "${NAME}" NAME_LOWER)
     FetchContent_Declare(${NAME})
     if (NOT ${NAME}_POPULATED)
         FetchContent_Populate(${NAME}
@@ -62,16 +61,15 @@ function(add_dep NAME GIT_URL GIT_TAG)
                 GIT_TAG ${GIT_TAG}                                      
                 )
 
-        add_subdirectory(${${NAME_LOWER}_SOURCE_DIR} ${${NAME_LOWER}_BINARY_DIR})       # Include the dependency.
+        add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
     endif ()
 
-    # Get the date of the last git commit for the GIT_TAG branch.
-    execute_process(COMMAND git log -1 --format=%cd --date=short                        # Get the last commit's date.
-            WORKING_DIRECTORY ${${NAME_LOWER}_SOURCE_DIR}                               # From the specified git dir.
-            OUTPUT_VARIABLE GIT_LAST_COMMIT)                                            # Save to GIT_LAST_COMMIT.
-    string(STRIP "${GIT_LAST_COMMIT}" GIT_LAST_COMMIT)                                  # Remove any trailing newlines.
+    execute_process(COMMAND git log -1 --format=%cd --date=short                        
+            WORKING_DIRECTORY ${${NAME_LOWER}_SOURCE_DIR}                               
+            OUTPUT_VARIABLE GIT_LAST_COMMIT)                                            
+    string(STRIP "${GIT_LAST_COMMIT}" GIT_LAST_COMMIT)                                  
 
-    message(STATUS "[FOUND] ${NAME} (${GIT_URL} ${GIT_TAG} ${GIT_LAST_COMMIT})")        # Print a success message.
+    message(STATUS "[FOUND] ${NAME} (${GIT_URL} ${GIT_TAG} ${GIT_LAST_COMMIT})")        
 endfunction()
 
 add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
