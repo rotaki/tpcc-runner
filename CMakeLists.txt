@@ -48,6 +48,35 @@ set(CMAKE_CXX_FLAGS_RELEASE        "-Ofast -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Ofast -DNDEBUG -g")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
+include(FetchContent)
+function(add_dep NAME GIT_URL GIT_TAG)
+    string(TOLOWER "${NAME}" NAME_LOWER)
+    FetchContent_Declare(${NAME})
+    if (NOT ${NAME}_POPULATED)
+        FetchContent_Populate(${NAME}
+                QUIET                                                   
+                SOURCE_DIR ${CMAKE_BINARY_DIR}/_deps/src/${NAME}        
+                BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/build/${NAME}      
+                SUBBUILD_DIR ${CMAKE_BINARY_DIR}/_deps/sub/${NAME}      
+                GIT_REPOSITORY ${GIT_URL}                               
+                GIT_TAG ${GIT_TAG}                                      
+                )
+
+        add_subdirectory(${${NAME_LOWER}_SOURCE_DIR} ${${NAME_LOWER}_BINARY_DIR})       # Include the dependency.
+    endif ()
+
+    # Get the date of the last git commit for the GIT_TAG branch.
+    execute_process(COMMAND git log -1 --format=%cd --date=short                        # Get the last commit's date.
+            WORKING_DIRECTORY ${${NAME_LOWER}_SOURCE_DIR}                               # From the specified git dir.
+            OUTPUT_VARIABLE GIT_LAST_COMMIT)                                            # Save to GIT_LAST_COMMIT.
+    string(STRIP "${GIT_LAST_COMMIT}" GIT_LAST_COMMIT)                                  # Remove any trailing newlines.
+
+    message(STATUS "[FOUND] ${NAME} (${GIT_URL} ${GIT_TAG} ${GIT_LAST_COMMIT})")        # Print a success message.
+endfunction()
+
+add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
+add_dep(googletest https://github.com/google/googletest.git release-1.10.0)
+
 ###############################################################################
 #                            Static library of tpcc                           #
 ###############################################################################
@@ -58,6 +87,7 @@ set(TPCCRUNNER_COMPILE_FEATURES "cxx_std_20")
 set(TPCCRUNNER_LINK_OPTIONS "")
 set(TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/tpcc/include")
 list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/tx_engine/include")
+list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/mimalloc/include")
 
 set(LOG_LEVEL
   "1"
@@ -95,6 +125,7 @@ file(GLOB_RECURSE
   )
 
 add_library(tpccrunner_objlib OBJECT ${TPCCRUNNER_SRCS})
+target_link_libraries(tpccrunner_objlib PRIVATE mimalloc)
 
 target_compile_definitions(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_DEFINITIONS})
 target_compile_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_OPTIONS})
@@ -146,15 +177,6 @@ endforeach (EXECUTABLE ${EXECUTABLES})
 ###############################################################################
 
 # Ref: https://google.github.io/googletest/quickstart-cmake.html
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/609281088cfefc76f9d0ce82e1ff6c30cc3591e5.zip
-)
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-FetchContent_MakeAvailable(googletest)
-
 enable_testing()
 
 include(GoogleTest)

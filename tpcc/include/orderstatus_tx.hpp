@@ -79,7 +79,7 @@ public:
         c_id = c->c_id;
         out << c->c_first << c->c_middle << c->c_last << c->c_balance;
 
-        const Order* o;
+        const Order* o = nullptr;
         res = tx.get_order_by_customer_id(o, OrderSecondary::Key::create_key(c_w_id, c_d_id, c_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);

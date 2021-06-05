@@ -4,6 +4,7 @@
 #include <memory>
 #include <stdexcept>
 
+#include "mimalloc-new-delete.h"
 #include "record_layout.hpp"
 
 template <typename Record>
@@ -11,7 +12,7 @@ struct RecordMemoryCache {
 public:
     std::unique_ptr<Record> allocate() {
         if (cache.empty()) {
-            return std::make_unique<Record>();
+            return std::unique_ptr<Record>(new Record);
         } else {
             std::unique_ptr<Record> ptr = std::move(cache.back());
             cache.pop_back();
@@ -21,7 +22,7 @@ public:
 
     void deallocate(std::unique_ptr<Record> rec_ptr) {
         if (cache.size() > n) {
-            // do nothing with the poniter which leads to freeing of memory
+            delete rec_ptr.release();
         } else {
             cache.push_back(std::move(rec_ptr));
         }
