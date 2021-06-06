@@ -1,8 +1,8 @@
 # Performance Notes
 
-## TPC-C
+## Optimizations and cheats
 
-The following is the list of optimizations and cheats which have been applied or not applied but scrutinized for better performance.
+The following is the a of optimizations and cheats which have been applied or not applied but scrutinized for better performance.
 
 - The specification of TPC-C defines the contents of output of the transactions and orders to print it in a certain format. This is simplified by creating a 64bit checksum of the specified output.
 
