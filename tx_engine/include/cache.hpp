@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "mimalloc-new-delete.h"
+
 #include "record_layout.hpp"
 
 template <typename Record>
