@@ -6,6 +6,7 @@
 
 #include "transaction.hpp"
 #include "initializer.hpp"
+#include "cache.hpp"
 
 #include <unistd.h>
 
@@ -32,6 +33,7 @@ void run_tx(int* flag, ThreadLocalData& t_data) {
             run_with_retry<NewOrderTx>(tx, stat, out);
         }
     }
+    Cache::print_memory_usage();
 }
 
 int main(int argc, const char* argv[]) {
