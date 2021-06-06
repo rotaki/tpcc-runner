@@ -1,8 +1,6 @@
 # tpcc-runner
 
-A portable TPC-C benchmark for various transaction engines. 
-
-__Current Status: WIP__
+A portable TPC-C benchmark for various in-memory database engines. 
 
 # Description
 
@@ -12,7 +10,7 @@ Although TPC-C has its own problems, it is still one of the standard benchmarks 
 
 # Motivation
 
-tpcc-runner aims to provide an Open Source C++ implementation of TPC-C which __separates the implementation of transaction profiles from the transaction engine__.
+tpcc-runner aims to provide an Open Source C++ implementation of in-memory TPC-C which __separates the implementation of transaction profiles from the transaction engine__.
 As mentioned above, TPC-C will run transactions of five different profiles which are NewOrder, Payment, OrderStatus, Delivery, and StockLevel. 
 Ideally these profiles should be independent from the backend transaction engine in the implementation level so that users can port these to different kinds of backends only by implementing the nessesary interfaces.
 This is better not only in terms of usability but in terms of fairness as a benchmark.
@@ -22,8 +20,8 @@ To address this issue, tpcc-runner provides an implementation of TPC-C where tra
 # Getting Started
 
 ## Dependencies
-- Tested on MaxOS Catalina, Ubuntu 20.04
-- Uses C++20
+- Ubuntu 20.04
+- C++20
 
 ## Build
 To build, 
@@ -35,40 +33,44 @@ cmake ..
 make
 ```
 
-To format code, 
+## Execute
+After building, the executable will be stored into the `build/bin` directory.
+To execute, 
 
 ```sh
-cd build
-cmake ..
-make
-make format
+cd build/bin
+./main w t s
 ```
 
-To set to a different log level, 
+This will create tables with `w` warehouses and execute transactions using `t` threads for `s` seconds. For example, `./main 2 5 20` will create tables with 2 warehouses and executes TPC-C using 5 threads for 20 seconds.
 
-```sh
-cd build
-ccmake .. ## set log level in GUI
+For more information on usage, see [USAGE.md](USAGE.md).
+
+# Performance
+
+Currently tpcc-runner has a simple transaction engine which locks the entire database while performing a transaction, which obviously does not scale with the number of threads. However, as a benchmark of the TPC-C itself (not the transaction engine) measuring the performance of a single-threaded execution should suffice.
+Benchmarking on transaction engines that utilizes multi-threaded concurrency control (such as Silo, ERMIA, TicToc, Cicada, and so on) is left for future work. 
+
+Executing `./main 1 1 20` yields the following output on `8 core Intel(R) Core(TM) i9-9900 CPU @ 3.10GHz` with `32GB RAM`
+
+```
+Loading all tables with 1 warehouse(s)
+Loaded
+1 warehouse(s), 1 thread(s), 20 second(s)
+    commits: 1329712
+    sys aborts: 0
+    usr aborts: 6081
+Throughput: 66485 txns/s
+
+Details:
+    NewOrder    c:595148(44.76%)   ua:6081  sa:0
+    Payment     c:573984(43.17%)   ua:0  sa:0
+    OrderStatus c:53265(4.01%)   ua:0  sa:0
+    Delivery    c:53500(4.02%)   ua:0  sa:0
+    StockLevel  c:53815(4.05%)   ua:0  sa:0
 ```
 
-To test all, 
-
-```sh
-cd build
-cmake ..
-make
-ctest
-```
-
-To execute a single test, 
-
-```sh
-cd build
-cmake ..
-make
-cd test/
-./test_name
-```
+Read more about performance in [PERFORMACES.md](PERFORMANCES.md).
 
 # Author
 

@@ -28,6 +28,8 @@ private:
 class ConcurrencyManager {
 public:
     bool lock() {
+        const Config& c = get_config();
+        if (c.get_num_threads() == 1) return true;
         if (has_lock) {
             return true;
         } else {
@@ -38,6 +40,8 @@ public:
     }
 
     void release() {
+        const Config& c = get_config();
+        if (c.get_num_threads() == 1) return;
         if (has_lock) {
             lock_table.unlock();
         }

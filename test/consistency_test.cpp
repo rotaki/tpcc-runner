@@ -12,7 +12,6 @@
 #include "record_layout.hpp"
 #include "utils.hpp"
 
-
 class ConsistencyTest : public ::testing::Test {
 protected:
     static void SetUpTestSuite() {
