@@ -6,7 +6,7 @@ The following is the list of optimizations and cheats which have been applied or
 
 - The specification of TPC-C defines the contents of output of the transactions and orders to print it in a certain format. This is simplified by creating a 64bit checksum of the specified output.
 
-- The current naive transaction engine uses WriteSet (which is respective to the transaction instances) to temporarily insert and update records before commit. This would allow us to abort transactions by clearing contents of the WriteSet and without touching the shared memory. This seems good but not in terms of performance compared with the in-place inserts and updates. The WriteSet increases the number of copies of the records and making copies is a heavy operation. In TPC-C, it is possible to update the shared memory in-place and create an undo buffer **only when aborting is certain**. This is because in TPC-C, you can know beforehand whether the transaction aborts. Although this would increase performance (because less copies will be made), in my opinion, this is impractical because it is impossible to know whether a transaction aborts before the start of the transaction in real world. Therefore, WriteSet was adopted in this implementation.
+- The current naive transaction engine uses WriteSet (which is respective to the transaction instances) to temporarily insert and update records before commit. This would allow us to abort transactions by clearing contents of the WriteSet and without touching the shared memory. This seems good but not in terms of performance compared with the in-place inserts and updates. The WriteSet increases the number of copies of the records and making copies is a heavy operation. In TPC-C, it is possible to update the shared memory in-place and create an undo buffer **only when aborting is certain**. This is because in TPC-C, you can know beforehand whether a transaction aborts. Although this would increase performance (because less copies will be made), in my opinion, this is impractical because it is impossible to know whether a transaction aborts before the start of the transaction in real world. Therefore, WriteSet was adopted in this implementation.
 
 ## Transaction Concurrency
 
@@ -30,7 +30,7 @@ Details:
 ```
 
 - usr aborts are aborts specified in TPC-C. (1% of the NewOrder Transaction should rollback according to the specification.)
-- sys aborts are aborts that occurs due to the concurrency control. (One example of sys aborts would be aborts due to no-wait in 2PL). Since there are no concurrency in the current implementation, there are no sys aborts.
+- sys aborts are aborts that occurs due to the concurrency control. (One example of sys aborts would be aborts due to no-wait in 2PL.) Since there are no concurrency in the current implementation, there are no sys aborts.
 
 Since the current implementation locks the whole database while performing a transaction, execution using multiple threads is **possible**. This, however, decreases performance due to contention.
 
