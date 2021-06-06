@@ -73,16 +73,7 @@ void Stock::deep_copy_from(const Stock& src) {
         s_ytd = src.s_ytd;
         s_order_cnt = src.s_order_cnt;
         s_remote_cnt = src.s_remote_cnt;
-        copy_cstr(s_dist_01, src.s_dist_01, sizeof(s_dist_01));
-        copy_cstr(s_dist_02, src.s_dist_02, sizeof(s_dist_02));
-        copy_cstr(s_dist_03, src.s_dist_03, sizeof(s_dist_03));
-        copy_cstr(s_dist_04, src.s_dist_04, sizeof(s_dist_04));
-        copy_cstr(s_dist_05, src.s_dist_05, sizeof(s_dist_05));
-        copy_cstr(s_dist_06, src.s_dist_06, sizeof(s_dist_06));
-        copy_cstr(s_dist_07, src.s_dist_07, sizeof(s_dist_07));
-        copy_cstr(s_dist_08, src.s_dist_08, sizeof(s_dist_08));
-        copy_cstr(s_dist_09, src.s_dist_09, sizeof(s_dist_09));
-        copy_cstr(s_dist_10, src.s_dist_10, sizeof(s_dist_10));
+        memcpy(s_dist[0], src.s_dist[0], sizeof(10 * (Stock::DIST + 1)));
         copy_cstr(s_data, src.s_data, sizeof(s_data));
     }
 }
@@ -94,16 +85,16 @@ void Stock::generate(uint16_t s_w_id_, uint32_t s_i_id_) {
     s_ytd = 0;                        // numeric(8)
     s_order_cnt = 0;                  // numeric(4)
     s_remote_cnt = 0;                 // numeric(4)
-    make_random_astring(s_dist_01, Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist_02, Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist_03, Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist_04, Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist_05, Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist_06, Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist_07, Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist_08, Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist_09, Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist_10, Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[0], Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[1], Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[2], Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[3], Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[4], Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[5], Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[6], Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[7], Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[8], Stock::DIST, Stock::DIST);
+    make_random_astring(s_dist[9], Stock::DIST, Stock::DIST);
     make_random_astring(s_data, Stock::MIN_DATA, Stock::MAX_DATA);
     if (urand_int(0, 99) < 10) make_original(s_data);
 }
@@ -113,8 +104,8 @@ void Stock::print() {
         "[STO] s_w_id:%" PRIu16 " s_i_id:%" PRIu32 " s_quantity:%" PRIu32 " s_ytd:%" PRIu32
         " s_order_cnt:%" PRIu16 " s_remote:%" PRIu16
         " s_dist_01:%s s_dist_02:%s s_dist_03:%s s_dist_04:%s s_dist_05:%s s_dist_06:%s s_dist_07:%s s_dist_08:%s s_dist_09:%s s_dist_10:%s",
-        s_w_id, s_i_id, s_quantity, s_ytd, s_order_cnt, s_remote_cnt, s_dist_01, s_dist_02,
-        s_dist_03, s_dist_04, s_dist_05, s_dist_06, s_dist_07, s_dist_08, s_dist_09, s_dist_10);
+        s_w_id, s_i_id, s_quantity, s_ytd, s_order_cnt, s_remote_cnt, s_dist[0], s_dist[1],
+        s_dist[2], s_dist[3], s_dist[4], s_dist[5], s_dist[6], s_dist[7], s_dist[8], s_dist[9]);
 }
 
 void District::deep_copy_from(const District& src) {

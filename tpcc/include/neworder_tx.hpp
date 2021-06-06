@@ -214,22 +214,7 @@ private:
         ol.ol_delivery_d = 0;
         ol.ol_quantity = ol_quantity;
         ol.ol_amount = ol_amount;
-        auto pick_sdist = [&]() -> const char* {
-            switch (d_id) {
-            case 1: return s.s_dist_01;
-            case 2: return s.s_dist_02;
-            case 3: return s.s_dist_03;
-            case 4: return s.s_dist_04;
-            case 5: return s.s_dist_05;
-            case 6: return s.s_dist_06;
-            case 7: return s.s_dist_07;
-            case 8: return s.s_dist_08;
-            case 9: return s.s_dist_09;
-            case 10: return s.s_dist_10;
-            default: return nullptr;  // BUG
-            }
-        };
-        copy_cstr(ol.ol_dist_info, pick_sdist(), sizeof(ol.ol_dist_info));
+        copy_cstr(ol.ol_dist_info, s.s_dist[d_id - 1], sizeof(ol.ol_dist_info));
     }
 
     void modify_stock(Stock& s, uint8_t ol_quantity, bool is_remote) {

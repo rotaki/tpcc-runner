@@ -110,16 +110,7 @@ struct Stock {
     uint32_t s_ytd;         // numeric(8)
     uint16_t s_order_cnt;   // numeric(4)
     uint16_t s_remote_cnt;  // numeric(4)
-    char s_dist_01[DIST + 1];
-    char s_dist_02[DIST + 1];
-    char s_dist_03[DIST + 1];
-    char s_dist_04[DIST + 1];
-    char s_dist_05[DIST + 1];
-    char s_dist_06[DIST + 1];
-    char s_dist_07[DIST + 1];
-    char s_dist_08[DIST + 1];
-    char s_dist_09[DIST + 1];
-    char s_dist_10[DIST + 1];
+    char s_dist[10][DIST + 1];
     char s_data[MAX_DATA + 1];
     void deep_copy_from(const Stock& src);
     void generate(uint16_t s_w_id_, uint32_t s_i_id_);
