@@ -70,7 +70,7 @@ Details:
     StockLevel  c:53815(4.05%)   ua:0  sa:0
 ```
 
-Read more on about performance in [PERFORMACES.md](PERFORMANCES.md).
+Read more about performance in [PERFORMACES.md](PERFORMANCES.md).
 
 # Author
 
