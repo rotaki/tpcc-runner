@@ -40,16 +40,17 @@ int main(int argc, const char* argv[]) {
         exit(1);
     }
 
-    uint16_t num_warehouse = static_cast<uint16_t>(std::stoi(argv[1], NULL, 10));
+    uint16_t num_warehouses = static_cast<uint16_t>(std::stoi(argv[1], NULL, 10));
     int num_threads = std::stoi(argv[2], NULL, 10);
     int seconds = std::stoi(argv[3], NULL, 10);
 
     assert(seconds > 0);
     
     Config& c = get_mutable_config();
-    c.set_num_warehouses(num_warehouse);
+    c.set_num_warehouses(num_warehouses);
+    c.set_num_threads(num_threads);
 
-    printf("Loading all tables with %" PRIu16 " warehouses\n", num_warehouse);
+    printf("Loading all tables with %" PRIu16 " warehouse(s)\n", num_warehouses);
     Initializer::load_all_tables();
     printf("Loaded\n");
 
@@ -93,16 +94,16 @@ int main(int argc, const char* argv[]) {
     }
 
 
-    printf("In %d seconds\n", seconds);
-    printf("    num commits: %lu\n", total_commits);
-    printf("    num sys aborts: %lu\n", total_sys_aborts);
-    printf("    num usr aborts: %lu\n", total_usr_aborts);
-    printf("Throughput: %lu\n", total_commits / seconds);
+    printf("%d warehouse(s), %d thread(s), %d second(s)\n", num_warehouses, num_threads, seconds);
+    printf("    commits: %lu\n", total_commits);
+    printf("    sys aborts: %lu\n", total_sys_aborts);
+    printf("    usr aborts: %lu\n", total_usr_aborts);
+    printf("Throughput: %lu txns/s\n", total_commits / seconds);
 
-    printf("\nDetais:\n");
-    printf("    NewOrder    c:%lu ua:%lu sa:%lu\n", commits[0], usr_aborts[0], sys_aborts[0]);
-    printf("    Payment     c:%lu ua:%lu sa:%lu\n", commits[1], usr_aborts[1], sys_aborts[1]);
-    printf("    OrderStatus c:%lu ua:%lu sa:%lu\n", commits[2], usr_aborts[2], sys_aborts[2]);
-    printf("    Delivery    c:%lu ua:%lu sa:%lu\n", commits[3], usr_aborts[3], sys_aborts[3]);
-    printf("    StockLevel  c:%lu ua:%lu sa:%lu\n", commits[4], usr_aborts[4], sys_aborts[4]);
+    printf("\nDetails:\n");
+    printf("    NewOrder    c:%lu(%.2f%%)   ua:%lu  sa:%lu\n", commits[0], 100*commits[0]/double(total_commits), usr_aborts[0], sys_aborts[0]);
+    printf("    Payment     c:%lu(%.2f%%)   ua:%lu  sa:%lu\n", commits[1], 100*commits[1]/double(total_commits), usr_aborts[1], sys_aborts[1]);
+    printf("    OrderStatus c:%lu(%.2f%%)   ua:%lu  sa:%lu\n", commits[2], 100*commits[2]/double(total_commits), usr_aborts[2], sys_aborts[2]);
+    printf("    Delivery    c:%lu(%.2f%%)   ua:%lu  sa:%lu\n", commits[3], 100*commits[3]/double(total_commits), usr_aborts[3], sys_aborts[3]);
+    printf("    StockLevel  c:%lu(%.2f%%)   ua:%lu  sa:%lu\n", commits[4], 100*commits[4]/double(total_commits), usr_aborts[4], sys_aborts[4]);
 }
