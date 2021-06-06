@@ -2,8 +2,6 @@
 
 A portable TPC-C benchmark for various in-memory database engines. 
 
-__Current Status: WIP__
-
 # Description
 
 tpcc-runner is yet another implementation of [TPC-C](http://www.tpc.org/tpcc/) which is a benchmark for online transaction processing systems.
