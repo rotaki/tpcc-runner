@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-set(TPCCRUNNER_DESCRIPTION " is a portable tpcc benchmark framework for various transaction engines")
+set(TPCCRUNNER_DESCRIPTION "tpcc-runner is a portable TPC-C benchmark framework for various in-memory transaction engines")
 project(
   tpcc-runner
   VERSION 1.0.0.0
