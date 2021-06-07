@@ -30,7 +30,7 @@ double get_sum_of_district_ytd_in_warehouse(uint16_t w_id) {
     auto iter_low = db.get_lower_bound_iter<District>(d_key_low);
     auto iter_high = db.get_lower_bound_iter<District>(d_key_high);
     double total_d_ytd = 0;
-    for (auto it = iter_low; it != iter_high; it++) {
+    for (auto it = iter_low; it != iter_high; ++it) {
         total_d_ytd += it->second->d_ytd;
     }
     return total_d_ytd;
@@ -43,7 +43,7 @@ uint32_t get_max_order_id_from_order(uint16_t w_id, uint8_t d_id) {
     auto iter_low = db.get_lower_bound_iter<Order>(o_key_low);
     auto iter_high = db.get_lower_bound_iter<Order>(o_key_high);
     uint32_t max_o_id = 0;
-    for (auto it = iter_low; it != iter_high; it++) {
+    for (auto it = iter_low; it != iter_high; ++it) {
         max_o_id = std::max(max_o_id, it->second->o_id);
     }
     return max_o_id;
@@ -56,7 +56,7 @@ uint32_t get_max_order_id_from_neworder(uint16_t w_id, uint8_t d_id) {
     auto iter_low = db.get_lower_bound_iter<NewOrder>(no_key_low);
     auto iter_high = db.get_lower_bound_iter<NewOrder>(no_key_high);
     uint32_t max_o_id = 0;
-    for (auto it = iter_low; it != iter_high; it++) {
+    for (auto it = iter_low; it != iter_high; ++it) {
         max_o_id = std::max(max_o_id, it->second->no_o_id);
     }
     return max_o_id;
@@ -71,7 +71,7 @@ void check_min_max_order_id_in_neworder(uint16_t w_id, uint8_t d_id) {
     uint32_t max_o_id = 0;
     uint32_t min_o_id = Order::ORDS_PER_DIST + 1;
     uint32_t cnt = 0;
-    for (auto it = iter_low; it != iter_high; it++) {
+    for (auto it = iter_low; it != iter_high; ++it) {
         cnt++;
         max_o_id = std::max(max_o_id, it->second->no_o_id);
         min_o_id = std::min(min_o_id, it->second->no_o_id);
@@ -91,7 +91,7 @@ void check_order_orderline_relationship(uint16_t w_id, uint8_t d_id) {
     auto o_iter_high = db.get_lower_bound_iter<Order>(o_key_high);
 
     int sum_ol_cnt = 0;
-    for (auto it = o_iter_low; it != o_iter_high; it++) {
+    for (auto it = o_iter_low; it != o_iter_high; ++it) {
         sum_ol_cnt += it->second->o_ol_cnt;
     }
 

@@ -95,7 +95,7 @@ public:
 
         std::vector<CustomerSecondary> temp;
         temp.reserve(n);
-        for (auto it = low_iter; it != up_iter; it++) {
+        for (auto it = low_iter; it != up_iter; ++it) {
             assert(it->second.ptr != nullptr);
             temp.push_back(it->second);
         }
@@ -141,7 +141,7 @@ public:
 
         uint32_t max_o_id = 0;
         Order* o_ptr = nullptr;
-        for (auto it = low_iter; it != up_iter; it++) {
+        for (auto it = low_iter; it != up_iter; ++it) {
             assert(it->second.ptr != nullptr);
             if (it->second.ptr->o_id > max_o_id) {
                 max_o_id = it->second.ptr->o_id;
@@ -171,7 +171,7 @@ public:
     Result range_query(typename Record::Key low, typename Record::Key up, Func&& func) {
         auto low_iter = db.get_lower_bound_iter<Record>(low);
         auto up_iter = db.get_lower_bound_iter<Record>(up);
-        for (auto it = low_iter; it != up_iter; it++) {
+        for (auto it = low_iter; it != up_iter; ++it) {
             func(*(it->second));
         }
         return Result::SUCCESS;
@@ -183,7 +183,7 @@ public:
         auto low_iter = db.get_lower_bound_iter<Record>(low);
         auto up_iter = db.get_lower_bound_iter<Record>(up);
 
-        for (auto it = low_iter; it != up_iter; it++) {
+        for (auto it = low_iter; it != up_iter; ++it) {
             Record* rec_ptr = ws.apply_update_to_writeset<Record>(it->first);
             assert(rec_ptr != nullptr);
             func(*(rec_ptr));

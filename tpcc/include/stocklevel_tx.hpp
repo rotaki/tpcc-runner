@@ -67,7 +67,7 @@ public:
             if (s->s_quantity >= threshold) {
                 it = s_i_ids.erase(it);
             } else {
-                it++;
+                ++it;
             }
         }
 

@@ -211,7 +211,7 @@ private:
     template <IsHistory Record>
     void apply_writeset_to_database() {
         typename RecordToWS<Record>::WS& ws = get_ws<Record>();
-        for (auto it = ws.begin(); it != ws.end(); it++) {
+        for (auto it = ws.begin(); it != ws.end(); ++it) {
             db.insert_record<Record>(std::move(it->rec_ptr));
         }
         ws.clear();
@@ -220,7 +220,7 @@ private:
     template <typename Record>
     void apply_writeset_to_database() {
         typename RecordToWS<Record>::WS& ws = get_ws<Record>();
-        for (auto it = ws.begin(); it != ws.end(); it++) {
+        for (auto it = ws.begin(); it != ws.end(); ++it) {
             switch (it->second.lt) {
             case LogType::INSERT:
                 db.insert_record<Record>(it->first, std::move(it->second.rec_ptr));
@@ -240,7 +240,7 @@ private:
     template <IsHistory Record>
     void clear_writeset() {
         typename RecordToWS<Record>::WS& ws = get_ws<Record>();
-        for (auto it = ws.begin(); it != ws.end(); it++) {
+        for (auto it = ws.begin(); it != ws.end(); ++it) {
             if (it->rec_ptr) {
                 Cache::deallocate<Record>(std::move(it->rec_ptr));
             } else {
@@ -253,7 +253,7 @@ private:
     template <typename Record>
     void clear_writeset() {
         typename RecordToWS<Record>::WS& ws = get_ws<Record>();
-        for (auto it = ws.begin(); it != ws.end(); it++) {
+        for (auto it = ws.begin(); it != ws.end(); ++it) {
             if (it->second.rec_ptr) {
                 Cache::deallocate<Record>(std::move(it->second.rec_ptr));
             } else {
