@@ -8,6 +8,11 @@ The following is a list of optimizations and cheats which have been applied or n
 
 - The current naive transaction engine uses WriteSet (which is respective to the transaction instances) to temporarily insert and update records before commit. This would allow us to abort transactions by clearing contents of the WriteSet and without touching the shared memory. This seems good but not in terms of performance compared with the in-place inserts and updates. The WriteSet increases the number of copies of the records and making copies is a heavy operation. In TPC-C, it is possible to update the shared memory in-place and create an undo buffer **only when aborting is certain**. This is because in TPC-C, you can know beforehand whether a transaction aborts. Although this would increase performance (because less copies will be made), in my opinion, this is impractical because it is impossible to know whether a transaction aborts before the start of the transaction in real world. Therefore, WriteSet was adopted in this implementation.
 
+- Further optimizations for this naive transaction engine would be to decrease the number of tree traverse by
+    - using unordered map instead of ordered map for tables which do not require range queries or lower/upper bounds
+    - decreasing the number of lower/upper bound calls when manipulating the tables
+    - remembering the iterator of the table from which writeset copied the record when preparing for update
+    
 ## Transaction Concurrency
 
 Executing `./main 1 1 20` yields the following output on `8 core Intel(R) Core(TM) i9-9900 CPU @ 3.10GHz` with `32GB RAM`
