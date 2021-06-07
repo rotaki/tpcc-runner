@@ -136,7 +136,7 @@ private:
     }
 
     void print_memory_usage_details() {
-        printf("i:%d w:%d s:%d c:%d h:%d o:%d ol:%d no:%d\n", m_i, m_w, m_s, m_c, m_h, m_o, m_ol, m_no);
+        printf("i:%d w:%d d:%d s:%d c:%d h:%d o:%d ol:%d no:%d\n", m_i, m_w, m_d, m_s, m_c, m_h, m_o, m_ol, m_no);
     }
 
     RecordMemoryCache<Item> rmc_i;
