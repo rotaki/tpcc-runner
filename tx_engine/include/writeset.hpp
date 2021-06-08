@@ -1,3 +1,4 @@
+#pragma once
 #include "cache.hpp"
 #include "database.hpp"
 #include "logger.hpp"
