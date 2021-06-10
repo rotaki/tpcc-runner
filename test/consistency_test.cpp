@@ -25,13 +25,13 @@ protected:
 
 double get_sum_of_district_ytd_in_warehouse(uint16_t w_id) {
     Database& db = Database::get_db();
-    District::Key d_key_low = District::Key::create_key(w_id, 0);
-    District::Key d_key_high = District::Key::create_key(w_id + 1, 0);
-    auto iter_low = db.get_lower_bound_iter<District>(d_key_low);
-    auto iter_high = db.get_lower_bound_iter<District>(d_key_high);
     double total_d_ytd = 0;
-    for (auto it = iter_low; it != iter_high; ++it) {
-        total_d_ytd += it->second->d_ytd;
+    RecordToTable<District>::type& t = db.get_table<District>();
+    for (const auto& p: t) {
+        const District& d = *p.second;
+        if (d.d_w_id == w_id) {
+            total_d_ytd += d.d_ytd;
+        }
     }
     return total_d_ytd;
 }
@@ -108,7 +108,8 @@ TEST_F(ConsistencyTest, Test1) {
     Database& db = Database::get_db();
     const Warehouse* w;
     for (uint16_t w_id = 1; w_id <= num_warehouse; w_id++) {
-        ASSERT_TRUE(db.get_record(w, Warehouse::Key::create_key(w_id)));
+        db.get_record(w, Warehouse::Key::create_key(w_id));
+        ASSERT_TRUE(w != nullptr);
         ASSERT_EQ(w->w_ytd, get_sum_of_district_ytd_in_warehouse(w_id));
     }
 }

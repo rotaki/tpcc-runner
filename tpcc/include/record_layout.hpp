@@ -1,9 +1,11 @@
 #pragma once
 
+#include <concepts>
 #include <cstdint>
 #include <cstring>
 #include <ctime>
 #include <string_view>
+#include <type_traits>
 
 struct Item;
 struct Warehouse;
@@ -182,6 +184,7 @@ struct CustomerSecondary {
     CustomerSecondary() {}
     CustomerSecondary(Customer* ptr)
         : ptr(ptr) {}
+    bool operator==(const CustomerSecondary& rhs) const noexcept { return ptr == rhs.ptr; };
 };
 
 // Primary Key None
@@ -232,6 +235,7 @@ struct OrderSecondary {
     OrderSecondary() {}
     OrderSecondary(Order* ptr)
         : ptr(ptr) {}
+    bool operator==(const OrderSecondary& rhs) const noexcept { return ptr == rhs.ptr; }
 };
 
 // Primary Key (no_w_id, no_d_id, no_o_id)

@@ -5,6 +5,10 @@
 #include "record_layout.hpp"
 #include "utils.hpp"
 
+
+static_assert(sizeof(size_t) >= sizeof(uint64_t));  // for hash function.
+
+
 struct ItemKey {
     uint32_t i_key = 0;
     bool operator<(const ItemKey& rhs) const noexcept { return i_key < rhs.i_key; }
@@ -19,6 +23,7 @@ struct ItemKey {
         k.i_key = i.i_id;
         return k;
     }
+    size_t hash() const noexcept { return i_key; }
 };
 
 struct WarehouseKey {
@@ -35,6 +40,7 @@ struct WarehouseKey {
         k.w_key = w.w_id;
         return k;
     }
+    size_t hash() const noexcept { return w_key; }
 };
 
 struct StockKey {
@@ -59,6 +65,7 @@ struct StockKey {
         k.i_id = s.s_i_id;
         return k;
     }
+    size_t hash() const noexcept { return s_key; }
 };
 
 struct DistrictKey {
@@ -83,6 +90,7 @@ struct DistrictKey {
         k.d_id = d.d_id;
         return k;
     }
+    size_t hash() const noexcept { return d_key; }
 };
 
 struct CustomerKey {
@@ -110,6 +118,7 @@ struct CustomerKey {
         k.c_id = c.c_id;
         return k;
     }
+    size_t hash() const noexcept { return c_key; }
 };
 
 struct OrderKey {
@@ -137,6 +146,7 @@ struct OrderKey {
         k.o_id = o.o_id;
         return k;
     }
+    size_t hash() const noexcept { return o_key; }
 };
 
 struct OrderLineKey {
@@ -167,6 +177,7 @@ struct OrderLineKey {
         k.o_id = ol.ol_o_id;
         return k;
     }
+    size_t hash() const noexcept { return ol_key; }
 };
 
 struct NewOrderKey {
@@ -194,6 +205,7 @@ struct NewOrderKey {
         k.o_id = no.no_o_id;
         return k;
     }
+    size_t hash() const noexcept { return o_key; }
 };
 
 
@@ -212,14 +224,19 @@ struct CustomerSecondaryKey {
         w_id = c.w_id;
         copy_cstr(c_last, c.c_last, sizeof(c_last));
     }
+
+    int cmp_c_last(const CustomerSecondaryKey& rhs) const {
+        return ::strncmp(c_last, rhs.c_last, Customer::MAX_LAST);
+    }
+
     bool operator<(const CustomerSecondaryKey& rhs) const noexcept {
         if (num == rhs.num)
-            return strncmp(c_last, rhs.c_last, Customer::MAX_LAST) < 0;
+            return cmp_c_last(rhs) < 0;
         else
             return num < rhs.num;
     }
     bool operator==(const CustomerSecondaryKey& rhs) const noexcept {
-        return (num == rhs.num) && (strcmp(c_last, rhs.c_last) == 0);
+        return num == rhs.num && cmp_c_last(rhs) == 0;
     }
     static CustomerSecondaryKey create_key(uint16_t w_id, uint8_t d_id, const char* c_last_in) {
         CustomerSecondaryKey k;

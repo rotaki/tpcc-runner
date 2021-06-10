@@ -141,8 +141,8 @@ inline void load_stocks_table(uint16_t s_w_id) {
 
 // Loading warehouses table eventually evokes loading of all the tables other than the items table.
 inline void load_warehouses_table() {
-    const Config& c = get_config();
-    for (int w_id = 1; w_id <= c.get_num_warehouses(); w_id++) {
+    const size_t nr_w = get_config().get_num_warehouses();
+    for (size_t w_id = 1; w_id <= nr_w; w_id++) {
         create_and_insert_warehouse_record(w_id);
         load_stocks_table(w_id);
         load_districts_table(w_id);

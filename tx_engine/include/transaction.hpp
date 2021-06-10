@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <cassert>
+#include <deque>
 
 #include "concurrency_manager.hpp"
 #include "database.hpp"
 #include "logger.hpp"
 #include "writeset.hpp"
+
 
 class Transaction {
 public:
@@ -35,46 +37,34 @@ public:
         ABORT  // e.g. could not acquire lock/latch and no-wait-> system abort
     };
 
+    // Do not use this function for read-modify-write.
+    // Use prepare_record_for_update() intead.
     template <typename Record>
     Result get_record(const Record*& rec_ptr, typename Record::Key rec_key) {
-        // rec_ptr points to data in db
-        if (db.get_record<Record>(rec_ptr, rec_key)) {
-            return Result::SUCCESS;
-        } else {
-            return Result::FAIL;
-        }
+        // We assume the write set does not hold the corresponding record.
+        db.get_record<Record>(rec_ptr, rec_key);
+        return rec_ptr == nullptr ? Result::FAIL : Result::SUCCESS;
     }
 
     template <IsHistory Record>
     Result prepare_record_for_insert(Record*& rec_ptr) {
         rec_ptr = ws.apply_insert_to_writeset<Record>();
-        if (rec_ptr) {
-            return Result::SUCCESS;
-        } else {
-            return Result::FAIL;
-        }
+        return rec_ptr == nullptr ? Result::FAIL : Result::SUCCESS;
     }
 
     template <typename Record>
     Result prepare_record_for_insert(Record*& rec_ptr, typename Record::Key rec_key) {
         // rec_ptr points to data in writeset
         rec_ptr = ws.apply_insert_to_writeset<Record>(rec_key);
-        if (rec_ptr) {
-            return Result::SUCCESS;
-        } else {
-            return Result::FAIL;
-        }
+        return rec_ptr == nullptr ? Result::FAIL : Result::SUCCESS;
     }
 
+    // Get record and prepare for update.
     template <typename Record>
     Result prepare_record_for_update(Record*& rec_ptr, typename Record::Key rec_key) {
         // rec_ptr points to data in writeset copied from db
         rec_ptr = ws.apply_update_to_writeset<Record>(rec_key);
-        if (rec_ptr) {
-            return Result::SUCCESS;
-        } else {
-            return Result::FAIL;
-        }
+        return rec_ptr == nullptr ? Result::FAIL : Result::SUCCESS;
     }
 
     template <typename Record>
@@ -87,73 +77,55 @@ public:
     }
 
     Result get_customer_by_last_name(const Customer*& c, CustomerSecondary::Key c_sec_key) {
-        auto low_iter = db.get_lower_bound_iter<CustomerSecondary>(c_sec_key);
-        auto up_iter = db.get_upper_bound_iter<CustomerSecondary>(c_sec_key);
+        auto& t = db.get_table<CustomerSecondary>();
+        auto it = t.lower_bound(c_sec_key);
+        std::deque<const CustomerSecondary*> temp;
 
-        if (low_iter == up_iter) return Result::FAIL;
-        int n = std::distance(low_iter, up_iter);
-
-        std::vector<CustomerSecondary> temp;
-        temp.reserve(n);
-        for (auto it = low_iter; it != up_iter; ++it) {
-            assert(it->second.ptr != nullptr);
-            temp.push_back(it->second);
+        while (it != t.end() && it->first == c_sec_key) {
+            temp.push_back(&it->second);
+            ++it;
         }
-
-        std::sort(
-            temp.begin(), temp.end(),
-            [](const CustomerSecondary& lhs, const CustomerSecondary& rhs) {
-                return strncmp(lhs.ptr->c_first, rhs.ptr->c_first, Customer::MAX_FIRST) < 0;
-            });
-
-        c = temp[(n + 1) / 2 - 1].ptr;
-        if (c) {
-            return Result::SUCCESS;
-        } else {
+        if (temp.empty()) {
+            c = nullptr;
             return Result::FAIL;
         }
+        std::sort(
+            temp.begin(), temp.end(),
+            [](const CustomerSecondary* lhs, const CustomerSecondary* rhs) {
+                return ::strncmp(lhs->ptr->c_first, rhs->ptr->c_first, Customer::MAX_FIRST) < 0;
+            });
+        c = temp[(temp.size() + 1) / 2 - 1]->ptr;
+        assert(c != nullptr);
+        return Result::SUCCESS;
     }
 
     Result get_customer_by_last_name_and_prepare_for_update(
         Customer*& c, CustomerSecondary::Key c_sec_key) {
         const Customer* c_temp = nullptr;
-        get_customer_by_last_name(c_temp, c_sec_key);
-
-        if (!c_temp) {
-            return Result::FAIL;
-        }
+        if (get_customer_by_last_name(c_temp, c_sec_key) == Result::FAIL) return Result::FAIL;
 
         // create update record in writeset
         Customer::Key c_key = Customer::Key::create_key(*c_temp);
         c = ws.apply_update_to_writeset<Customer>(c_key);
-
-        if (c) {
-            return Result::SUCCESS;
-        } else {
-            return Result::FAIL;
-        }
+        assert(c != nullptr);
+        return Result::SUCCESS;
     }
 
     Result get_order_by_customer_id(const Order*& o, OrderSecondary::Key o_sec_key) {
-        auto low_iter = db.get_lower_bound_iter<OrderSecondary>(o_sec_key);
-        auto up_iter = db.get_upper_bound_iter<OrderSecondary>(o_sec_key);
-        if (low_iter == up_iter) return Result::FAIL;
-
+        auto& t = db.get_table<OrderSecondary>();
+        auto it = t.lower_bound(o_sec_key);
         uint32_t max_o_id = 0;
-        Order* o_ptr = nullptr;
-        for (auto it = low_iter; it != up_iter; ++it) {
-            assert(it->second.ptr != nullptr);
-            if (it->second.ptr->o_id > max_o_id) {
-                max_o_id = it->second.ptr->o_id;
-                o_ptr = it->second.ptr;
+        const Order* o_ptr = nullptr;
+        while (it != t.end() && it->first == o_sec_key) {
+            const Order* p = it->second.ptr;
+            if (p->o_id > max_o_id) {
+                max_o_id = p->o_id;
+                o_ptr = p;
             }
+            ++it;
         }
         o = o_ptr;
-        if (o) {
-            return Result::SUCCESS;
-        } else {
-            return Result::FAIL;
-        }
+        return o == nullptr ? Result::FAIL : Result::SUCCESS;
     }
 
     Result get_neworder_with_smallest_key_no_less_than(const NewOrder*& no, NewOrder::Key low) {
@@ -169,10 +141,11 @@ public:
     // [low ,up)
     template <typename Record, typename Func>
     Result range_query(typename Record::Key low, typename Record::Key up, Func&& func) {
-        auto low_iter = db.get_lower_bound_iter<Record>(low);
-        auto up_iter = db.get_lower_bound_iter<Record>(up);
-        for (auto it = low_iter; it != up_iter; ++it) {
-            func(*(it->second));
+        auto& t = db.get_table<Record>();
+        auto it = t.lower_bound(low);
+        while (it != t.end() && it->first < up) {
+            func(*it->second);
+            ++it;
         }
         return Result::SUCCESS;
     }
@@ -180,13 +153,13 @@ public:
     // [low ,up)
     template <typename Record, typename Func>
     Result range_update(typename Record::Key low, typename Record::Key up, Func&& func) {
-        auto low_iter = db.get_lower_bound_iter<Record>(low);
-        auto up_iter = db.get_lower_bound_iter<Record>(up);
-
-        for (auto it = low_iter; it != up_iter; ++it) {
+        auto& t = db.get_table<Record>();
+        auto it = t.lower_bound(low);
+        while (it != t.end() && it->first < up) {
             Record* rec_ptr = ws.apply_update_to_writeset<Record>(it->first);
             assert(rec_ptr != nullptr);
-            func(*(rec_ptr));
+            func(*rec_ptr);
+            ++it;
         }
         return Result::SUCCESS;
     }

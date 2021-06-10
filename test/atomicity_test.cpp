@@ -39,17 +39,20 @@ TEST_F(AtomicityTest, Test1) {
 
     const Warehouse* w;
     Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
-    ASSERT_TRUE(db.get_record(w, w_key));
+    db.get_record(w, w_key);
+    ASSERT_TRUE(w != nullptr);
     double w_ytd = w->w_ytd;
 
     const District* d;
     District::Key d_key = District::Key::create_key(w_id, d_id);
-    ASSERT_TRUE(db.get_record(d, d_key));
+    db.get_record(d, d_key);
+    ASSERT_TRUE(d != nullptr);
     double d_ytd = d->d_ytd;
 
     const Customer* c;
     Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
-    ASSERT_TRUE(db.get_record(c, c_key));
+    db.get_record(c, c_key);
+    ASSERT_TRUE(c != nullptr);
     double c_balance = c->c_balance;
     double c_ytd_payment = c->c_ytd_payment;
     uint16_t c_payment_cnt = c->c_payment_cnt;
@@ -60,13 +63,16 @@ TEST_F(AtomicityTest, Test1) {
 
     payment.run(tx, stat, out);
 
-    ASSERT_TRUE(db.get_record(w, w_key));
+    db.get_record(w, w_key);
+    ASSERT_TRUE(w != nullptr);
     ASSERT_EQ(w_ytd + h_amount, w->w_ytd);
 
-    ASSERT_TRUE(db.get_record(d, d_key));
+    db.get_record(d, d_key);
+    ASSERT_TRUE(d != nullptr);
     ASSERT_EQ(d_ytd + h_amount, d->d_ytd);
 
-    ASSERT_TRUE(db.get_record(c, c_key));
+    db.get_record(c, c_key);
+    ASSERT_TRUE(c != nullptr);
     ASSERT_EQ(c_ytd_payment + h_amount, c->c_ytd_payment);
     ASSERT_EQ(c_balance - h_amount, c->c_balance);
     ASSERT_EQ(c_payment_cnt + 1, c->c_payment_cnt);

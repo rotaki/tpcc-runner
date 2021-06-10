@@ -11,14 +11,23 @@ struct LogRecord {
     LogRecord() = default;
     LogRecord(LogType lt, std::unique_ptr<Record> rec_ptr)
         : lt(lt)
-        , rec_ptr(std::move(rec_ptr)) {}
+        , rec_ptr(std::move(rec_ptr))
+        , it() {}
     LogType lt;
     std::unique_ptr<Record> rec_ptr;
+
+    using Iterator = typename RecordToIterator<Record>::type;
+    Iterator it;
 };
 
 template <typename Record>
 struct RecordToWS {
+#if 1  // std::map seems faster.
     using WS = std::map<typename Record::Key, LogRecord<Record>>;
+#else
+    using WS =
+        std::unordered_map<typename Record::Key, LogRecord<Record>, Hash<typename Record::Key>>;
+#endif
 };
 
 template <>
@@ -29,7 +38,7 @@ struct RecordToWS<History> {
 
 class WriteSet {
 public:
-    WriteSet(Database& db)
+    explicit WriteSet(Database& db)
         : db(db) {}
 
     ~WriteSet() { clear_all(); }
@@ -74,16 +83,18 @@ public:
 
         const Record* rec_ptr_in_db;
         // search into database
-        if (db.get_record<Record>(rec_ptr_in_db, rec_key)) {
-            // allocate memory in writeset
-            Record* rec_ptr_in_ws =
-                create_logrecord(LogType::UPDATE, rec_key, std::move(Cache::allocate<Record>()));
-            // copy from database
-            rec_ptr_in_ws->deep_copy_from(*rec_ptr_in_db);
-            return rec_ptr_in_ws;
-        } else {
+        auto it = db.get_record<Record>(rec_ptr_in_db, rec_key);
+        if (rec_ptr_in_db == nullptr) {
             throw std::runtime_error("No record to update in db");
         }
+        // allocate memory in writeset
+        LogRecord<Record>& lr =
+            create_logrecord(LogType::UPDATE, rec_key, std::move(Cache::allocate<Record>()));
+        Record* rec_ptr_in_ws = lr.rec_ptr.get();
+        // copy from database
+        rec_ptr_in_ws->deep_copy_from(*rec_ptr_in_db);
+        lr.it = it;
+        return rec_ptr_in_ws;
     }
 
     template <IsHistory Record>
@@ -108,14 +119,18 @@ public:
             }
         }
 
-        // Search into db
+#if 0  // Existance check is skipped.
+       // Search into db
         const Record* rec_ptr_in_db;
-        if (!db.get_record<Record>(rec_ptr_in_db, rec_key)) {
-            // allocate memory in writeset
-            return create_logrecord(LogType::INSERT, rec_key, std::move(Cache::allocate<Record>()));
-        } else {
+        db.get_record<Record>(rec_ptr_in_db, rec_key);
+        if (rec_ptr_in_db != nullptr) {
             throw std::runtime_error("Record already exists in db");
         }
+#endif
+        // allocate memory in writeset
+        LogRecord<Record>& lr =
+            create_logrecord(LogType::INSERT, rec_key, std::move(Cache::allocate<Record>()));
+        return lr.rec_ptr.get();
     }
 
     template <typename Record>
@@ -135,12 +150,14 @@ public:
 
         // Search into db
         const Record* rec_ptr_in_db;
-        if (db.get_record<Record>(rec_ptr_in_db, rec_key)) {
-            create_logrecord(LogType::DELETE, rec_key, std::move(Cache::allocate<Record>()));
-            return true;
-        } else {
+        auto it = db.get_record<Record>(rec_ptr_in_db, rec_key);
+        if (rec_ptr_in_db == nullptr) {
             throw std::runtime_error("Record not found in db");
         }
+        LogRecord<Record>& lr =
+            create_logrecord(LogType::DELETE, rec_key, std::move(Cache::allocate<Record>()));
+        lr.it = it;
+        return true;
     }
 
     bool apply_to_database() {
@@ -184,28 +201,31 @@ private:
     template <typename Record>
     LogRecord<Record>* lookup_logrecord(typename Record::Key rec_key) {
         typename RecordToWS<Record>::WS& ws = get_ws<Record>();
-        if (ws.find(rec_key) == ws.end()) {
-            return nullptr;
-        } else {
-            return &(ws[rec_key]);
-        }
+        auto it = ws.find(rec_key);
+        if (it == ws.end()) return nullptr;
+        return &it->second;
     }
 
     template <typename Record>
-    Record* create_logrecord(
+    LogRecord<Record>& create_logrecord(
         LogType lt, typename Record::Key rec_key, std::unique_ptr<Record> rec_ptr) {
         typename RecordToWS<Record>::WS& ws = get_ws<Record>();
-        ws[rec_key].lt = lt;
-        ws[rec_key].rec_ptr = std::move(rec_ptr);
-        return ws[rec_key].rec_ptr.get();
+        auto [it, ret] = ws.try_emplace(rec_key);
+        assert(ret);
+        LogRecord<Record>& lr = it->second;
+        lr.lt = lt;
+        lr.rec_ptr = std::move(rec_ptr);
+        return lr;
     }
 
     template <typename Record>
     void remove_logrecord_with_logtype(typename Record::Key rec_key, LogType lt) {
         typename RecordToWS<Record>::WS& ws = get_ws<Record>();
-        if (ws[rec_key].lt == lt) {
-            Cache::deallocate<Record>(std::move(ws[rec_key].rec_ptr));
-            ws.erase(rec_key);
+        auto it = ws.find(rec_key);
+        assert(it != ws.end());
+        if (it->second.lt == lt) {
+            Cache::deallocate<Record>(std::move(it->second.rec_ptr));
+            ws.erase(it);
         }
     }
 
@@ -222,15 +242,14 @@ private:
     void apply_writeset_to_database() {
         typename RecordToWS<Record>::WS& ws = get_ws<Record>();
         for (auto it = ws.begin(); it != ws.end(); ++it) {
-            switch (it->second.lt) {
-            case LogType::INSERT:
-                db.insert_record<Record>(it->first, std::move(it->second.rec_ptr));
-                break;
-            case LogType::UPDATE:
-                db.update_record<Record>(it->first, std::move(it->second.rec_ptr));
-                break;
+            const typename Record::Key& key = it->first;
+            LogRecord<Record>& lr = it->second;
+
+            switch (lr.lt) {
+            case LogType::INSERT: db.insert_record<Record>(key, std::move(lr.rec_ptr)); break;
+            case LogType::UPDATE: db.update_record<Record>(lr.it, std::move(lr.rec_ptr)); break;
             case LogType::DELETE:
-                db.delete_record<Record>(it->first);
+                db.delete_record<Record>(lr.it);
                 Cache::deallocate<Record>(std::move(it->second.rec_ptr));
                 break;
             }

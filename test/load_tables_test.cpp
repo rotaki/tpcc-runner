@@ -47,12 +47,14 @@ void check_items_table() {
     const Item* i;
     uint32_t i_id = 1;
     Item::Key i_key = Item::Key::create_key(i_id);
-    ASSERT_TRUE(Database::get_db().get_record<Item>(i, i_key));
+    Database::get_db().get_record<Item>(i, i_key);
+    ASSERT_TRUE(i != nullptr);
     check_item_record(*i);
 
     i_id = 100000;
     i_key = Item::Key::create_key(i_id);
-    ASSERT_TRUE(Database::get_db().get_record<Item>(i, i_key));
+    Database::get_db().get_record<Item>(i, i_key);
+    ASSERT_TRUE(i != nullptr);
     check_item_record(*i);
 }
 
@@ -89,12 +91,14 @@ void check_warehouses_table() {
     const Warehouse* w;
     uint16_t w_id = 1;
     Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
-    ASSERT_TRUE(Database::get_db().get_record<Warehouse>(w, w_key));
+    Database::get_db().get_record<Warehouse>(w, w_key);
+    ASSERT_TRUE(w != nullptr);
     check_warehouse_record(*w);
 
     w_id = num_warehouse;
     w_key = Warehouse::Key::create_key(w_id);
-    ASSERT_TRUE(Database::get_db().get_record<Warehouse>(w, w_key));
+    Database::get_db().get_record<Warehouse>(w, w_key);
+    ASSERT_TRUE(w != nullptr);
     check_warehouse_record(*w);
 }
 
@@ -129,13 +133,15 @@ void check_stocks_table() {
     uint16_t w_id = 1;
     uint32_t i_id = 1;
     Stock::Key s_key = Stock::Key::create_key(w_id, i_id);
-    ASSERT_TRUE(Database::get_db().get_record<Stock>(s, s_key));
+    Database::get_db().get_record<Stock>(s, s_key);
+    ASSERT_TRUE(s != nullptr);
     check_stock_record(*s);
 
     w_id = num_warehouse;
     i_id = 100000;
     s_key = Stock::Key::create_key(w_id, i_id);
-    ASSERT_TRUE(Database::get_db().get_record<Stock>(s, s_key));
+    Database::get_db().get_record<Stock>(s, s_key);
+    ASSERT_TRUE(s != nullptr);
     check_stock_record(*s);
 }
 
@@ -161,13 +167,15 @@ void check_districts_table() {
     uint16_t w_id = 1;
     uint8_t d_id = 1;
     District::Key d_key = District::Key::create_key(w_id, d_id);
-    ASSERT_TRUE(Database::get_db().get_record<District>(d, d_key));
+    Database::get_db().get_record<District>(d, d_key);
+    ASSERT_TRUE(d != nullptr);
     check_district_record(*d);
 
     w_id = num_warehouse;
     d_id = 10;
     d_key = District::Key::create_key(w_id, d_id);
-    ASSERT_TRUE(Database::get_db().get_record<District>(d, d_key));
+    Database::get_db().get_record<District>(d, d_key);
+    ASSERT_TRUE(d != nullptr);
     check_district_record(*d);
 }
 
@@ -211,14 +219,16 @@ void check_customers_table() {
     uint8_t d_id = 1;
     uint32_t c_id = 1;
     Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
-    ASSERT_TRUE(Database::get_db().get_record<Customer>(c, c_key));
+    Database::get_db().get_record<Customer>(c, c_key);
+    ASSERT_TRUE(c != nullptr);
     check_customer_record(*c);
 
     w_id = num_warehouse;
     d_id = 10;
     c_id = 3000;
     c_key = Customer::Key::create_key(w_id, d_id, c_id);
-    ASSERT_TRUE(Database::get_db().get_record<Customer>(c, c_key));
+    Database::get_db().get_record<Customer>(c, c_key);
+    ASSERT_TRUE(c != nullptr);
     check_customer_record(*c);
 }
 
@@ -287,14 +297,16 @@ void check_orders_table() {
     uint8_t d_id = 1;
     uint32_t o_id = 1;
     Order::Key o_key = Order::Key::create_key(w_id, d_id, o_id);
-    ASSERT_TRUE(Database::get_db().get_record<Order>(o, o_key));
+    Database::get_db().get_record<Order>(o, o_key);
+    ASSERT_TRUE(o != nullptr);
     check_order_record(*o);
 
     w_id = num_warehouse;
     d_id = 10;
     o_id = 3000;
     o_key = Order::Key::create_key(w_id, d_id, o_id);
-    ASSERT_TRUE(Database::get_db().get_record<Order>(o, o_key));
+    Database::get_db().get_record<Order>(o, o_key);
+    ASSERT_TRUE(o != nullptr);
     check_order_record(*o);
 }
 
@@ -334,7 +346,8 @@ void check_orderlines_table() {
     uint32_t o_id = 1;
     uint8_t ol_number = 1;
     OrderLine::Key ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_number);
-    ASSERT_TRUE(Database::get_db().get_record<OrderLine>(ol, ol_key));
+    Database::get_db().get_record<OrderLine>(ol, ol_key);
+    ASSERT_TRUE(ol != nullptr);
     check_orderline_record(*ol);
 
     w_id = num_warehouse;
@@ -342,7 +355,8 @@ void check_orderlines_table() {
     o_id = 3000;
     ol_number = 5;
     ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_number);
-    ASSERT_TRUE(Database::get_db().get_record<OrderLine>(ol, ol_key));
+    Database::get_db().get_record<OrderLine>(ol, ol_key);
+    ASSERT_TRUE(ol != nullptr);
     check_orderline_record(*ol);
 }
 
@@ -363,14 +377,16 @@ void check_neworders_table() {
     uint8_t d_id = 1;
     uint32_t o_id = 2101;
     NewOrder::Key no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
-    ASSERT_TRUE(Database::get_db().get_record<NewOrder>(no, no_key));
+    Database::get_db().get_record<NewOrder>(no, no_key);
+    ASSERT_TRUE(no != nullptr);
     check_neworder_record(*no);
 
     w_id = num_warehouse;
     d_id = 10;
     o_id = 3000;
     no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
-    ASSERT_TRUE(Database::get_db().get_record<NewOrder>(no, no_key));
+    Database::get_db().get_record<NewOrder>(no, no_key);
+    ASSERT_TRUE(no != nullptr);
     check_neworder_record(*no);
 }
 

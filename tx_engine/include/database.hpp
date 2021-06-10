@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <concepts>
 #include <cstdint>
 #include <map>
 #include <mutex>
@@ -13,9 +14,38 @@
 #include "record_key.hpp"
 #include "record_layout.hpp"
 
+
+template <typename T>
+concept UseOrderedMap = is_any<T, Order, OrderLine, Customer, NewOrder>::value;
+
+template <typename T>
+concept UseUnorderedMap = is_any<T, Item, Warehouse, Stock, District>::value;
+
+
+template <typename Key>
+requires requires(Key k) {
+    { k.hash() }
+    noexcept->std::same_as<size_t>;
+}
+struct Hash {
+    size_t operator()(const Key& key) const noexcept { return key.hash(); }
+};
+
+
 template <typename Record>
 struct RecordToTable {
-    using Table = std::map<typename Record::Key, std::unique_ptr<Record>>;
+    using type = void;
+};
+
+template <UseOrderedMap Record>
+struct RecordToTable<Record> {
+    using type = std::map<typename Record::Key, std::unique_ptr<Record>>;
+};
+
+template <UseUnorderedMap Record>
+struct RecordToTable<Record> {
+    using type = std::unordered_map<
+        typename Record::Key, std::unique_ptr<Record>, Hash<typename Record::Key>>;
 };
 
 struct HistoryTable {
@@ -25,37 +55,44 @@ struct HistoryTable {
     }
 };
 
-template <>
-struct RecordToTable<History> {
-    using Table = HistoryTable;
+template <IsHistory Record>
+struct RecordToTable<Record> {
+    using type = HistoryTable;
+};
+
+template <IsSecondary Record>
+struct RecordToTable<Record> {
+    using type = std::multimap<typename Record::Key, Record>;
+};
+
+
+template <typename Record>
+struct RecordToIterator {
+    using type = typename RecordToTable<Record>::type::iterator;
 };
 
 template <>
-struct RecordToTable<CustomerSecondary> {
-    using Table = std::multimap<typename CustomerSecondary::Key, CustomerSecondary>;
+struct RecordToIterator<History> {
+    using type = size_t;  // dummy
 };
 
-template <>
-struct RecordToTable<OrderSecondary> {
-    using Table = std::multimap<typename OrderSecondary::Key, OrderSecondary>;
-};
 
 class Database {
 private:
     Database() = default;
     ~Database() = default;
 
-    RecordToTable<Item>::Table items;
-    RecordToTable<Warehouse>::Table warehouses;
-    RecordToTable<Stock>::Table stocks;
-    RecordToTable<District>::Table districts;
-    RecordToTable<Customer>::Table customers;
-    RecordToTable<CustomerSecondary>::Table customers_secondary;
-    RecordToTable<History>::Table histories;
-    RecordToTable<Order>::Table orders;
-    RecordToTable<OrderSecondary>::Table orders_secondary;
-    RecordToTable<NewOrder>::Table neworders;
-    RecordToTable<OrderLine>::Table orderlines;
+    RecordToTable<Item>::type items;
+    RecordToTable<Warehouse>::type warehouses;
+    RecordToTable<Stock>::type stocks;
+    RecordToTable<District>::type districts;
+    RecordToTable<Customer>::type customers;
+    RecordToTable<CustomerSecondary>::type customers_secondary;
+    RecordToTable<History>::type histories;
+    RecordToTable<Order>::type orders;
+    RecordToTable<OrderSecondary>::type orders_secondary;
+    RecordToTable<NewOrder>::type neworders;
+    RecordToTable<OrderLine>::type orderlines;
 
 public:
     Database(Database const&) = delete;
@@ -67,7 +104,7 @@ public:
     }
 
     template <typename Record>
-    typename RecordToTable<Record>::Table& get_table() {
+    typename RecordToTable<Record>::type& get_table() {
         if constexpr (std::is_same<Record, Item>::value) {
             return items;
         } else if constexpr (std::is_same<Record, Warehouse>::value) {
@@ -96,44 +133,43 @@ public:
     }
 
     template <typename Record>
-    typename RecordToTable<Record>::Table::iterator get_lower_bound_iter(typename Record::Key key) {
+    requires UseOrderedMap<Record> || IsSecondary<Record>
+    typename RecordToIterator<Record>::type get_lower_bound_iter(typename Record::Key key) {
         return get_table<Record>().lower_bound(key);
     }
 
     template <typename Record>
-    typename RecordToTable<Record>::Table::iterator get_upper_bound_iter(typename Record::Key key) {
+    requires UseOrderedMap<Record> || IsSecondary<Record>
+    typename RecordToIterator<Record>::type get_upper_bound_iter(typename Record::Key key) {
         return get_table<Record>().upper_bound(key);
     }
 
     // Cannot be used for History, CustomerSecondary, OrderSecondary
     template <typename Record>
     Record* allocate_record(typename Record::Key key) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
-        if (t.find(key) == t.end()) {
-            t[key] = std::move(Cache::allocate<Record>());
-            return t[key].get();
-        } else {
-            assert(t[key]);
-            return t[key].get();
+        typename RecordToTable<Record>::type& t = get_table<Record>();
+        auto it = t.find(key);
+        if (it == t.end()) {
+            bool ret;
+            std::tie(it, ret) = t.emplace(key, Cache::allocate<Record>());
+            assert(ret);
         }
+        return it->second.get();
     }
 
     // Cannot be used for History, CustomerSecondary, OrderSecondary
     template <typename Record>
-    bool get_record(const Record*& rec_ptr, typename Record::Key key) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
-        if (t.find(key) == t.end()) {
-            rec_ptr = nullptr;
-            return false;
-        } else {
-            rec_ptr = t[key].get();
-            return true;
-        }
+    typename RecordToIterator<Record>::type get_record(
+        const Record*& rec_ptr, typename Record::Key key) {
+        typename RecordToTable<Record>::type& t = get_table<Record>();
+        auto it = t.find(key);
+        rec_ptr = (it == t.end()) ? nullptr : it->second.get();
+        return it;
     }
 
     template <IsHistory Record>
     bool insert_record(std::unique_ptr<Record> rec_ptr) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
+        typename RecordToTable<Record>::type& t = get_table<Record>();
         auto& deq = t.get_local_deque();
         deq.push_back(std::move(rec_ptr));
         return true;
@@ -141,61 +177,71 @@ public:
 
     template <HasSecondary Record>
     bool insert_record(typename Record::Key key, std::unique_ptr<Record> rec_ptr) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
-        if (t.find(key) == t.end()) {
-            t.emplace(key, std::move(rec_ptr));
-            // create secondary record and insert
-            typename Record::Secondary sec_rec(t[key].get());
-            typename Record::Secondary::Key sec_key = Record::Secondary::Key::create_key(*(t[key]));
-            return insert_record(sec_key, sec_rec);
-        } else {
-            return false;
-        }
+        typename RecordToTable<Record>::type& t = get_table<Record>();
+        auto [it, ret] = t.try_emplace(key, std::move(rec_ptr));
+        if (!ret) return false;
+
+        // create secondary record and insert
+        Record& rec = *it->second;
+        typename Record::Secondary sec_rec(&rec);
+        typename Record::Secondary::Key sec_key = Record::Secondary::Key::create_key(rec);
+        return insert_record(sec_key, sec_rec);
     }
+
+#ifndef NDEBUG
+    template <IsSecondary Record>
+    bool multimap_find(
+        typename RecordToTable<Record>::type& t, typename Record::Key key,
+        const Record& rec) const {
+        bool found = false;
+        auto it0 = t.lower_bound(key);
+        auto it1 = t.upper_bound(key);
+        while (it0 != it1) {
+            if (it0->second == rec) {
+                found = true;
+                break;
+            }
+            ++it0;
+        }
+        return found;
+    }
+#endif
 
     template <IsSecondary Record>
     bool insert_record(typename Record::Key key, const Record& rec) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
-        if (t.find(key) == t.end()) {
-            t.emplace(key, rec);
-            return true;
-        } else {
-            return false;
-        }
+        typename RecordToTable<Record>::type& t = get_table<Record>();
+#ifndef NDEBUG
+        if (multimap_find(t, key, rec)) return false;
+#endif
+        t.emplace(key, rec);
+        return true;
     }
 
     template <typename Record>
-    bool insert_record(typename Record::Key key, std::unique_ptr<Record> rec_ptr) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
-        if (t.find(key) == t.end()) {
-            t.emplace(key, std::move(rec_ptr));
-            return true;
-        } else {
-            return false;
-        }
+    requires(UseUnorderedMap<Record> || UseOrderedMap<Record>)
+        && (!HasSecondary<Record>)bool insert_record(
+            typename Record::Key key, std::unique_ptr<Record> rec_ptr) {
+        typename RecordToTable<Record>::type& t = get_table<Record>();
+        auto [it, ret] = t.try_emplace(key, std::move(rec_ptr));
+        return ret;
     }
 
     template <typename Record>
-    bool update_record(typename Record::Key key, std::unique_ptr<Record> rec_ptr) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
-        if (t.find(key) == t.end()) {
-            return false;
-        } else {
-            Cache::deallocate<Record>(std::move(t[key]));
-            t[key] = std::move(rec_ptr);
-            return true;
-        }
+    requires UseUnorderedMap<Record> || UseOrderedMap<Record>
+    bool update_record(
+        typename RecordToIterator<Record>::type iter, std::unique_ptr<Record> rec_ptr) {
+        std::unique_ptr<Record>& dst = iter->second;
+        Cache::deallocate<Record>(std::move(dst));
+        dst = std::move(rec_ptr);
+        return true;
     }
 
     template <typename Record>
-    bool delete_record(typename Record::Key key) {
-        typename RecordToTable<Record>::Table& t = get_table<Record>();
-        if (t.find(key) == t.end()) {
-            return false;
-        } else {
-            Cache::deallocate<Record>(std::move(t[key]));
-            t.erase(key);
-            return true;
-        }
+    requires UseUnorderedMap<Record> || UseOrderedMap<Record>
+    bool delete_record(typename RecordToIterator<Record>::type iter) {
+        typename RecordToTable<Record>::type& t = get_table<Record>();
+        Cache::deallocate<Record>(std::move(iter->second));
+        t.erase(iter);
+        return true;
     }
 };
