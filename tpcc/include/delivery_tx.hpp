@@ -4,9 +4,11 @@
 
 #include <cstdint>
 
+#include "logger.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
 #include "tx_utils.hpp"
+
 
 class DeliveryTx {
 public:
@@ -36,6 +38,7 @@ public:
     template <typename Transaction>
     Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
+        TxHelper<Transaction> helper(tx, stat[TxType::Delivery]);
 
         uint16_t w_id = input.w_id;
         uint8_t o_carrier_id = input.o_carrier_id;
@@ -48,16 +51,16 @@ public:
             res = tx.get_neworder_with_smallest_key_no_less_than(no, no_low);
             if (res == Transaction::Result::FAIL) continue;
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+            if (not_succeeded(tx, res)) return helper.kill(res);
             res = tx.template delete_record<NewOrder>(NewOrder::Key::create_key(*no));
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+            if (not_succeeded(tx, res)) return helper.kill(res);
 
             Order* o;
             Order::Key o_key = Order::Key::create_key(w_id, d_id, no->no_o_id);
             res = tx.prepare_record_for_update(o, o_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+            if (not_succeeded(tx, res)) return helper.kill(res);
             o->o_carrier_id = o_carrier_id;
 
             double total_ol_amount = 0.0;
@@ -69,33 +72,19 @@ public:
                     total_ol_amount += ol.ol_amount;
                 });
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+            if (not_succeeded(tx, res)) return helper.kill(res);
 
             Customer* c;
             Customer::Key c_key = Customer::Key::create_key(w_id, d_id, o->o_c_id);
             res = tx.prepare_record_for_update(c, c_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+            if (not_succeeded(tx, res)) return helper.kill(res);
             c->c_balance += total_ol_amount;
             c->c_delivery_cnt += 1;
 
             out << d_id << o->o_id;
         }
 
-        if (tx.commit()) {
-            LOG_TRACE("commit success");
-            stat.num_commits[3]++;
-            return Status::SUCCESS;
-        } else {
-            LOG_TRACE("commit fail");
-            stat.num_sys_aborts[3]++;
-            return Status::SYSTEM_ABORT;
-        }
+        return helper.commit();
     };
-
-private:
-    template <typename Transaction>
-    Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat) {
-        return ::kill_tx(tx, res, stat, 3);
-    }
 };

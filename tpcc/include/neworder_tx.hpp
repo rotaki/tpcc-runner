@@ -4,9 +4,11 @@
 
 #include <cstdint>
 
+#include "logger.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
 #include "tx_utils.hpp"
+
 
 class NewOrderTx {
 public:
@@ -75,6 +77,7 @@ public:
     template <typename Transaction>
     Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
+        TxHelper<Transaction> helper(tx, stat[TxType::NewOrder]);
 
         bool is_remote = input.is_remote;
         uint16_t w_id = input.w_id;
@@ -89,13 +92,13 @@ public:
         Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
         res = tx.get_record(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         District* d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.prepare_record_for_update(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
         uint32_t o_id = d->d_next_o_id;
         d->d_next_o_id++;
 
@@ -103,7 +106,7 @@ public:
         Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
         res = tx.get_record(c, c_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         out << c->c_last << c->c_credit << c->c_discount << w->w_tax << d->d_tax << ol_cnt
             << d->d_next_o_id << o_entry_d;
@@ -112,14 +115,14 @@ public:
         NewOrder::Key no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
         res = tx.prepare_record_for_insert(no, no_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
         create_neworder(*no, w_id, d_id, o_id);
 
         Order* o;
         Order::Key o_key = Order::Key::create_key(w_id, d_id, o_id);
         res = tx.prepare_record_for_insert(o, o_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
         create_order(*o, w_id, d_id, c_id, o_id, ol_cnt, is_remote);
 
         double total = 0;
@@ -129,22 +132,19 @@ public:
             uint32_t ol_i_id = input.items[ol_num - 1].ol_i_id;
             uint8_t ol_quantity = input.items[ol_num - 1].ol_quantity;
 
-            if (ol_i_id == Item::UNUSED_ID) {
-                stat.num_usr_aborts[0]++;
-                return Status::USER_ABORT;
-            }
+            if (ol_i_id == Item::UNUSED_ID) return helper.usr_abort();
 
             const Item* i;
             Item::Key i_key = Item::Key::create_key(ol_i_id);
             res = tx.get_record(i, i_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+            if (not_succeeded(tx, res)) return helper.kill(res);
 
             Stock* s;
             Stock::Key s_key = Stock::Key::create_key(ol_supply_w_id, ol_i_id);
             res = tx.prepare_record_for_update(s, s_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+            if (not_succeeded(tx, res)) return helper.kill(res);
             char brand_generic;
             if (strstr(i->i_data, "ORIGINAL") && strstr(s->s_data, "ORIGINAL")) {
                 brand_generic = 'B';
@@ -160,7 +160,7 @@ public:
             OrderLine::Key ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_num);
             res = tx.prepare_record_for_insert(ol, ol_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+            if (not_succeeded(tx, res)) return helper.kill(res);
             create_orderline(
                 *ol, w_id, d_id, o_id, ol_num, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, *s);
 
@@ -171,15 +171,7 @@ public:
         total *= (1 - c->c_discount) * (1 + w->w_tax + d->d_tax);
         out << total;
 
-        if (tx.commit()) {
-            LOG_TRACE("commit success");
-            stat.num_commits[0]++;
-            return Status::SUCCESS;
-        } else {
-            LOG_TRACE("commit fail");
-            stat.num_sys_aborts[0]++;
-            return Status::SYSTEM_ABORT;
-        }
+        return helper.commit();
     }
 
 private:
@@ -224,10 +216,5 @@ private:
             s.s_quantity = (s.s_quantity - ol_quantity) + 91;
         s.s_order_cnt += 1;
         if (is_remote) s.s_remote_cnt += 1;
-    }
-
-    template <typename Transaction>
-    Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat) {
-        return ::kill_tx(tx, res, stat, 0);
     }
 };

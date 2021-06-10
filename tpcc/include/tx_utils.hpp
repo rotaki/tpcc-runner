@@ -40,10 +40,69 @@ private:
     uint64_t out = 0;
 };
 
+
+struct TxType {
+    enum Value : uint8_t {
+        NewOrder = 0,
+        Payment = 1,
+        OrderStatus = 2,
+        Delivery = 3,
+        StockLevel = 4,
+        Max = 5,
+    };
+
+    Value value;
+
+    TxType() = default;
+    TxType(Value v)
+        : value(v){};
+    TxType(uint8_t i)
+        : value(Value(i)) {
+        assert(i < Max);
+    }
+
+    operator size_t() const { return size_t(value); }
+
+    static const char* name(TxType tx_type) {
+        assert(tx_type < Max);
+        constexpr const char* n[] = {
+            "NewOrder", "Payment", "OrderStatus", "Delivery", "StockLevel"};
+        return n[tx_type];
+    }
+};
+
+
 struct Stat {
-    size_t num_commits[5] = {};
-    size_t num_usr_aborts[5] = {};
-    size_t num_sys_aborts[5] = {};
+    struct PerTxType {
+        size_t num_commits = 0;
+        size_t num_usr_aborts = 0;
+        size_t num_sys_aborts = 0;
+
+        void add(const PerTxType& rhs) {
+            num_commits += rhs.num_commits;
+            num_usr_aborts += rhs.num_usr_aborts;
+            num_sys_aborts += rhs.num_sys_aborts;
+        }
+    };
+
+    PerTxType& operator[](TxType tx_type) { return per_type_[tx_type]; }
+    const PerTxType& operator[](TxType tx_type) const { return per_type_[tx_type]; }
+
+    void add(const Stat& rhs) {
+        for (size_t i = 0; i < TxType::Max; i++) {
+            per_type_[i].add(rhs.per_type_[i]);
+        }
+    }
+    PerTxType aggregate_perf() const {
+        PerTxType out;
+        for (size_t i = 0; i < TxType::Max; i++) {
+            out.add(per_type_[i]);
+        }
+        return out;
+    }
+
+private:
+    PerTxType per_type_[TxType::Max];
 };
 
 struct ThreadLocalData {
@@ -62,15 +121,36 @@ inline bool not_succeeded(Transaction& tx, typename Transaction::Result& res) {
     return res != Transaction::Result::SUCCESS;
 }
 
+
 template <typename Transaction>
-inline Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat, int n) {
-    assert(not_succeeded(tx, res));
-    if (res == Transaction::Result::FAIL) {
-        return Status::BUG;
-    } else {
-        assert(n >= 0);
-        assert(n <= 4);
-        stat.num_sys_aborts[n]++;
-        return Status::SYSTEM_ABORT;
+struct TxHelper {
+    Transaction& tx_;
+    Stat::PerTxType& per_type_;
+
+    explicit TxHelper(Transaction& tx, Stat::PerTxType& per_type_)
+        : tx_(tx)
+        , per_type_(per_type_) {}
+
+    Status kill(typename Transaction::Result res) {
+        switch (res) {
+        case Transaction::Result::FAIL: return Status::BUG;
+        case Transaction::Result::ABORT: per_type_.num_sys_aborts++; return Status::SYSTEM_ABORT;
+        default: throw std::runtime_error("wrong Transaction::Result");
+        }
     }
-}
+
+    Status commit() {
+        if (tx_.commit()) {
+            per_type_.num_commits++;
+            return Status::SUCCESS;
+        } else {
+            per_type_.num_sys_aborts++;
+            return Status::SYSTEM_ABORT;
+        }
+    }
+
+    Status usr_abort() {
+        per_type_.num_usr_aborts++;
+        return Status::USER_ABORT;
+    }
+};

@@ -5,9 +5,11 @@
 #include <cassert>
 #include <cstdint>
 
+#include "logger.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
 #include "tx_utils.hpp"
+
 
 class PaymentTx {
 public:
@@ -71,6 +73,7 @@ public:
     template <typename Transaction>
     Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
+        TxHelper<Transaction> helper(tx, stat[TxType::Payment]);
 
         uint16_t w_id = input.w_id;
         uint8_t d_id = input.d_id;
@@ -88,14 +91,14 @@ public:
         Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
         res = tx.prepare_record_for_update(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
         w->w_ytd += h_amount;
 
         District* d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.prepare_record_for_update(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
         d->d_ytd += h_amount;
 
         Customer* c = nullptr;
@@ -111,7 +114,7 @@ public:
             res = tx.prepare_record_for_update(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
         }
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
         c_id = c->c_id;
 
         out << c_id << c_d_id << c_w_id << h_amount << h_date;
@@ -132,18 +135,10 @@ public:
         History* h;
         res = tx.prepare_record_for_insert(h);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
         create_history(*h, w_id, d_id, c_id, c_w_id, c_d_id, h_amount, w->w_name, d->d_name);
 
-        if (tx.commit()) {
-            LOG_TRACE("commit success");
-            stat.num_commits[1]++;
-            return Status::SUCCESS;
-        } else {
-            LOG_TRACE("commit fail");
-            stat.num_sys_aborts[1]++;
-            return Status::SYSTEM_ABORT;
-        }
+        return helper.commit();
     }
 
 private:
@@ -171,10 +166,5 @@ private:
         h.h_date = get_timestamp();
         h.h_amount = h_amount;
         snprintf(h.h_data, sizeof(h.h_data), "%-10.10s    %.10s", w_name, d_name);
-    }
-
-    template <typename Transaction>
-    Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat) {
-        return ::kill_tx(tx, res, stat, 1);
     }
 };

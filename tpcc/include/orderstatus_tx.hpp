@@ -5,9 +5,11 @@
 #include <cstdint>
 #include <deque>
 
+#include "logger.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
 #include "tx_utils.hpp"
+
 
 class OrderStatusTx {
 public:
@@ -52,6 +54,7 @@ public:
     template <typename Transaction>
     Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
+        TxHelper<Transaction> helper(tx, stat[TxType::OrderStatus]);
 
         uint16_t c_w_id = input.w_id;
         uint8_t c_d_id = input.d_id;
@@ -74,7 +77,7 @@ public:
             res = tx.get_record(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
         }
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         c_id = c->c_id;
         out << c->c_first << c->c_middle << c->c_last << c->c_balance;
@@ -82,7 +85,7 @@ public:
         const Order* o = nullptr;
         res = tx.get_order_by_customer_id(o, OrderSecondary::Key::create_key(c_w_id, c_d_id, c_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         out << o->o_id << o->o_entry_d << o->o_carrier_id;
 
@@ -95,22 +98,8 @@ public:
         });
 
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return kill_tx(tx, res, stat);
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
-        if (tx.commit()) {
-            LOG_TRACE("commit success");
-            stat.num_commits[2]++;
-            return Status::SUCCESS;
-        } else {
-            LOG_TRACE("commit fail");
-            stat.num_sys_aborts[2]++;
-            return Status::SYSTEM_ABORT;
-        }
-    }
-
-private:
-    template <typename Transaction>
-    Status kill_tx(Transaction& tx, typename Transaction::Result res, Stat& stat) {
-        return ::kill_tx(tx, res, stat, 2);
+        return helper.commit();
     }
 };
