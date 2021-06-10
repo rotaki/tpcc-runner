@@ -33,7 +33,7 @@ set(default_build_type "Release")
 if(EXISTS "${CMAKE_SOURCE_DIR}/.git")
   set(default_build_type "Debug")
 endif()
- 
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
   message(STATUS "Setting build type to '${default_build_type}' as none was specified.")
   set(CMAKE_BUILD_TYPE "${default_build_type}" CACHE
@@ -54,23 +54,23 @@ function(add_dep NAME GIT_URL GIT_TAG)
     FetchContent_Declare(${NAME})
     if (NOT ${NAME}_POPULATED)
         FetchContent_Populate(${NAME}
-                QUIET                                                   
-                SOURCE_DIR ${CMAKE_BINARY_DIR}/_deps/src/${NAME}        
-                BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/build/${NAME}      
-                SUBBUILD_DIR ${CMAKE_BINARY_DIR}/_deps/sub/${NAME}      
-                GIT_REPOSITORY ${GIT_URL}                               
-                GIT_TAG ${GIT_TAG}                                      
+                QUIET
+                SOURCE_DIR ${CMAKE_BINARY_DIR}/_deps/src/${NAME}
+                BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/build/${NAME}
+                SUBBUILD_DIR ${CMAKE_BINARY_DIR}/_deps/sub/${NAME}
+                GIT_REPOSITORY ${GIT_URL}
+                GIT_TAG ${GIT_TAG}
                 )
 
         add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
     endif ()
 
-    execute_process(COMMAND git log -1 --format=%cd --date=short                        
-            WORKING_DIRECTORY ${${NAME}_SOURCE_DIR}                               
-            OUTPUT_VARIABLE GIT_LAST_COMMIT)                                            
-    string(STRIP "${GIT_LAST_COMMIT}" GIT_LAST_COMMIT)                                  
+    execute_process(COMMAND git log -1 --format=%cd --date=short
+            WORKING_DIRECTORY ${${NAME}_SOURCE_DIR}
+            OUTPUT_VARIABLE GIT_LAST_COMMIT)
+    string(STRIP "${GIT_LAST_COMMIT}" GIT_LAST_COMMIT)
 
-    message(STATUS "[FOUND] ${NAME} (${GIT_URL} ${GIT_TAG} ${GIT_LAST_COMMIT})")        
+    message(STATUS "[FOUND] ${NAME} (${GIT_URL} ${GIT_TAG} ${GIT_LAST_COMMIT})")
 endfunction()
 
 add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
@@ -212,7 +212,7 @@ find_program(CLANG_FORMAT_BIN clang-format)
 if ("${CLANG_FORMAT_BIN}" STREQUAL "CLANG_FORMAT_BIN-NOTFOUND")
   message(STATUS "[MISSING] clang-format not found, no check-format")
 else()
-  
+
   # target format is only build when `make format` is issued
   add_custom_target(format
     COMMENT "Running: format"
@@ -240,10 +240,10 @@ else()
 
   add_custom_command(TARGET format DEPENDS gtest_main)
   add_custom_command(TARGET check-format DEPENDS gtest_main)
-  
+
   message(STATUS "[ADDED] format and check-format (${CLANG_FORMAT_BIN})")
   unset(FORMAT_DIRS)
-  
+
 endif()
 unset(CLANG_FORMAT_BIN)
 
