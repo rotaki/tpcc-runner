@@ -7,9 +7,10 @@ project(
   )
 
 message(STATUS "Welcome to tpcc-runner, Version: ${PROJECT_VERSION}")
-set(CMAKE_C_COMPILER /usr/bin/gcc CACHE PATH "")
-set(CMAKE_CXX_COMPILER /usr/bin/g++ CACHE PATH "")
-message(STATUS "Compiler: ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+set(CMAKE_C_COMPILER "gcc" CACHE STRING "C compiler")
+set(CMAKE_CXX_COMPILER "g++" CACHE STRING "C++ compiler")
+message(STATUS "C Compiler: ${CMAKE_C_COMPILER} ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
+message(STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER} ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "System: ${CMAKE_SYSTEM_NAME} ${CMAKE_SYSTEM_VERSION} ${CMAKE_SYSTEM_PROCESSOR}")
 
 function(print_sys_info QUERY_TARGET)
@@ -49,6 +50,12 @@ set(CMAKE_CXX_FLAGS_RELEASE        "-Ofast -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Ofast -DNDEBUG -g")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF)
+list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # For language server.
+
 include(FetchContent)
 function(add_dep NAME GIT_URL GIT_TAG)
     FetchContent_Declare(${NAME})
@@ -74,15 +81,14 @@ function(add_dep NAME GIT_URL GIT_TAG)
 endfunction()
 
 add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
-add_dep(googletest https://github.com/google/googletest.git release-1.10.0)
+add_dep(googletest https://github.com/google/googletest.git master)
 
 ###############################################################################
 #                            Static library of tpcc                           #
 ###############################################################################
 
 set(TPCCRUNNER_COMPILE_DEFINITIONS "")
-set(TPCCRUNNER_COMPILE_OPTIONS "-fconcepts")
-set(TPCCRUNNER_COMPILE_FEATURES "cxx_std_20")
+list(APPEND TPCCRUNNER_COMPILE_OPTIONS ${COMMON_COMPILE_FLAGS})
 set(TPCCRUNNER_LINK_OPTIONS "")
 set(TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/tpcc/include")
 list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/tx_engine/include")
@@ -128,11 +134,10 @@ target_link_libraries(tpccrunner_objlib PRIVATE mimalloc)
 
 target_compile_definitions(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_DEFINITIONS})
 target_compile_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_OPTIONS})
-target_compile_features(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_FEATURES})
 target_link_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_LINK_OPTIONS})
 target_include_directories(tpccrunner_objlib PUBLIC ${TPCCRUNNER_INCLUDE_DIRECTORIES})
 
-target_compile_options(tpccrunner_objlib PRIVATE "-fPIC" "-Werror" "-Wall")
+target_compile_options(tpccrunner_objlib PRIVATE ${COMMON_COMPILE_FLAGS})
 
 # create static library
 add_library(tpccrunner_static STATIC $<TARGET_OBJECTS:tpccrunner_objlib>)
@@ -159,7 +164,7 @@ foreach (EXECUTABLE ${EXECUTABLES})
   add_executable(${FILENAME} ${EXECUTABLE})
   target_link_options(${FILENAME} PUBLIC "-pthread")
   target_compile_options(${FILENAME} PUBLIC "-pthread")
-  target_compile_options(${FILENAME} PRIVATE "-Werror" "-Wall")
+  target_compile_options(${FILENAME} PRIVATE ${COMMON_COMPILE_FLAGS})
   target_link_libraries(${FILENAME} tpccrunner_static)
   set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
   set_target_properties(
@@ -188,7 +193,7 @@ foreach (TPCC_TEST ${TPCC_TESTS})
   if (${FILENAME} MATCHES "test")
     add_executable(${FILENAME} ${TPCC_TEST})
     gtest_discover_tests(${FILENAME})
-    target_compile_options(${FILENAME} PRIVATE "-Werror" "-Wall")
+    target_compile_options(${FILENAME} PRIVATE ${COMMON_COMPILE_FLAGS})
     target_include_directories(${FILENAME} PRIVATE "${PROJECT_SOURCE_DIR}/test")
     target_link_libraries(${FILENAME} tpccrunner_static gtest_main)
     set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
