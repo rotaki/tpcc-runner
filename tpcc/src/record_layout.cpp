@@ -85,16 +85,9 @@ void Stock::generate(uint16_t s_w_id_, uint32_t s_i_id_) {
     s_ytd = 0;                        // numeric(8)
     s_order_cnt = 0;                  // numeric(4)
     s_remote_cnt = 0;                 // numeric(4)
-    make_random_astring(s_dist[0], Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist[1], Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist[2], Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist[3], Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist[4], Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist[5], Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist[6], Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist[7], Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist[8], Stock::DIST, Stock::DIST);
-    make_random_astring(s_dist[9], Stock::DIST, Stock::DIST);
+    for (size_t i = 0; i < 10; i++) {
+        make_random_astring(s_dist[i], Stock::DIST, Stock::DIST);
+    }
     make_random_astring(s_data, Stock::MIN_DATA, Stock::MAX_DATA);
     if (urand_int(0, 99) < 10) make_original(s_data);
 }

@@ -16,10 +16,10 @@
 
 // https://blog.galowicz.de/2016/02/20/short_file_macro/
 using cstr = const char*;
-static constexpr cstr PastLastSlash(cstr a, cstr b) {
+inline constexpr cstr PastLastSlash(cstr a, cstr b) {
     return *a == '\0' ? b : *b == '/' ? PastLastSlash(a + 1, a + 1) : PastLastSlash(a + 1, b);
 }
-static constexpr cstr PastLastSlash(cstr a) {
+inline constexpr cstr PastLastSlash(cstr a) {
     return PastLastSlash(a, a);
 }
 #define __SHORT_FILE__                                \
@@ -28,7 +28,7 @@ static constexpr cstr PastLastSlash(cstr a) {
         sf__;                                         \
     })
 
-void OutputLogHeader(const char* file_name, int line, const char* func, int level);
+inline void OutputLogHeader(const char* file_name, int line, const char* func, int level);
 
 #if LOG_LEVEL >= LOG_LEVEL_ERROR
 #    define LOG_ERROR(...)                                                        \

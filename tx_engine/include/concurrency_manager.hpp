@@ -3,6 +3,7 @@
 #include <condition_variable>
 #include <mutex>
 
+#include "config.hpp"
 #include "logger.hpp"
 
 class LockTable {

@@ -21,16 +21,13 @@ public:
     }
 
     void deallocate(std::unique_ptr<Record> rec_ptr) {
-        if (cache.size() > n) {
-            delete rec_ptr.release();
-        } else {
-            cache.push_back(std::move(rec_ptr));
-        }
+        cache.push_back(std::move(rec_ptr));
+        if (cache.size() > n) cache.pop_front();
     }
 
 private:
     std::deque<std::unique_ptr<Record>> cache;
-    size_t n = 30;
+    size_t n = 30;  // TODO: move the constant to configuration.
 };
 
 class Cache {
