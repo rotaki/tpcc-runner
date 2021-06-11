@@ -57,17 +57,17 @@ Executing `./main 1 1 20` yields the following output on `8 core Intel(R) Core(T
 Loading all tables with 1 warehouse(s)
 Loaded
 1 warehouse(s), 1 thread(s), 20 second(s)
-    commits: 1329712
+    commits: 2436911
     sys aborts: 0
-    usr aborts: 6081
-Throughput: 66485 txns/s
+    usr aborts: 11196
+Throughput: 121845 txns/s
 
 Details:
-    NewOrder    c:595148(44.76%)   ua:6081  sa:0
-    Payment     c:573984(43.17%)   ua:0  sa:0
-    OrderStatus c:53265(4.01%)   ua:0  sa:0
-    Delivery    c:53500(4.02%)   ua:0  sa:0
-    StockLevel  c:53815(4.05%)   ua:0  sa:0
+    NewOrder    c: 1089872(0.45%)   ua: 11196  sa:     0
+    Payment     c: 1053197(0.43%)   ua:     0  sa:     0
+    OrderStatus c:   97858(0.04%)   ua:     0  sa:     0
+    Delivery    c:   98044(0.04%)   ua:     0  sa:     0
+    StockLevel  c:   97940(0.04%)   ua:     0  sa:     0
 ```
 
 Read more about performance in [PERFORMACES.md](PERFORMANCES.md).

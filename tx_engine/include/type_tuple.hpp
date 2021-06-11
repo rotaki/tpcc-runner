@@ -32,25 +32,25 @@ concept IsTypeTuple = requires(TT& t) {
 
 namespace {
 
-    template <bool b, size_t t, size_t f>
-    inline constexpr size_t conditional_v = t;
+template <bool b, size_t t, size_t f>
+inline constexpr size_t conditional_v = t;
 
-    template <size_t t, size_t f>
-    inline constexpr size_t conditional_v<false, t, f> = f;
+template <size_t t, size_t f>
+inline constexpr size_t conditional_v<false, t, f> = f;
 
 
-    template <IsTypeTuple TT, typename T, size_t i>
-    struct GetTupleIndexDetail {
-        static constexpr size_t nr_ = std::tuple_size_v<TT>;
-        static constexpr size_t value = conditional_v<
-            std::is_same_v<typename std::tuple_element<nr_ - i, TT>::type, T>, nr_ - i,
-            GetTupleIndexDetail<TT, T, i - 1>::value>;
-    };
+template <IsTypeTuple TT, typename T, size_t i>
+struct GetTupleIndexDetail {
+    static constexpr size_t nr_ = std::tuple_size_v<TT>;
+    static constexpr size_t value = conditional_v<
+        std::is_same_v<typename std::tuple_element<nr_ - i, TT>::type, T>, nr_ - i,
+        GetTupleIndexDetail<TT, T, i - 1>::value>;
+};
 
-    template <IsTypeTuple TT, typename T>
-    struct GetTupleIndexDetail<TT, T, 0> {
-        static constexpr size_t value = std::tuple_size_v<TT>;  // not found.
-    };
+template <IsTypeTuple TT, typename T>
+struct GetTupleIndexDetail<TT, T, 0> {
+    static constexpr size_t value = std::tuple_size_v<TT>;  // not found.
+};
 
 }  // anonymous namespace
 

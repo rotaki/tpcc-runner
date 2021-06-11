@@ -21,17 +21,17 @@ Executing `./main 1 1 20` yields the following output on `8 core Intel(R) Core(T
 Loading all tables with 1 warehouse(s)
 Loaded
 1 warehouse(s), 1 thread(s), 20 second(s)
-    commits: 1329712
+    commits: 2436911
     sys aborts: 0
-    usr aborts: 6081
-Throughput: 66485 txns/s
+    usr aborts: 11196
+Throughput: 121845 txns/s
 
 Details:
-    NewOrder    c:595148(44.76%)   ua:6081  sa:0
-    Payment     c:573984(43.17%)   ua:0  sa:0
-    OrderStatus c:53265(4.01%)   ua:0  sa:0
-    Delivery    c:53500(4.02%)   ua:0  sa:0
-    StockLevel  c:53815(4.05%)   ua:0  sa:0
+    NewOrder    c: 1089872(0.45%)   ua: 11196  sa:     0
+    Payment     c: 1053197(0.43%)   ua:     0  sa:     0
+    OrderStatus c:   97858(0.04%)   ua:     0  sa:     0
+    Delivery    c:   98044(0.04%)   ua:     0  sa:     0
+    StockLevel  c:   97940(0.04%)   ua:     0  sa:     0
 ```
 
 - usr aborts are aborts specified in TPC-C. (1% of the NewOrder Transaction should rollback according to the specification.)
@@ -42,33 +42,33 @@ Since the current implementation locks the whole database while performing a tra
 - 2 threads
 ```
 1 warehouse(s), 2 thread(s), 20 second(s)
-    commits: 1203014
+    commits: 2131902
     sys aborts: 0
-    usr aborts: 5505
-Throughput: 60150 txns/s
+    usr aborts: 9834
+Throughput: 106595 txns/s
 
 Details:
-    NewOrder    c:537842(44.71%)   ua:5505  sa:0
-    Payment     c:519590(43.19%)   ua:0  sa:0
-    OrderStatus c:48515(4.03%)   ua:0  sa:0
-    Delivery    c:48609(4.04%)   ua:0  sa:0
-    StockLevel  c:48458(4.03%)   ua:0  sa:0
+    NewOrder    c:  953095(0.45%)   ua:  9834  sa:     0
+    Payment     c:  921336(0.43%)   ua:     0  sa:     0
+    OrderStatus c:   85672(0.04%)   ua:     0  sa:     0
+    Delivery    c:   86054(0.04%)   ua:     0  sa:     0
+    StockLevel  c:   85745(0.04%)   ua:     0  sa:     0
 ```
 
 - 5 threads
 ```
 1 warehouse(s), 5 thread(s), 20 second(s)
-    commits: 1143756
+    commits: 1998028
     sys aborts: 0
-    usr aborts: 5405
-Throughput: 57187 txns/s
+    usr aborts: 9204
+Throughput: 99901 txns/s
 
 Details:
-    NewOrder    c:511939(44.76%)   ua:5405  sa:0
-    Payment     c:493250(43.13%)   ua:0  sa:0
-    OrderStatus c:46360(4.05%)   ua:0  sa:0
-    Delivery    c:46242(4.04%)   ua:0  sa:0
-    StockLevel  c:45965(4.02%)   ua:0  sa:0
+    NewOrder    c:  894493(0.45%)   ua:  9204  sa:     0
+    Payment     c:  862455(0.43%)   ua:     0  sa:     0
+    OrderStatus c:   80360(0.04%)   ua:     0  sa:     0
+    Delivery    c:   79834(0.04%)   ua:     0  sa:     0
+    StockLevel  c:   80886(0.04%)   ua:     0  sa:     0
 ```
 
 Implementing concurrent transactions is left for future work.

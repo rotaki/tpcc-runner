@@ -22,16 +22,16 @@ concept UseOrderedMap = is_any<T, Order, OrderLine, Customer, NewOrder>::value;
 template <typename T>
 concept UseUnorderedMap = is_any<T, Item, Warehouse, Stock, District>::value;
 
-
-template <typename Key>
-requires requires(Key k) {
-    { k.hash() }
+template <typename T>
+concept HasHashFunction = requires(const T& key) {
+    { key.hash() }
     noexcept->std::same_as<size_t>;
-}
+};
+
+template <HasHashFunction Key>
 struct Hash {
     size_t operator()(const Key& key) const noexcept { return key.hash(); }
 };
-
 
 template <typename Record>
 struct RecordToTable {
@@ -106,14 +106,12 @@ public:
     }
 
     template <typename Record>
-    requires UseOrderedMap<Record> || IsSecondary<Record>
-    typename RecordToIterator<Record>::type get_lower_bound_iter(typename Record::Key key) {
+        requires UseOrderedMap<Record> || IsSecondary<Record> typename RecordToIterator<Record>::type get_lower_bound_iter(typename Record::Key key) {
         return get_table<Record>().lower_bound(key);
     }
 
     template <typename Record>
-    requires UseOrderedMap<Record> || IsSecondary<Record>
-    typename RecordToIterator<Record>::type get_upper_bound_iter(typename Record::Key key) {
+        requires UseOrderedMap<Record> || IsSecondary<Record> typename RecordToIterator<Record>::type get_upper_bound_iter(typename Record::Key key) {
         return get_table<Record>().upper_bound(key);
     }
 
@@ -191,7 +189,7 @@ public:
     }
 
     template <typename Record>
-    requires(UseUnorderedMap<Record> || UseOrderedMap<Record>)
+        requires(UseUnorderedMap<Record> || UseOrderedMap<Record>)
         && (!HasSecondary<Record>)bool insert_record(
             typename Record::Key key, std::unique_ptr<Record> rec_ptr) {
         typename RecordToTable<Record>::type& t = get_table<Record>();
@@ -200,9 +198,7 @@ public:
     }
 
     template <typename Record>
-    requires UseUnorderedMap<Record> || UseOrderedMap<Record>
-    bool update_record(
-        typename RecordToIterator<Record>::type iter, std::unique_ptr<Record> rec_ptr) {
+        requires UseUnorderedMap<Record> || UseOrderedMap<Record> bool update_record(typename RecordToIterator<Record>::type iter, std::unique_ptr<Record> rec_ptr) {
         std::unique_ptr<Record>& dst = iter->second;
         Cache::deallocate<Record>(std::move(dst));
         dst = std::move(rec_ptr);
@@ -210,8 +206,7 @@ public:
     }
 
     template <typename Record>
-    requires UseUnorderedMap<Record> || UseOrderedMap<Record>
-    bool delete_record(typename RecordToIterator<Record>::type iter) {
+        requires UseUnorderedMap<Record> || UseOrderedMap<Record> bool delete_record(typename RecordToIterator<Record>::type iter) {
         typename RecordToTable<Record>::type& t = get_table<Record>();
         Cache::deallocate<Record>(std::move(iter->second));
         t.erase(iter);

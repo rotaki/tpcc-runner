@@ -29,8 +29,7 @@ private:
 class ConcurrencyManager {
 public:
     bool lock() {
-        const Config& c = get_config();
-        if (c.get_num_threads() == 1) return true;
+        if (is_single_thread()) return true;
         if (has_lock) {
             return true;
         } else {
@@ -41,14 +40,17 @@ public:
     }
 
     void release() {
-        const Config& c = get_config();
-        if (c.get_num_threads() == 1) return;
+        if (is_single_thread()) return;
         if (has_lock) {
             lock_table.unlock();
         }
     }
 
 private:
+    bool is_single_thread() {
+        return get_config().get_num_threads() == 1;
+    }
+
     bool has_lock = false;
     static LockTable lock_table;
 };
