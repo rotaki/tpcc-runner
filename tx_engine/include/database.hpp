@@ -13,6 +13,7 @@
 #include "logger.hpp"
 #include "record_key.hpp"
 #include "record_layout.hpp"
+#include "type_tuple.hpp"
 
 
 template <typename T>
@@ -82,17 +83,13 @@ private:
     Database() = default;
     ~Database() = default;
 
-    RecordToTable<Item>::type items;
-    RecordToTable<Warehouse>::type warehouses;
-    RecordToTable<Stock>::type stocks;
-    RecordToTable<District>::type districts;
-    RecordToTable<Customer>::type customers;
-    RecordToTable<CustomerSecondary>::type customers_secondary;
-    RecordToTable<History>::type histories;
-    RecordToTable<Order>::type orders;
-    RecordToTable<OrderSecondary>::type orders_secondary;
-    RecordToTable<NewOrder>::type neworders;
-    RecordToTable<OrderLine>::type orderlines;
+    using TT = TypeTuple<
+        RecordToTable<Item>::type, RecordToTable<Warehouse>::type, RecordToTable<Stock>::type,
+        RecordToTable<District>::type, RecordToTable<Customer>::type,
+        RecordToTable<CustomerSecondary>::type, RecordToTable<History>::type,
+        RecordToTable<Order>::type, RecordToTable<OrderSecondary>::type,
+        RecordToTable<NewOrder>::type, RecordToTable<OrderLine>::type>;
+    TT table_tuple;
 
 public:
     Database(Database const&) = delete;
@@ -105,31 +102,7 @@ public:
 
     template <typename Record>
     typename RecordToTable<Record>::type& get_table() {
-        if constexpr (std::is_same<Record, Item>::value) {
-            return items;
-        } else if constexpr (std::is_same<Record, Warehouse>::value) {
-            return warehouses;
-        } else if constexpr (std::is_same<Record, Stock>::value) {
-            return stocks;
-        } else if constexpr (std::is_same<Record, District>::value) {
-            return districts;
-        } else if constexpr (std::is_same<Record, Customer>::value) {
-            return customers;
-        } else if constexpr (std::is_same<Record, CustomerSecondary>::value) {
-            return customers_secondary;
-        } else if constexpr (std::is_same<Record, History>::value) {
-            return histories;
-        } else if constexpr (std::is_same<Record, Order>::value) {
-            return orders;
-        } else if constexpr (std::is_same<Record, OrderSecondary>::value) {
-            return orders_secondary;
-        } else if constexpr (std::is_same<Record, NewOrder>::value) {
-            return neworders;
-        } else if constexpr (std::is_same<Record, OrderLine>::value) {
-            return orderlines;
-        } else {
-            assert(false);
-        }
+        return get<typename RecordToTable<Record>::type>(table_tuple);
     }
 
     template <typename Record>

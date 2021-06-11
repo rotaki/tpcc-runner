@@ -3,6 +3,8 @@
 #include "database.hpp"
 #include "logger.hpp"
 #include "record_layout.hpp"
+#include "type_tuple.hpp"
+
 
 enum LogType { INSERT, UPDATE, DELETE };
 
@@ -23,49 +25,30 @@ struct LogRecord {
 template <typename Record>
 struct RecordToWS {
 #if 1  // std::map seems faster.
-    using WS = std::map<typename Record::Key, LogRecord<Record>>;
+    using type = std::map<typename Record::Key, LogRecord<Record>>;
 #else
-    using WS =
+    using type =
         std::unordered_map<typename Record::Key, LogRecord<Record>, Hash<typename Record::Key>>;
 #endif
 };
 
 template <>
 struct RecordToWS<History> {
-    using WS = std::deque<LogRecord<History>>;
+    using type = std::deque<LogRecord<History>>;
 };
 
 
 class WriteSet {
 public:
     explicit WriteSet(Database& db)
-        : db(db) {}
+        : db(db)
+        , ws_tuple() {}
 
     ~WriteSet() { clear_all(); }
 
     template <typename Record>
-    typename RecordToWS<Record>::WS& get_ws() {
-        if constexpr (std::is_same<Record, Item>::value) {
-            return ws_i;
-        } else if constexpr (std::is_same<Record, Warehouse>::value) {
-            return ws_w;
-        } else if constexpr (std::is_same<Record, Stock>::value) {
-            return ws_s;
-        } else if constexpr (std::is_same<Record, District>::value) {
-            return ws_d;
-        } else if constexpr (std::is_same<Record, Customer>::value) {
-            return ws_c;
-        } else if constexpr (std::is_same<Record, History>::value) {
-            return ws_h;
-        } else if constexpr (std::is_same<Record, Order>::value) {
-            return ws_o;
-        } else if constexpr (std::is_same<Record, NewOrder>::value) {
-            return ws_no;
-        } else if constexpr (std::is_same<Record, OrderLine>::value) {
-            return ws_ol;
-        } else {
-            throw std::runtime_error("Undefined Record");
-        }
+    typename RecordToWS<Record>::type& get_ws() {
+        return get<typename RecordToWS<Record>::type>(ws_tuple);
     }
 
     template <typename Record>
@@ -99,7 +82,7 @@ public:
 
     template <IsHistory Record>
     Record* apply_insert_to_writeset() {
-        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        typename RecordToWS<Record>::type& ws = get_ws<Record>();
         ws.emplace_back(LogType::INSERT, std::move(Cache::allocate<Record>()));
         return ws.back().rec_ptr.get();
     }
@@ -188,19 +171,15 @@ public:
 private:
     Database& db;
 
-    RecordToWS<Item>::WS ws_i;
-    RecordToWS<Warehouse>::WS ws_w;
-    RecordToWS<Stock>::WS ws_s;
-    RecordToWS<District>::WS ws_d;
-    RecordToWS<Customer>::WS ws_c;
-    RecordToWS<History>::WS ws_h;
-    RecordToWS<Order>::WS ws_o;
-    RecordToWS<NewOrder>::WS ws_no;
-    RecordToWS<OrderLine>::WS ws_ol;
+    using TT = TypeTuple<
+        RecordToWS<Item>::type, RecordToWS<Warehouse>::type, RecordToWS<Stock>::type,
+        RecordToWS<District>::type, RecordToWS<Customer>::type, RecordToWS<History>::type,
+        RecordToWS<Order>::type, RecordToWS<NewOrder>::type, RecordToWS<OrderLine>::type>;
+    TT ws_tuple;
 
     template <typename Record>
     LogRecord<Record>* lookup_logrecord(typename Record::Key rec_key) {
-        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        typename RecordToWS<Record>::type& ws = get_ws<Record>();
         auto it = ws.find(rec_key);
         if (it == ws.end()) return nullptr;
         return &it->second;
@@ -209,7 +188,7 @@ private:
     template <typename Record>
     LogRecord<Record>& create_logrecord(
         LogType lt, typename Record::Key rec_key, std::unique_ptr<Record> rec_ptr) {
-        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        typename RecordToWS<Record>::type& ws = get_ws<Record>();
         auto [it, ret] = ws.try_emplace(rec_key);
         assert(ret);
         LogRecord<Record>& lr = it->second;
@@ -220,7 +199,7 @@ private:
 
     template <typename Record>
     void remove_logrecord_with_logtype(typename Record::Key rec_key, LogType lt) {
-        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        typename RecordToWS<Record>::type& ws = get_ws<Record>();
         auto it = ws.find(rec_key);
         assert(it != ws.end());
         if (it->second.lt == lt) {
@@ -231,7 +210,7 @@ private:
 
     template <IsHistory Record>
     void apply_writeset_to_database() {
-        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        typename RecordToWS<Record>::type& ws = get_ws<Record>();
         for (auto it = ws.begin(); it != ws.end(); ++it) {
             db.insert_record<Record>(std::move(it->rec_ptr));
         }
@@ -240,7 +219,7 @@ private:
 
     template <typename Record>
     void apply_writeset_to_database() {
-        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        typename RecordToWS<Record>::type& ws = get_ws<Record>();
         for (auto it = ws.begin(); it != ws.end(); ++it) {
             const typename Record::Key& key = it->first;
             LogRecord<Record>& lr = it->second;
@@ -259,7 +238,7 @@ private:
 
     template <IsHistory Record>
     void clear_writeset() {
-        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        typename RecordToWS<Record>::type& ws = get_ws<Record>();
         for (auto it = ws.begin(); it != ws.end(); ++it) {
             if (it->rec_ptr) {
                 Cache::deallocate<Record>(std::move(it->rec_ptr));
@@ -272,7 +251,7 @@ private:
 
     template <typename Record>
     void clear_writeset() {
-        typename RecordToWS<Record>::WS& ws = get_ws<Record>();
+        typename RecordToWS<Record>::type& ws = get_ws<Record>();
         for (auto it = ws.begin(); it != ws.end(); ++it) {
             if (it->second.rec_ptr) {
                 Cache::deallocate<Record>(std::move(it->second.rec_ptr));

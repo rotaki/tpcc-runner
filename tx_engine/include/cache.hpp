@@ -6,6 +6,7 @@
 
 #include "mimalloc-new-delete.h"
 #include "record_layout.hpp"
+#include "type_tuple.hpp"
 
 template <typename Record>
 struct RecordMemoryCache {
@@ -34,27 +35,7 @@ class Cache {
 public:
     template <typename Record>
     RecordMemoryCache<Record>& get_rmc() {
-        if constexpr (std::is_same<Record, Item>::value) {
-            return rmc_i;
-        } else if constexpr (std::is_same<Record, Warehouse>::value) {
-            return rmc_w;
-        } else if constexpr (std::is_same<Record, Stock>::value) {
-            return rmc_s;
-        } else if constexpr (std::is_same<Record, District>::value) {
-            return rmc_d;
-        } else if constexpr (std::is_same<Record, Customer>::value) {
-            return rmc_c;
-        } else if constexpr (std::is_same<Record, History>::value) {
-            return rmc_h;
-        } else if constexpr (std::is_same<Record, Order>::value) {
-            return rmc_o;
-        } else if constexpr (std::is_same<Record, NewOrder>::value) {
-            return rmc_no;
-        } else if constexpr (std::is_same<Record, OrderLine>::value) {
-            return rmc_ol;
-        } else {
-            throw std::runtime_error("Undefined Record");
-        }
+        return get<RecordMemoryCache<Record>>(rmc_tuple);
     }
 
     template <typename Record>
@@ -75,13 +56,10 @@ private:
         return c;
     }
 
-    RecordMemoryCache<Item> rmc_i;
-    RecordMemoryCache<Warehouse> rmc_w;
-    RecordMemoryCache<Stock> rmc_s;
-    RecordMemoryCache<District> rmc_d;
-    RecordMemoryCache<Customer> rmc_c;
-    RecordMemoryCache<History> rmc_h;
-    RecordMemoryCache<Order> rmc_o;
-    RecordMemoryCache<OrderLine> rmc_ol;
-    RecordMemoryCache<NewOrder> rmc_no;
+    using TT = TypeTuple<
+        RecordMemoryCache<Item>, RecordMemoryCache<Warehouse>, RecordMemoryCache<Stock>,
+        RecordMemoryCache<District>, RecordMemoryCache<Customer>, RecordMemoryCache<History>,
+        RecordMemoryCache<Order>, RecordMemoryCache<OrderLine>, RecordMemoryCache<NewOrder>>;
+
+    TT rmc_tuple;
 };
