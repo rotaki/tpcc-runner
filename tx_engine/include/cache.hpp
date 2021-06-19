@@ -11,23 +11,27 @@
 template <typename Record>
 struct RecordMemoryCache {
 public:
-    std::unique_ptr<Record> allocate() {
+    Record* allocate() {
         if (cache.empty()) {
-            return std::unique_ptr<Record>(new Record);
+            return new Record;
         } else {
-            std::unique_ptr<Record> ptr = std::move(cache.back());
+            Record* ptr = cache.back();
             cache.pop_back();
             return ptr;
         }
     }
 
-    void deallocate(std::unique_ptr<Record> rec_ptr) {
-        cache.push_back(std::move(rec_ptr));
-        if (cache.size() > n) cache.pop_front();
+    void deallocate(Record*& rec_ptr) {
+        cache.push_back(rec_ptr);
+        if (cache.size() > n) {
+            delete cache.front();
+            cache.pop_front();
+        }
+        rec_ptr = nullptr;
     }
 
 private:
-    std::deque<std::unique_ptr<Record>> cache;
+    std::deque<Record*> cache;
     size_t n = 30;  // TODO: move the constant to configuration.
 };
 
@@ -39,15 +43,15 @@ public:
     }
 
     template <typename Record>
-    static std::unique_ptr<Record> allocate() {
+    static Record* allocate() {
         Cache& cache = get_cache();
         return cache.get_rmc<Record>().allocate();
     }
 
     template <typename Record>
-    static void deallocate(typename std::unique_ptr<Record> rec_ptr) {
+    static void deallocate(Record* rec_ptr) {
         Cache& cache = get_cache();
-        return cache.get_rmc<Record>().deallocate(std::move(rec_ptr));
+        return cache.get_rmc<Record>().deallocate(rec_ptr);
     }
 
 private:

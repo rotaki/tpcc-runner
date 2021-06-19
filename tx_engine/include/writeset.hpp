@@ -11,12 +11,12 @@ enum LogType { INSERT, UPDATE, DELETE };
 template <typename Record>
 struct LogRecord {
     LogRecord() = default;
-    LogRecord(LogType lt, std::unique_ptr<Record> rec_ptr)
+    LogRecord(LogType lt, Record* rec_ptr)
         : lt(lt)
-        , rec_ptr(std::move(rec_ptr))
+        , rec_ptr(rec_ptr)
         , it() {}
     LogType lt;
-    std::unique_ptr<Record> rec_ptr;
+    Record* rec_ptr;
 
     using Iterator = typename RecordToIterator<Record>::type;
     Iterator it;
@@ -57,8 +57,8 @@ public:
         LogRecord<Record>* current_logrec_ptr = lookup_logrecord<Record>(rec_key);
         if (current_logrec_ptr) {
             switch (current_logrec_ptr->lt) {
-            case INSERT: return current_logrec_ptr->rec_ptr.get();
-            case UPDATE: return current_logrec_ptr->rec_ptr.get();
+            case INSERT: return current_logrec_ptr->rec_ptr;
+            case UPDATE: return current_logrec_ptr->rec_ptr;
             case DELETE: throw std::runtime_error("Record already deleted");
             default: throw std::runtime_error("Invalid LogType");
             }
@@ -72,8 +72,8 @@ public:
         }
         // allocate memory in writeset
         LogRecord<Record>& lr =
-            create_logrecord(LogType::UPDATE, rec_key, std::move(Cache::allocate<Record>()));
-        Record* rec_ptr_in_ws = lr.rec_ptr.get();
+            create_logrecord(LogType::UPDATE, rec_key, Cache::allocate<Record>());
+        Record* rec_ptr_in_ws = lr.rec_ptr;
         // copy from database
         rec_ptr_in_ws->deep_copy_from(*rec_ptr_in_db);
         lr.it = it;
@@ -83,8 +83,8 @@ public:
     template <IsHistory Record>
     Record* apply_insert_to_writeset() {
         typename RecordToWS<Record>::type& ws = get_ws<Record>();
-        ws.emplace_back(LogType::INSERT, std::move(Cache::allocate<Record>()));
-        return ws.back().rec_ptr.get();
+        ws.emplace_back(LogType::INSERT, Cache::allocate<Record>());
+        return ws.back().rec_ptr;
     }
 
     template <typename Record>
@@ -97,7 +97,7 @@ public:
             case UPDATE: throw std::runtime_error("Record already updated");
             case DELETE:
                 current_logrec_ptr->lt = LogType::UPDATE;
-                return current_logrec_ptr->rec_ptr.get();
+                return current_logrec_ptr->rec_ptr;
             default: throw std::runtime_error("Invalid LogType");
             }
         }
@@ -112,8 +112,8 @@ public:
 #endif
         // allocate memory in writeset
         LogRecord<Record>& lr =
-            create_logrecord(LogType::INSERT, rec_key, std::move(Cache::allocate<Record>()));
-        return lr.rec_ptr.get();
+            create_logrecord(LogType::INSERT, rec_key, Cache::allocate<Record>());
+        return lr.rec_ptr;
     }
 
     template <typename Record>
@@ -138,7 +138,7 @@ public:
             throw std::runtime_error("Record not found in db");
         }
         LogRecord<Record>& lr =
-            create_logrecord(LogType::DELETE, rec_key, std::move(Cache::allocate<Record>()));
+            create_logrecord(LogType::DELETE, rec_key, Cache::allocate<Record>());
         lr.it = it;
         return true;
     }
@@ -187,13 +187,13 @@ private:
 
     template <typename Record>
     LogRecord<Record>& create_logrecord(
-        LogType lt, typename Record::Key rec_key, std::unique_ptr<Record> rec_ptr) {
+        LogType lt, typename Record::Key rec_key, Record* rec_ptr) {
         typename RecordToWS<Record>::type& ws = get_ws<Record>();
         auto [it, ret] = ws.try_emplace(rec_key);
         assert(ret);
         LogRecord<Record>& lr = it->second;
         lr.lt = lt;
-        lr.rec_ptr = std::move(rec_ptr);
+        lr.rec_ptr = rec_ptr;
         return lr;
     }
 
@@ -203,7 +203,7 @@ private:
         auto it = ws.find(rec_key);
         assert(it != ws.end());
         if (it->second.lt == lt) {
-            Cache::deallocate<Record>(std::move(it->second.rec_ptr));
+            Cache::deallocate<Record>(it->second.rec_ptr);
             ws.erase(it);
         }
     }
@@ -212,7 +212,7 @@ private:
     void apply_writeset_to_database() {
         typename RecordToWS<Record>::type& ws = get_ws<Record>();
         for (auto it = ws.begin(); it != ws.end(); ++it) {
-            db.insert_record<Record>(std::move(it->rec_ptr));
+            db.insert_record<Record>(it->rec_ptr);
         }
         ws.clear();
     }
@@ -225,11 +225,11 @@ private:
             LogRecord<Record>& lr = it->second;
 
             switch (lr.lt) {
-            case LogType::INSERT: db.insert_record<Record>(key, std::move(lr.rec_ptr)); break;
-            case LogType::UPDATE: db.update_record<Record>(lr.it, std::move(lr.rec_ptr)); break;
+            case LogType::INSERT: db.insert_record<Record>(key, lr.rec_ptr); break;
+            case LogType::UPDATE: db.update_record<Record>(lr.it, lr.rec_ptr); break;
             case LogType::DELETE:
                 db.delete_record<Record>(lr.it);
-                Cache::deallocate<Record>(std::move(it->second.rec_ptr));
+                Cache::deallocate<Record>(it->second.rec_ptr);
                 break;
             }
         }
@@ -241,7 +241,7 @@ private:
         typename RecordToWS<Record>::type& ws = get_ws<Record>();
         for (auto it = ws.begin(); it != ws.end(); ++it) {
             if (it->rec_ptr) {
-                Cache::deallocate<Record>(std::move(it->rec_ptr));
+                Cache::deallocate<Record>(it->rec_ptr);
             } else {
                 throw std::runtime_error("Null pointer found in writeset");
             }
@@ -254,7 +254,7 @@ private:
         typename RecordToWS<Record>::type& ws = get_ws<Record>();
         for (auto it = ws.begin(); it != ws.end(); ++it) {
             if (it->second.rec_ptr) {
-                Cache::deallocate<Record>(std::move(it->second.rec_ptr));
+                Cache::deallocate<Record>(it->second.rec_ptr);
             } else {
                 throw std::runtime_error("Null poitner found in writeset");
             }

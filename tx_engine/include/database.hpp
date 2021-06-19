@@ -40,18 +40,18 @@ struct RecordToTable {
 
 template <UseOrderedMap Record>
 struct RecordToTable<Record> {
-    using type = std::map<typename Record::Key, std::unique_ptr<Record>>;
+    using type = std::map<typename Record::Key, Record*>;
 };
 
 template <UseUnorderedMap Record>
 struct RecordToTable<Record> {
     using type = std::unordered_map<
-        typename Record::Key, std::unique_ptr<Record>, Hash<typename Record::Key>>;
+        typename Record::Key, Record*, Hash<typename Record::Key>>;
 };
 
 struct HistoryTable {
-    std::deque<std::unique_ptr<History>>& get_local_deque() {
-        thread_local std::deque<std::unique_ptr<History>> history_table;
+    std::deque<History*>& get_local_deque() {
+        thread_local std::deque<History*> history_table;
         return history_table;
     }
 };
@@ -125,7 +125,7 @@ public:
             std::tie(it, ret) = t.emplace(key, Cache::allocate<Record>());
             assert(ret);
         }
-        return it->second.get();
+        return it->second;
     }
 
     // Cannot be used for History, CustomerSecondary, OrderSecondary
@@ -134,22 +134,22 @@ public:
         const Record*& rec_ptr, typename Record::Key key) {
         typename RecordToTable<Record>::type& t = get_table<Record>();
         auto it = t.find(key);
-        rec_ptr = (it == t.end()) ? nullptr : it->second.get();
+        rec_ptr = (it == t.end()) ? nullptr : it->second;
         return it;
     }
 
     template <IsHistory Record>
-    bool insert_record(std::unique_ptr<Record> rec_ptr) {
+    bool insert_record(Record* rec_ptr) {
         typename RecordToTable<Record>::type& t = get_table<Record>();
         auto& deq = t.get_local_deque();
-        deq.push_back(std::move(rec_ptr));
+        deq.push_back(rec_ptr);
         return true;
     }
 
     template <HasSecondary Record>
-    bool insert_record(typename Record::Key key, std::unique_ptr<Record> rec_ptr) {
+    bool insert_record(typename Record::Key key, Record* rec_ptr) {
         typename RecordToTable<Record>::type& t = get_table<Record>();
-        auto [it, ret] = t.try_emplace(key, std::move(rec_ptr));
+        auto [it, ret] = t.try_emplace(key, rec_ptr);
         if (!ret) return false;
 
         // create secondary record and insert
@@ -189,26 +189,27 @@ public:
     }
 
     template <typename Record>
-        requires(UseUnorderedMap<Record> || UseOrderedMap<Record>)
-        && (!HasSecondary<Record>)bool insert_record(
-            typename Record::Key key, std::unique_ptr<Record> rec_ptr) {
+        requires(UseUnorderedMap<Record> || UseOrderedMap<Record>) && (!HasSecondary<Record>)
+        bool insert_record(typename Record::Key key, Record* rec_ptr) {
         typename RecordToTable<Record>::type& t = get_table<Record>();
-        auto [it, ret] = t.try_emplace(key, std::move(rec_ptr));
+        auto [it, ret] = t.try_emplace(key, rec_ptr);
         return ret;
     }
 
     template <typename Record>
-        requires UseUnorderedMap<Record> || UseOrderedMap<Record> bool update_record(typename RecordToIterator<Record>::type iter, std::unique_ptr<Record> rec_ptr) {
-        std::unique_ptr<Record>& dst = iter->second;
-        Cache::deallocate<Record>(std::move(dst));
-        dst = std::move(rec_ptr);
+        requires UseUnorderedMap<Record> || UseOrderedMap<Record> 
+        bool update_record(typename RecordToIterator<Record>::type iter, Record* rec_ptr) {
+        Record*& dst = iter->second;
+        Cache::deallocate<Record>(dst);
+        dst = rec_ptr;
         return true;
     }
 
     template <typename Record>
-        requires UseUnorderedMap<Record> || UseOrderedMap<Record> bool delete_record(typename RecordToIterator<Record>::type iter) {
+        requires UseUnorderedMap<Record> || UseOrderedMap<Record> 
+        bool delete_record(typename RecordToIterator<Record>::type iter) {
         typename RecordToTable<Record>::type& t = get_table<Record>();
-        Cache::deallocate<Record>(std::move(iter->second));
+        Cache::deallocate<Record>(iter->second);
         t.erase(iter);
         return true;
     }

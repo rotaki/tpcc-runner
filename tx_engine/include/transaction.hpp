@@ -131,7 +131,7 @@ public:
     Result get_neworder_with_smallest_key_no_less_than(const NewOrder*& no, NewOrder::Key low) {
         auto low_iter = db.get_lower_bound_iter<NewOrder>(low);
         if (low_iter->first.w_id == low.w_id && low_iter->first.d_id == low.d_id) {
-            no = low_iter->second.get();
+            no = low_iter->second;
             return Result::SUCCESS;
         } else {
             return Result::FAIL;

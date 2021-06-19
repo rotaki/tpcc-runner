@@ -47,9 +47,9 @@ inline void create_and_insert_customer_record(
 
 inline void create_and_insert_history_record(
     uint16_t h_c_w_id, uint8_t h_c_d_id, uint32_t h_c_id, uint16_t h_w_id, uint8_t h_d_id) {
-    auto h = std::make_unique<History>();
+    History* h = Cache::allocate<History>();
     h->generate(h_c_w_id, h_c_d_id, h_c_id, h_w_id, h_d_id);
-    Database::get_db().insert_record<History>(std::move(h));
+    Database::get_db().insert_record<History>(h);
 }
 
 inline std::pair<Timestamp, uint8_t> create_and_insert_order_record(
