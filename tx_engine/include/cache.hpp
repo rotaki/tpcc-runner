@@ -11,6 +11,12 @@
 template <typename Record>
 struct RecordMemoryCache {
 public:
+    ~RecordMemoryCache() {
+        for (size_t i = 0; i < cache.size(); i++) {
+            delete cache[i];
+        }
+    }
+
     Record* allocate() {
         if (cache.empty()) {
             return new Record;
