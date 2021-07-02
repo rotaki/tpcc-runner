@@ -214,6 +214,7 @@ private:
             s.s_quantity -= ol_quantity;
         else
             s.s_quantity = (s.s_quantity - ol_quantity) + 91;
+        s.s_ytd += ol_quantity;
         s.s_order_cnt += 1;
         if (is_remote) s.s_remote_cnt += 1;
     }
