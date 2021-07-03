@@ -89,8 +89,8 @@ public:
 
         out << o->o_id << o->o_entry_d << o->o_carrier_id;
 
-        OrderLine::Key low = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_c_id, 0);
-        OrderLine::Key up = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_c_id + 1, 0);
+        OrderLine::Key low = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_c_id, 1);
+        OrderLine::Key up = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_c_id + 1, 1);
 
         res = tx.template range_query<OrderLine>(low, up, [&out](const OrderLine& ol) {
             out << ol.ol_supply_w_id << ol.ol_i_id << ol.ol_quantity << ol.ol_amount

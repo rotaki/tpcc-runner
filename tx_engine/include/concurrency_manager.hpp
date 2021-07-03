@@ -47,9 +47,7 @@ public:
     }
 
 private:
-    bool is_single_thread() {
-        return get_config().get_num_threads() == 1;
-    }
+    bool is_single_thread() { return get_config().get_num_threads() == 1; }
 
     bool has_lock = false;
     static LockTable lock_table;
