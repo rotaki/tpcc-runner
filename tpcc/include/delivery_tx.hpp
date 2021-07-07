@@ -47,7 +47,7 @@ public:
 
         for (uint8_t d_id = 1; d_id <= District::DISTS_PER_WARE; d_id++) {
             const NewOrder* no;
-            NewOrder::Key no_low = NewOrder::Key::create_key(w_id, d_id, 0);
+            NewOrder::Key no_low = NewOrder::Key::create_key(w_id, d_id, 1);
             res = tx.get_neworder_with_smallest_key_no_less_than(no, no_low);
             if (res == Transaction::Result::FAIL) continue;
             LOG_TRACE("res: %d", static_cast<int>(res));
@@ -64,8 +64,8 @@ public:
             o->o_carrier_id = o_carrier_id;
 
             double total_ol_amount = 0.0;
-            OrderLine::Key o_low = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_id, 0);
-            OrderLine::Key o_up = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_id + 1, 0);
+            OrderLine::Key o_low = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_id, 1);
+            OrderLine::Key o_up = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_id + 1, 1);
             res =
                 tx.template range_update<OrderLine>(o_low, o_up, [&total_ol_amount](OrderLine& ol) {
                     ol.ol_delivery_d = get_timestamp();

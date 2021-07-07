@@ -54,8 +54,8 @@ public:
         if (not_succeeded(tx, res)) return helper.kill(res);
 
         std::set<uint32_t> s_i_ids;
-        OrderLine::Key low = OrderLine::Key::create_key(w_id, d_id, d->d_next_o_id - 20, 0);
-        OrderLine::Key up = OrderLine::Key::create_key(w_id, d_id, d->d_next_o_id + 1, 0);
+        OrderLine::Key low = OrderLine::Key::create_key(w_id, d_id, d->d_next_o_id - 20, 1);
+        OrderLine::Key up = OrderLine::Key::create_key(w_id, d_id, d->d_next_o_id, 1);
         res = tx.template range_query<OrderLine>(low, up, [&s_i_ids](const OrderLine& ol) {
             if (ol.ol_i_id != Item::UNUSED_ID) s_i_ids.insert(ol.ol_i_id);
         });
