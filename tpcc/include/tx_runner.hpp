@@ -14,17 +14,6 @@
 #include "tx_utils.hpp"
 #include "utils.hpp"
 
-template <typename T>
-concept IsStockLevelTx = std::is_same<T, StockLevelTx>::value;
-
-template <IsStockLevelTx TxProfile, typename Transaction>
-inline Status run(Transaction& tx, Stat& stat, Output& out) {
-    uint16_t w_id = urand_int(1, get_config().get_num_warehouses());
-    uint8_t d_id = urand_int(1, District::DISTS_PER_WARE);
-    TxProfile p(w_id, d_id);
-    return p.run(tx, stat, out);
-}
-
 template <typename TxProfile, typename Transaction>
 inline Status run(Transaction& tx, Stat& stat, Output& out) {
     uint16_t w_id = urand_int(1, get_config().get_num_warehouses());

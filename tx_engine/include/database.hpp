@@ -15,6 +15,17 @@
 #include "record_layout.hpp"
 #include "type_tuple.hpp"
 
+template <typename T, typename... Ts>
+struct is_any : std::disjunction<std::is_same<T, Ts>...> {};
+
+template <typename T>
+concept HasSecondary = is_any<T, Customer, Order>::value;
+
+template <typename T>
+concept IsSecondary = is_any<T, CustomerSecondary, OrderSecondary>::value;
+
+template <typename T>
+concept IsHistory = std::is_same<T, History>::value;
 
 template <typename T>
 concept UseOrderedMap = is_any<T, Order, OrderLine, Customer, NewOrder>::value;

@@ -13,8 +13,8 @@
 
 class StockLevelTx {
 public:
-    StockLevelTx(uint16_t w_id0, uint8_t d_id0) {
-        input.generate(w_id0, d_id0);
+    StockLevelTx(uint16_t w_id0) {
+        input.generate(w_id0);
         input.print();
     }
 
@@ -23,9 +23,9 @@ public:
         uint8_t d_id;
         uint8_t threshold;
 
-        void generate(uint16_t w_id0, uint8_t d_id0) {
+        void generate(uint16_t w_id0) {
             w_id = w_id0;
-            d_id = d_id0;
+            d_id = urand_int(1, District::DISTS_PER_WARE);
             threshold = urand_int(10, 20);
         }
 

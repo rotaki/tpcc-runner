@@ -1,6 +1,5 @@
 #pragma once
 
-#include <concepts>
 #include <cstdint>
 #include <cstring>
 #include <ctime>
@@ -18,18 +17,6 @@ struct Order;
 struct OrderSecondary;
 struct NewOrder;
 struct OrderLine;
-
-template <typename T, typename... Ts>
-struct is_any : std::disjunction<std::is_same<T, Ts>...> {};
-
-template <typename T>
-concept HasSecondary = is_any<T, Customer, Order>::value;
-
-template <typename T>
-concept IsSecondary = is_any<T, CustomerSecondary, OrderSecondary>::value;
-
-template <typename T>
-concept IsHistory = std::is_same<T, History>::value;
 
 using Timestamp = int64_t;
 inline Timestamp get_timestamp() {
