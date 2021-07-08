@@ -88,13 +88,13 @@ public:
 
         out << w_id << d_id << c_id;
 
-        const Warehouse* w;
+        const Warehouse* w = nullptr;
         Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
         res = tx.get_record(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);
 
-        District* d;
+        District* d = nullptr;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.prepare_record_for_update(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
@@ -102,7 +102,7 @@ public:
         uint32_t o_id = d->d_next_o_id;
         d->d_next_o_id++;
 
-        const Customer* c;
+        const Customer* c = nullptr;
         Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
         res = tx.get_record(c, c_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
@@ -111,14 +111,14 @@ public:
         out << c->c_last << c->c_credit << c->c_discount << w->w_tax << d->d_tax << ol_cnt
             << d->d_next_o_id << o_entry_d;
 
-        NewOrder* no;
+        NewOrder* no = nullptr;
         NewOrder::Key no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
         res = tx.prepare_record_for_insert(no, no_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);
         create_neworder(*no, w_id, d_id, o_id);
 
-        Order* o;
+        Order* o = nullptr;
         Order::Key o_key = Order::Key::create_key(w_id, d_id, o_id);
         res = tx.prepare_record_for_insert(o, o_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
@@ -134,7 +134,7 @@ public:
 
             if (ol_i_id == Item::UNUSED_ID) return helper.usr_abort();
 
-            const Item* i;
+            const Item* i = nullptr;
             Item::Key i_key = Item::Key::create_key(ol_i_id);
             res = tx.get_record(i, i_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
@@ -156,7 +156,7 @@ public:
             double ol_amount = ol_quantity * i->i_price;
             total += ol_amount;
 
-            OrderLine* ol;
+            OrderLine* ol = nullptr;
             OrderLine::Key ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_num);
             res = tx.prepare_record_for_insert(ol, ol_key);
             LOG_TRACE("res: %d", static_cast<int>(res));

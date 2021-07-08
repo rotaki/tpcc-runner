@@ -132,7 +132,7 @@ public:
             modify_customer_data(*c, w_id, d_id, c_w_id, c_d_id, h_amount);
         }
 
-        History* h;
+        History* h = nullptr;
         res = tx.prepare_record_for_insert(h);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);

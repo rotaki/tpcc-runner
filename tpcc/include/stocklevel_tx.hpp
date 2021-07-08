@@ -48,7 +48,7 @@ public:
 
         out << w_id << d_id << threshold;
 
-        const District* d;
+        const District* d = nullptr;
         res = tx.get_record(d, District::Key::create_key(w_id, d_id));
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);
@@ -63,7 +63,7 @@ public:
         if (not_succeeded(tx, res)) return helper.kill(res);
 
         auto it = s_i_ids.begin();
-        const Stock* s;
+        const Stock* s = nullptr;
         while (it != s_i_ids.end()) {
             res = tx.get_record(s, Stock::Key::create_key(w_id, *it));
             LOG_TRACE("res: %d", static_cast<int>(res));
