@@ -15,6 +15,103 @@
 #include "record_layout.hpp"
 #include "type_tuple.hpp"
 
+struct CustomerSecondaryKey;
+struct OrderSecondaryKey;
+
+struct CustomerSecondary {
+    using Key = CustomerSecondaryKey;
+    Customer* ptr = nullptr;
+    CustomerSecondary() {}
+    CustomerSecondary(Customer* ptr)
+        : ptr(ptr) {}
+    bool operator==(const CustomerSecondary& rhs) const noexcept { return ptr == rhs.ptr; };
+};
+
+struct CustomerSecondaryKey {
+    union {
+        struct {
+            uint32_t d_id : 8;
+            uint32_t w_id : 16;
+        };
+        uint32_t num = 0;
+    };
+    char c_last[Customer::MAX_LAST + 1];
+    CustomerSecondaryKey() = default;
+    CustomerSecondaryKey(const CustomerSecondaryKey& c) {
+        d_id = c.d_id;
+        w_id = c.w_id;
+        copy_cstr(c_last, c.c_last, sizeof(c_last));
+    }
+
+    int cmp_c_last(const CustomerSecondaryKey& rhs) const {
+        return ::strncmp(c_last, rhs.c_last, Customer::MAX_LAST);
+    }
+
+    bool operator<(const CustomerSecondaryKey& rhs) const noexcept {
+        if (num == rhs.num)
+            return cmp_c_last(rhs) < 0;
+        else
+            return num < rhs.num;
+    }
+    bool operator==(const CustomerSecondaryKey& rhs) const noexcept {
+        return num == rhs.num && cmp_c_last(rhs) == 0;
+    }
+    static CustomerSecondaryKey create_key(uint16_t w_id, uint8_t d_id, const char* c_last_in) {
+        CustomerSecondaryKey k;
+        k.w_id = w_id;
+        k.d_id = d_id;
+        copy_cstr(k.c_last, c_last_in, sizeof(k.c_last));
+        return k;
+    }
+    static CustomerSecondaryKey create_key(const Customer& c) {
+        CustomerSecondaryKey k;
+        k.w_id = c.c_w_id;
+        k.d_id = c.c_d_id;
+        copy_cstr(k.c_last, c.c_last, sizeof(k.c_last));
+        return k;
+    }
+};
+
+struct OrderSecondary {
+    using Key = OrderSecondaryKey;
+    Order* ptr = nullptr;
+    OrderSecondary() {}
+    OrderSecondary(Order* ptr)
+        : ptr(ptr) {}
+    bool operator==(const OrderSecondary& rhs) const noexcept { return ptr == rhs.ptr; }
+};
+
+struct OrderSecondaryKey {
+    union {
+        struct {
+            uint64_t c_id : 32;
+            uint64_t d_id : 8;
+            uint64_t w_id : 16;
+        };
+        uint64_t o_sec_key = 0;
+    };
+    bool operator<(const OrderSecondaryKey& rhs) const noexcept {
+        return o_sec_key < rhs.o_sec_key;
+    }
+    bool operator==(const OrderSecondaryKey& rhs) const noexcept {
+        return o_sec_key == rhs.o_sec_key;
+    }
+    static OrderSecondaryKey create_key(uint16_t w_id, uint8_t d_id, uint32_t c_id) {
+        OrderSecondaryKey k;
+        k.w_id = w_id;
+        k.d_id = d_id;
+        k.c_id = c_id;
+        return k;
+    }
+    static OrderSecondaryKey create_key(const Order& o) {
+        OrderSecondaryKey k;
+        k.w_id = o.o_w_id;
+        k.d_id = o.o_d_id;
+        k.c_id = o.o_c_id;
+        return k;
+    }
+};
+
 template <typename T, typename... Ts>
 struct is_any : std::disjunction<std::is_same<T, Ts>...> {};
 

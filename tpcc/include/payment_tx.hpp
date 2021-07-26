@@ -106,9 +106,7 @@ public:
         if (by_last_name) {
             LOG_TRACE("c_last: %s", c_last);
             assert(c_id == Customer::UNUSED_ID);
-            CustomerSecondary::Key c_last_key =
-                CustomerSecondary::Key::create_key(c_w_id, c_d_id, c_last);
-            res = tx.get_customer_by_last_name_and_prepare_for_update(c, c_last_key);
+            res = tx.get_customer_by_last_name_and_prepare_for_update(c, c_w_id, c_d_id, c_last);
         } else {
             assert(c_id != Customer::UNUSED_ID);
             res = tx.prepare_record_for_update(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));

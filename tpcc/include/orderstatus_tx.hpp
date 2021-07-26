@@ -69,9 +69,7 @@ public:
         if (by_last_name) {
             LOG_TRACE("c_last: %s", c_last);
             assert(c_id == Customer::UNUSED_ID);
-            CustomerSecondary::Key c_last_key =
-                CustomerSecondary::Key::create_key(c_w_id, c_d_id, c_last);
-            res = tx.get_customer_by_last_name(c, c_last_key);
+            res = tx.get_customer_by_last_name(c, c_w_id, c_d_id, c_last);
         } else {
             assert(c_id != Customer::UNUSED_ID);
             res = tx.get_record(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
@@ -83,7 +81,7 @@ public:
         out << c->c_first << c->c_middle << c->c_last << c->c_balance;
 
         const Order* o = nullptr;
-        res = tx.get_order_by_customer_id(o, OrderSecondary::Key::create_key(c_w_id, c_d_id, c_id));
+        res = tx.get_order_by_customer_id(o, c_w_id, c_d_id, c_id);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);
 

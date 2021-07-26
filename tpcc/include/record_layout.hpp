@@ -6,18 +6,6 @@
 #include <string_view>
 #include <type_traits>
 
-struct Item;
-struct Warehouse;
-struct Stock;
-struct District;
-struct Customer;
-struct CustomerSecondary;
-struct History;
-struct Order;
-struct OrderSecondary;
-struct NewOrder;
-struct OrderLine;
-
 using Timestamp = int64_t;
 inline Timestamp get_timestamp() {
     thread_local Timestamp i = 0;
@@ -33,8 +21,6 @@ struct CustomerKey;
 struct OrderKey;
 struct NewOrderKey;
 struct OrderLineKey;
-struct CustomerSecondaryKey;
-struct OrderSecondaryKey;
 
 // Primary Key i_id
 struct Item {
@@ -165,15 +151,6 @@ struct Customer {
     void print();
 };
 
-struct CustomerSecondary {
-    using Key = CustomerSecondaryKey;
-    Customer* ptr = nullptr;
-    CustomerSecondary() {}
-    CustomerSecondary(Customer* ptr)
-        : ptr(ptr) {}
-    bool operator==(const CustomerSecondary& rhs) const noexcept { return ptr == rhs.ptr; };
-};
-
 // Primary Key None
 // Foreign Key (h_c_w_id, h_c_d_id, h_c_id) references (c_w_id, c_d_id, c_id)
 // Foreign Key (h_w_id, h_d_id) references (d_w_id, d_id)
@@ -214,15 +191,6 @@ struct Order {
     void deep_copy_from(const Order& src);
     void generate(uint16_t o_w_id_, uint8_t o_d_id_, uint32_t o_id_, uint32_t o_c_id_);
     void print();
-};
-
-struct OrderSecondary {
-    using Key = OrderSecondaryKey;
-    Order* ptr = nullptr;
-    OrderSecondary() {}
-    OrderSecondary(Order* ptr)
-        : ptr(ptr) {}
-    bool operator==(const OrderSecondary& rhs) const noexcept { return ptr == rhs.ptr; }
 };
 
 // Primary Key (no_w_id, no_d_id, no_o_id)

@@ -76,7 +76,9 @@ public:
         }
     }
 
-    Result get_customer_by_last_name(const Customer*& c, CustomerSecondary::Key c_sec_key) {
+    Result get_customer_by_last_name(
+        const Customer*& c, uint16_t w_id, uint8_t d_id, const char* c_last) {
+        CustomerSecondary::Key c_sec_key = CustomerSecondary::Key::create_key(w_id, d_id, c_last);
         auto& t = db.get_table<CustomerSecondary>();
         auto it = t.lower_bound(c_sec_key);
         std::deque<const CustomerSecondary*> temp;
@@ -100,9 +102,10 @@ public:
     }
 
     Result get_customer_by_last_name_and_prepare_for_update(
-        Customer*& c, CustomerSecondary::Key c_sec_key) {
+        Customer*& c, uint16_t w_id, uint8_t d_id, const char* c_last) {
         const Customer* c_temp = nullptr;
-        if (get_customer_by_last_name(c_temp, c_sec_key) == Result::FAIL) return Result::FAIL;
+        if (get_customer_by_last_name(c_temp, w_id, d_id, c_last) == Result::FAIL)
+            return Result::FAIL;
 
         // create update record in writeset
         Customer::Key c_key = Customer::Key::create_key(*c_temp);
@@ -111,7 +114,8 @@ public:
         return Result::SUCCESS;
     }
 
-    Result get_order_by_customer_id(const Order*& o, OrderSecondary::Key o_sec_key) {
+    Result get_order_by_customer_id(const Order*& o, uint16_t w_id, uint8_t d_id, uint32_t c_id) {
+        OrderSecondary::Key o_sec_key = OrderSecondary::Key::create_key(w_id, d_id, c_id);
         auto& t = db.get_table<OrderSecondary>();
         auto it = t.lower_bound(o_sec_key);
         uint32_t max_o_id = 0;
