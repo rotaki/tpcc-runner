@@ -44,7 +44,7 @@ cd build/bin
 
 This will create tables with `w` warehouses and execute transactions using `t` threads for `s` seconds. For example, `./main 2 5 20` will create tables with 2 warehouses and executes TPC-C using 5 threads for 20 seconds.
 
-For more information on usage, see [USAGE.md](USAGE.md).
+For more information on usage, see [USAGE.md](DOCS/USAGE.md).
 
 # Performance
 
@@ -70,7 +70,7 @@ Details:
     StockLevel  c:   97940(0.04%)   ua:     0  sa:     0
 ```
 
-Read more about performance in [PERFORMACES.md](PERFORMANCES.md).
+Read more about performance in [PERFORMACES.md](DOCS/PERFORMANCES.md).
 
 # Author
 
