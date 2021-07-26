@@ -31,4 +31,4 @@ Possible ways to protect range queries from phantoms are
 
 Masstree provides good interface to implement Node Verify style phantom protection. See https://github.com/wattlebirdaz/masstree-wrapper for more detail.
 
-Note that phantoms are also possible due to lookups and deletes that fail. In the current implementation of TPC-C, as soon as failure is detected the transaction will abort, thus this is not a problem. However, if you are trying to implement a protocol that continues even when a failure is detected, you need to implement phantom protection for these in addition to range queries.
+Note that phantoms are also possible due to lookups and deletes that fail. In the current implementation of TPC-C, as soon as failure is detected a transaction will abort, thus this is not a problem. However, if you are trying to implement a protocol that continues even when a failure is detected, you need to implement phantom protection for these in addition to range queries.
