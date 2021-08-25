@@ -1,15 +1,11 @@
 #include "gtest/gtest.h"
-
-// Glue code
-#include "database.hpp"
-#include "initializer.hpp"
-#include "transaction.hpp"
-
-// TPCC
-#include "logger.hpp"
-#include "payment_tx.hpp"
-#include "record_layout.hpp"
-#include "tx_runner.hpp"
+#include "naive/include/database.hpp"
+#include "naive/include/initializer.hpp"
+#include "naive/include/transaction.hpp"
+#include "tpcc/include/payment_tx.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "tpcc/include/tx_runner.hpp"
+#include "utils/logger.hpp"
 
 class AtomicityTest : public ::testing::Test {
 protected:

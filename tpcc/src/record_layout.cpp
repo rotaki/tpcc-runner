@@ -1,9 +1,10 @@
-#include "record_layout.hpp"
+#include "tpcc/include/record_layout.hpp"
 
 #include <inttypes.h>
 
-#include "logger.hpp"
-#include "utils.hpp"
+#include "utils/logger.hpp"
+#include "utils/utils.hpp"
+
 
 void Item::deep_copy_from(const Item& src) {
     if (this != &src) {

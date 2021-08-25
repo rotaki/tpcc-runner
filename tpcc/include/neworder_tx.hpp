@@ -4,10 +4,10 @@
 
 #include <cstdint>
 
-#include "logger.hpp"
-#include "record_key.hpp"
-#include "record_layout.hpp"
-#include "tx_utils.hpp"
+#include "tpcc/include/record_key.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "tpcc/include/tx_utils.hpp"
+#include "utils/logger.hpp"
 
 
 class NewOrderTx {
@@ -101,6 +101,9 @@ public:
         if (not_succeeded(tx, res)) return helper.kill(res);
         uint32_t o_id = d->d_next_o_id;
         d->d_next_o_id++;
+        res = tx.finish_update(d);
+        LOG_TRACE("res: %d", static_cast<int>(res));
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         const Customer* c = nullptr;
         Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
@@ -117,6 +120,9 @@ public:
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);
         create_neworder(*no, w_id, d_id, o_id);
+        res = tx.finish_insert(no);
+        LOG_TRACE("res: %d", static_cast<int>(res));
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         Order* o = nullptr;
         Order::Key o_key = Order::Key::create_key(w_id, d_id, o_id);
@@ -124,6 +130,9 @@ public:
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);
         create_order(*o, w_id, d_id, c_id, o_id, ol_cnt, is_remote);
+        res = tx.finish_insert(o);
+        LOG_TRACE("res: %d", static_cast<int>(res));
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         double total = 0;
 
@@ -152,6 +161,9 @@ public:
                 brand_generic = 'G';
             }
             modify_stock(*s, ol_quantity, is_remote);
+            res = tx.finish_update(s);
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return helper.kill(res);
 
             double ol_amount = ol_quantity * i->i_price;
             total += ol_amount;
@@ -163,6 +175,9 @@ public:
             if (not_succeeded(tx, res)) return helper.kill(res);
             create_orderline(
                 *ol, w_id, d_id, o_id, ol_num, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, *s);
+            res = tx.finish_insert(ol);
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return helper.kill(res);
 
             out << ol_supply_w_id << ol_i_id << i->i_name << ol_quantity << s->s_quantity
                 << brand_generic << i->i_price << ol_amount;

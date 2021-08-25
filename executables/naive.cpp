@@ -1,16 +1,15 @@
-#include "logger.hpp"
-#include "config.hpp"
-#include "utils.hpp"
-#include "tx_utils.hpp"
-#include "tx_runner.hpp"
-
-#include "transaction.hpp"
-#include "initializer.hpp"
-
 #include <unistd.h>
 
 #include <string>
 #include <thread>
+
+#include "naive/include/initializer.hpp"
+#include "naive/include/transaction.hpp"
+#include "tpcc/include/config.hpp"
+#include "tpcc/include/tx_runner.hpp"
+#include "tpcc/include/tx_utils.hpp"
+#include "utils/logger.hpp"
+#include "utils/utils.hpp"
 
 void run_tx(int* flag, ThreadLocalData& t_data) {
     while (__atomic_load_n(flag, __ATOMIC_ACQUIRE)) {
@@ -86,11 +85,9 @@ int main(int argc, const char* argv[]) {
 
     printf("\nDetails:\n");
     for (size_t i = 0; i < TxType::Max; i++) {
-        printf("    %-11s c:%8lu(%.2f%%)   ua:%6lu  sa:%6lu\n"
-               , TxType::name(i)
-               , stat[i].num_commits
-               , stat[i].num_commits/(double)total.num_commits
-               , stat[i].num_usr_aborts
-               , stat[i].num_sys_aborts);
+        printf(
+            "    %-11s c:%8lu(%.2f%%)   ua:%6lu  sa:%6lu\n", TxType::name(i), stat[i].num_commits,
+            stat[i].num_commits / (double)total.num_commits, stat[i].num_usr_aborts,
+            stat[i].num_sys_aborts);
     }
 }

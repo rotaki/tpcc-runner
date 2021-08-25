@@ -3,8 +3,8 @@
 #include <condition_variable>
 #include <mutex>
 
-#include "config.hpp"
-#include "logger.hpp"
+#include "tpcc/include/config.hpp"
+#include "utils/logger.hpp"
 
 class LockTable {
 public:

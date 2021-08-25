@@ -50,55 +50,14 @@ set(CMAKE_CXX_FLAGS_RELEASE        "-Ofast -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Ofast -DNDEBUG -g")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
-set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
-list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
-
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # For language server.
-
-include(FetchContent)
-function(add_dep NAME GIT_URL GIT_TAG)
-    FetchContent_Declare(${NAME})
-    if (NOT ${NAME}_POPULATED)
-        FetchContent_Populate(${NAME}
-                QUIET
-                SOURCE_DIR ${CMAKE_BINARY_DIR}/_deps/src/${NAME}
-                BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/build/${NAME}
-                SUBBUILD_DIR ${CMAKE_BINARY_DIR}/_deps/sub/${NAME}
-                GIT_REPOSITORY ${GIT_URL}
-                GIT_TAG ${GIT_TAG}
-                )
-
-        add_subdirectory(${${NAME}_SOURCE_DIR} ${${NAME}_BINARY_DIR})
-    endif ()
-
-    execute_process(COMMAND git log -1 --format=%cd --date=short
-            WORKING_DIRECTORY ${${NAME}_SOURCE_DIR}
-            OUTPUT_VARIABLE GIT_LAST_COMMIT)
-    string(STRIP "${GIT_LAST_COMMIT}" GIT_LAST_COMMIT)
-
-    message(STATUS "[FOUND] ${NAME} (${GIT_URL} ${GIT_TAG} ${GIT_LAST_COMMIT})")
-endfunction()
-
-add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
-add_dep(googletest https://github.com/google/googletest.git master)
-
-###############################################################################
-#                            Static library of tpcc                           #
-###############################################################################
-
-set(TPCCRUNNER_COMPILE_DEFINITIONS "")
-list(APPEND TPCCRUNNER_COMPILE_OPTIONS ${COMMON_COMPILE_FLAGS})
-set(TPCCRUNNER_LINK_OPTIONS "")
-set(TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/tpcc/include")
-list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/tx_engine/include")
-list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/mimalloc/include")
 
 set(LOG_LEVEL
   "1"
   CACHE STRING "0(off) 1(error) 2(warn) 3(into) 4(debug) 5(trace)")
 
-list(APPEND TPCCRUNNER_COMPILE_DEFINITIONS "-DLOG_LEVEL=${LOG_LEVEL}")
+set(LOG_LEVEL_DEFINITION "-DLOG_LEVEL=${LOG_LEVEL}")
 if ("${LOG_LEVEL}" STREQUAL "0")
   message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (NONE)")
 elseif ("${LOG_LEVEL}" STREQUAL "1")
@@ -115,6 +74,93 @@ else()
   message(STATUS "LOG_LEVEL: ${LOG_LEVEL} (UNKWN)")
 endif()
 
+include(FetchContent)
+function(add_dep NAME GIT_URL GIT_TAG)
+    string(TOLOWER "${NAME}" NAME_LOWER)
+    FetchContent_Declare(${NAME})
+    if (NOT ${NAME}_POPULATED)
+        FetchContent_Populate(${NAME}
+                QUIET
+                SOURCE_DIR ${CMAKE_BINARY_DIR}/_deps/src/${NAME}
+                BINARY_DIR ${CMAKE_BINARY_DIR}/_deps/build/${NAME}
+                SUBBUILD_DIR ${CMAKE_BINARY_DIR}/_deps/sub/${NAME}
+                GIT_REPOSITORY ${GIT_URL}
+                GIT_TAG ${GIT_TAG}
+                )
+        
+        set(DEP_CUSTOM_CMAKELISTS ${PROJECT_SOURCE_DIR}/third_party/deps_override/${NAME}_CMakeLists.txt)
+        if (EXISTS ${DEP_CUSTOM_CMAKELISTS})
+            file(COPY ${DEP_CUSTOM_CMAKELISTS} DESTINATION ${${NAME_LOWER}_SOURCE_DIR})
+            file(RENAME ${${NAME_LOWER}_SOURCE_DIR}/${NAME}_CMakeLists.txt ${${NAME_LOWER}_SOURCE_DIR}/CMakeLists.txt)
+            message(STATUS "Copied ${DEP_CUSTOM_CMAKELISTS} -> ${${NAME_LOWER}_SOURCE_DIR}/CMakeLists.txt.")
+        endif ()
+        unset(DEP_CUSTOM_CMAKELISTS)
+
+        add_subdirectory(${${NAME_LOWER}_SOURCE_DIR} ${${NAME_LOWER}_BINARY_DIR})
+    endif ()
+
+    execute_process(COMMAND git log -1 --format=%cd --date=short
+            WORKING_DIRECTORY ${${NAME_LOWER}_SOURCE_DIR}
+            OUTPUT_VARIABLE GIT_LAST_COMMIT)
+    string(STRIP "${GIT_LAST_COMMIT}" GIT_LAST_COMMIT)
+
+    message(STATUS "[FOUND] ${NAME} (${GIT_URL} ${GIT_TAG} ${GIT_LAST_COMMIT})")
+endfunction()
+
+
+set(CC_ALG
+  "NAIVE"
+  CACHE STRING "NAIVE, SILO")
+
+# CC specific paramters
+set(CC_EXECUTABLE "")
+set(CC_SRCS_DIRECTORIES "")
+set(CC_SRCS "")
+set(CC_LINK_LIBRARIES "")
+set(CC_TEST_DIRECTORY "")
+
+if ("${CC_ALG}" STREQUAL "NAIVE")
+  set(CMAKE_CXX_STANDARD 20)
+  list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
+  list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/naive.cpp")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/naive/include")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/naive/src")
+  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/naive/include/*.hpp" "${PROJECT_SOURCE_DIR}/naive/src/*.cpp")
+  list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/naive")
+elseif ("${CC_ALG}" STREQUAL "SILO")
+  set(CMAKE_CXX_STANDARD 17)
+  list(APPEND COMMON_COMPILE_FLAGS "-W" "-Wall" "-fPIC")
+  add_dep(masstree https://github.com/kohler/masstree-beta.git master)
+  list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/silo.cpp")
+  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/silo/glue_code")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/silo/include")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/silo/src")
+  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/silo/glue_code/*.hpp" "${PROJECT_SOURCE_DIR}/silo/include/*.hpp" "${PROJECT_SOURCE_DIR}/silo/src/*.cpp")
+  list(APPEND CC_LINK_LIBRARIES "masstree")
+  list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/silo")
+endif()
+
+add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
+add_dep(googletest https://github.com/google/googletest.git master)
+
+###############################################################################
+#                            Static library of tpcc                           #
+###############################################################################
+
+set(TPCCRUNNER_COMPILE_DEFINITIONS "")
+list(APPEND TPCCRUNNER_COMPILE_OPTIONS ${COMMON_COMPILE_FLAGS})
+
+set(TPCCRUNNER_LINK_OPTIONS "")
+
+set(TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/")
+list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/mimalloc/include")
+list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/")
+list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${CC_INCLUDE_DIRECTORIES}")
+
+set(TPCCRUNNER_LINK_LIBRARIES "mimalloc")
+list(APPEND TPCCRUNNER_LINK_LIBRARIES "${CC_LINK_LIBRARIES}")
+
 if (APPLE)
   list(APPEND TPCCRUNNER_COMPILE_OPTIONS "-fvisibility=hidden")
   list(APPEND TPCCRUNNER_LINK_OPTIONS "-fvisibility=hidden")
@@ -124,14 +170,13 @@ endif ()
 file(GLOB_RECURSE
   TPCCRUNNER_SRCS
   ${PROJECT_SOURCE_DIR}/tpcc/src/*.cpp
-  ${PROJECT_SORUCE_DIR}/tpcc/include/*.hpp
-  ${PROJECT_SOURCE_DIR}/tx_engine/src/*.cpp
-  ${PROJECT_SOURCE_DIR}/tx_engine/include/*.hpp
-  )
+  ${PROJECT_SOURCE_DIR}/tpcc/include/*.hpp
+  ${PROJECT_SOURCE_DIR}/utils/*.hpp
+)
+list(APPEND TPCCRUNNER_SRCS "${CC_SRCS}")
 
 add_library(tpccrunner_objlib OBJECT ${TPCCRUNNER_SRCS})
-target_link_libraries(tpccrunner_objlib PRIVATE mimalloc)
-
+target_link_libraries(tpccrunner_objlib PRIVATE ${TPCCRUNNER_LINK_LIBRARIES})
 target_compile_definitions(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_DEFINITIONS})
 target_compile_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_OPTIONS})
 target_link_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_LINK_OPTIONS})
@@ -158,23 +203,20 @@ message(STATUS "[ADDED] tpccrunner_static")
 #                                Main binaries                                #
 ###############################################################################
 
-file(GLOB_RECURSE EXECUTABLES "${PROJECT_SOURCE_DIR}/executables/*.cpp")
-foreach (EXECUTABLE ${EXECUTABLES})
-  get_filename_component(FILENAME ${EXECUTABLE} NAME_WE)
-  add_executable(${FILENAME} ${EXECUTABLE})
-  target_link_options(${FILENAME} PUBLIC "-pthread")
-  target_compile_options(${FILENAME} PUBLIC "-pthread")
-  target_compile_options(${FILENAME} PRIVATE ${COMMON_COMPILE_FLAGS})
-  target_link_libraries(${FILENAME} tpccrunner_static)
-  set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
-  set_target_properties(
-    ${FILENAME}
-    PROPERTIES
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-  )
-endforeach (EXECUTABLE ${EXECUTABLES})
+get_filename_component(FILENAME "${CC_EXECUTABLE}" NAME_WE)
+add_executable(${FILENAME} ${CC_EXECUTABLE})
+target_link_options(${FILENAME} PUBLIC "-pthread")
+target_compile_options(${FILENAME} PUBLIC "-pthread")
+target_compile_options(${FILENAME} PRIVATE ${COMMON_COMPILE_FLAGS})
+target_link_libraries(${FILENAME} tpccrunner_static)
+set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
+set_target_properties(
+  ${FILENAME}
+  PROPERTIES
+  ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
 
 ###############################################################################
 #                                 Test binaries                                #
@@ -187,14 +229,14 @@ include(GoogleTest)
 
 # test for tpcc
 
-file(GLOB_RECURSE TPCC_TESTS "${PROJECT_SOURCE_DIR}/test/*.cpp")
+file(GLOB_RECURSE TPCC_TESTS "${CC_TEST_DIRECTORY}/*.cpp")
 foreach (TPCC_TEST ${TPCC_TESTS})
   get_filename_component(FILENAME ${TPCC_TEST} NAME_WE)
   if (${FILENAME} MATCHES "test")
     add_executable(${FILENAME} ${TPCC_TEST})
     gtest_discover_tests(${FILENAME})
     target_compile_options(${FILENAME} PRIVATE ${COMMON_COMPILE_FLAGS})
-    target_include_directories(${FILENAME} PRIVATE "${PROJECT_SOURCE_DIR}/test")
+    target_include_directories(${FILENAME} PRIVATE "${CC_TEST_DIRECTORY}")
     target_link_libraries(${FILENAME} tpccrunner_static gtest_main)
     set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
     set_target_properties(
@@ -223,10 +265,13 @@ else()
     COMMENT "Running: format"
     COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
     --clang-format-executable ${CLANG_FORMAT_BIN}
-    -r ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/include
+    -r
+    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc
     ${CMAKE_CURRENT_SOURCE_DIR}/test
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/executables
+    ${CMAKE_CURRENT_SOURCE_DIR}/naive
+    ${CMAKE_CURRENT_SOURCE_DIR}/silo
     -i                          # format file instead of printing diff
     -q
     USES_TERMINAL
@@ -236,10 +281,13 @@ else()
     COMMENT "Running: check-format"
     COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
     --clang-format-executable ${CLANG_FORMAT_BIN}
-    -r ${CMAKE_CURRENT_SOURCE_DIR}/tx_engine/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/src
-    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc/include
+    -r
+    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc
     ${CMAKE_CURRENT_SOURCE_DIR}/test
+    ${CMAKE_CURRENT_SOURCE_DIR}/utils
+    ${CMAKE_CURRENT_SOURCE_DIR}/executables
+    ${CMAKE_CURRENT_SOURCE_DIR}/naive
+    ${CMAKE_CURRENT_SOURCE_DIR}/silo
     USES_TERMINAL
     )
 

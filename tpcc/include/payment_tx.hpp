@@ -5,10 +5,10 @@
 #include <cassert>
 #include <cstdint>
 
-#include "logger.hpp"
-#include "record_key.hpp"
-#include "record_layout.hpp"
-#include "tx_utils.hpp"
+#include "tpcc/include/record_key.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "tpcc/include/tx_utils.hpp"
+#include "utils/logger.hpp"
 
 
 class PaymentTx {
@@ -93,6 +93,9 @@ public:
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);
         w->w_ytd += h_amount;
+        res = tx.finish_update(w);
+        LOG_TRACE("res: %d", static_cast<int>(res));
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         District* d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
@@ -100,6 +103,9 @@ public:
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);
         d->d_ytd += h_amount;
+        res = tx.finish_update(d);
+        LOG_TRACE("res: %d", static_cast<int>(res));
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         Customer* c = nullptr;
         LOG_TRACE("by_last_name %s", by_last_name ? "true" : "false");
@@ -129,12 +135,18 @@ public:
             out << c->c_data;
             modify_customer_data(*c, w_id, d_id, c_w_id, c_d_id, h_amount);
         }
+        res = tx.finish_update(c);
+        LOG_TRACE("res: %d", static_cast<int>(res));
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         History* h = nullptr;
         res = tx.prepare_record_for_insert(h);
         LOG_TRACE("res: %d", static_cast<int>(res));
         if (not_succeeded(tx, res)) return helper.kill(res);
         create_history(*h, w_id, d_id, c_id, c_w_id, c_d_id, h_amount, w->w_name, d->d_name);
+        res = tx.finish_insert(h);
+        LOG_TRACE("res: %d", static_cast<int>(res));
+        if (not_succeeded(tx, res)) return helper.kill(res);
 
         return helper.commit();
     }

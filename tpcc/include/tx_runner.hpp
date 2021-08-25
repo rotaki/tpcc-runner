@@ -4,15 +4,15 @@
 #include <set>
 #include <stdexcept>
 
-#include "delivery_tx.hpp"
-#include "logger.hpp"
-#include "neworder_tx.hpp"
-#include "orderstatus_tx.hpp"
-#include "payment_tx.hpp"
-#include "record_layout.hpp"
-#include "stocklevel_tx.hpp"
-#include "tx_utils.hpp"
-#include "utils.hpp"
+#include "tpcc/include/delivery_tx.hpp"
+#include "tpcc/include/neworder_tx.hpp"
+#include "tpcc/include/orderstatus_tx.hpp"
+#include "tpcc/include/payment_tx.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "tpcc/include/stocklevel_tx.hpp"
+#include "tpcc/include/tx_utils.hpp"
+#include "utils/logger.hpp"
+#include "utils/utils.hpp"
 
 template <typename TxProfile, typename Transaction>
 inline Status run(Transaction& tx, Stat& stat, Output& out) {

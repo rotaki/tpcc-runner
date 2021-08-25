@@ -1,9 +1,9 @@
 #pragma once
-#include "cache.hpp"
-#include "database.hpp"
-#include "logger.hpp"
-#include "record_layout.hpp"
-#include "type_tuple.hpp"
+#include "naive/include/cache.hpp"
+#include "naive/include/database.hpp"
+#include "naive/include/type_tuple.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "utils/logger.hpp"
 
 
 enum LogType { INSERT, UPDATE, DELETE };

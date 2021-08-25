@@ -2,11 +2,11 @@
 
 #include <utility>
 
-#include "config.hpp"
-#include "database.hpp"
-#include "record_key.hpp"
-#include "record_layout.hpp"
-#include "utils.hpp"
+#include "naive/include/database.hpp"
+#include "tpcc/include/config.hpp"
+#include "tpcc/include/record_key.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "utils/utils.hpp"
 
 namespace Initializer {
 

@@ -1,16 +1,12 @@
 #include <algorithm>
 
 #include "gtest/gtest.h"
-
-// Glue code //////////////////////////////////////////////////////////////////
-#include "database.hpp"
-#include "initializer.hpp"
-
-// TPCC code //////////////////////////////////////////////////////////////////
-#include "config.hpp"
-#include "record_key.hpp"
-#include "record_layout.hpp"
-#include "utils.hpp"
+#include "naive/include/database.hpp"
+#include "naive/include/initializer.hpp"
+#include "tpcc/include/config.hpp"
+#include "tpcc/include/record_key.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "utils/utils.hpp"
 
 class ConsistencyTest : public ::testing::Test {
 protected:

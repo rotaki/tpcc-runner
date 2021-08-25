@@ -4,10 +4,10 @@
 #include <cassert>
 #include <deque>
 
-#include "concurrency_manager.hpp"
-#include "database.hpp"
-#include "logger.hpp"
-#include "writeset.hpp"
+#include "naive/include/concurrency_manager.hpp"
+#include "naive/include/database.hpp"
+#include "naive/include/writeset.hpp"
+#include "utils/logger.hpp"
 
 
 class Transaction {
@@ -53,6 +53,11 @@ public:
     }
 
     template <typename Record>
+    Result finish_insert([[maybe_unused]] Record* rec_ptr) {
+        return Result::SUCCESS;
+    }
+
+    template <typename Record>
     Result prepare_record_for_insert(Record*& rec_ptr, typename Record::Key rec_key) {
         // rec_ptr points to data in writeset
         rec_ptr = ws.apply_insert_to_writeset<Record>(rec_key);
@@ -68,12 +73,23 @@ public:
     }
 
     template <typename Record>
-    Result delete_record(typename Record::Key rec_key) {
+    Result finish_update([[maybe_unused]] Record* rec_ptr) {
+        return Result::SUCCESS;
+    }
+
+    template <typename Record>
+    Result prepare_record_for_delete(
+        [[maybe_unused]] const Record*& rec_ptr, typename Record::Key rec_key) {
         if (ws.apply_delete_to_writeset<Record>(rec_key)) {
             return Result::SUCCESS;
         } else {
             return Result::FAIL;
         }
+    }
+
+    template <typename Record>
+    Result finish_delete([[maybe_unused]] Record* rec_ptr) {
+        return Result::SUCCESS;
     }
 
     Result get_customer_by_last_name(

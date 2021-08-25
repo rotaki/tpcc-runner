@@ -4,10 +4,10 @@
 
 #include <cstdint>
 
-#include "logger.hpp"
-#include "record_key.hpp"
-#include "record_layout.hpp"
-#include "tx_utils.hpp"
+#include "tpcc/include/record_key.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "tpcc/include/tx_utils.hpp"
+#include "utils/logger.hpp"
 
 
 class DeliveryTx {
@@ -46,13 +46,17 @@ public:
         out << w_id << o_carrier_id;
 
         for (uint8_t d_id = 1; d_id <= District::DISTS_PER_WARE; d_id++) {
-            const NewOrder* no;
+            const NewOrder* no = nullptr;
             NewOrder::Key no_low = NewOrder::Key::create_key(w_id, d_id, 1);
             res = tx.get_neworder_with_smallest_key_no_less_than(no, no_low);
             if (res == Transaction::Result::FAIL) continue;
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return helper.kill(res);
-            res = tx.template delete_record<NewOrder>(NewOrder::Key::create_key(*no));
+            res =
+                tx.template prepare_record_for_delete<NewOrder>(no, NewOrder::Key::create_key(*no));
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return helper.kill(res);
+            res = tx.finish_delete(no);
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return helper.kill(res);
 
@@ -62,6 +66,9 @@ public:
             LOG_TRACE("res: %d", static_cast<int>(res));
             if (not_succeeded(tx, res)) return helper.kill(res);
             o->o_carrier_id = o_carrier_id;
+            res = tx.finish_update(o);
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return helper.kill(res);
 
             double total_ol_amount = 0.0;
             OrderLine::Key o_low = OrderLine::Key::create_key(o->o_w_id, o->o_d_id, o->o_id, 1);
@@ -81,6 +88,9 @@ public:
             if (not_succeeded(tx, res)) return helper.kill(res);
             c->c_balance += total_ol_amount;
             c->c_delivery_cnt += 1;
+            res = tx.finish_update(c);
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return helper.kill(res);
 
             out << d_id << o->o_id;
         }

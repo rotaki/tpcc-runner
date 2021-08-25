@@ -5,10 +5,10 @@
 #include <cstdint>
 #include <deque>
 
-#include "logger.hpp"
-#include "record_key.hpp"
-#include "record_layout.hpp"
-#include "tx_utils.hpp"
+#include "tpcc/include/record_key.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "tpcc/include/tx_utils.hpp"
+#include "utils/logger.hpp"
 
 
 class OrderStatusTx {

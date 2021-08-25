@@ -1,7 +1,7 @@
 #pragma once
 
-#include "config.hpp"
-#include "utils.hpp"
+#include "tpcc/include/config.hpp"
+#include "utils/utils.hpp"
 
 enum Status {
     SUCCESS = 0,   // if all stages of transaction return Result::SUCCESS
@@ -114,9 +114,12 @@ template <typename Transaction>
 inline bool not_succeeded(Transaction& tx, typename Transaction::Result& res) {
     const Config& c = get_config();
     bool flag = c.get_random_abort_flag();
+    // Randomized abort
     if (flag && res == Transaction::Result::SUCCESS && urand_int(1, 100) == 1) {
-        tx.abort();
         res = Transaction::Result::ABORT;
+    }
+    if (res == Transaction::Result::ABORT) {
+        tx.abort();
     }
     return res != Transaction::Result::SUCCESS;
 }

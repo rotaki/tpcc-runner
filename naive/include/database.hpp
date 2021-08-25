@@ -9,11 +9,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include "cache.hpp"
-#include "logger.hpp"
-#include "record_key.hpp"
-#include "record_layout.hpp"
-#include "type_tuple.hpp"
+#include "naive/include/cache.hpp"
+#include "naive/include/type_tuple.hpp"
+#include "tpcc/include/record_key.hpp"
+#include "tpcc/include/record_layout.hpp"
+#include "utils/logger.hpp"
 
 struct CustomerSecondaryKey;
 struct OrderSecondaryKey;
@@ -185,6 +185,21 @@ struct RecordToIterator<History> {
     using type = size_t;  // dummy
 };
 
+template <typename T>
+struct Traits;
+
+template <>
+struct Traits<Order> {
+    using SecondaryIndexType = OrderSecondary;
+};
+
+template <>
+struct Traits<Customer> {
+    using SecondaryIndexType = CustomerSecondary;
+};
+
+template <typename Record>
+using Secondary = typename Traits<Record>::SecondaryIndexType;
 
 class Database {
 private:
@@ -262,8 +277,8 @@ public:
 
         // create secondary record and insert
         Record& rec = *it->second;
-        typename Record::Secondary sec_rec(&rec);
-        typename Record::Secondary::Key sec_key = Record::Secondary::Key::create_key(rec);
+        Secondary<Record> sec_rec(&rec);
+        typename Secondary<Record>::Key sec_key = Secondary<Record>::Key::create_key(rec);
         return insert_record(sec_key, sec_rec);
     }
 
