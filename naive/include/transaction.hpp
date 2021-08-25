@@ -12,6 +12,8 @@
 
 class Transaction {
 public:
+    uint32_t thread_id = 0;
+
     Transaction(Database& db)
         : db(db)
         , ws(db) {

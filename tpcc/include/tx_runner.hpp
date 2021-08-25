@@ -16,7 +16,13 @@
 
 template <typename TxProfile, typename Transaction>
 inline Status run(Transaction& tx, Stat& stat, Output& out) {
-    uint16_t w_id = urand_int(1, get_config().get_num_warehouses());
+    uint16_t w_id;
+    const Config& c = get_config();
+    if (c.get_fixed_warehouse_flag()) {
+        w_id = tx.thread_id % c.get_num_warehouses() + 1;
+    } else {
+        w_id = urand_int(1, get_config().get_num_warehouses());
+    }
     TxProfile p(w_id);
     return p.run(tx, stat, out);
 }

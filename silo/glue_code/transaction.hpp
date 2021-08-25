@@ -14,7 +14,11 @@
 
 class Transaction {
 public:
-    Transaction(Worker& worker) { silo = std::move(worker.begin_tx()); }
+    uint32_t thread_id = 0;
+
+    Transaction(Worker& worker)
+        : thread_id(worker.get_id())
+        , silo(std::move(worker.begin_tx())) {}
 
     ~Transaction() {}
 

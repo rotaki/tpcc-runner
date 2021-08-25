@@ -14,6 +14,8 @@ public:
 
     uint32_t& get_worker_epoch();
 
+    uint32_t get_id();
+
 private:
     alignas(64) uint32_t worker_id{0};
     uint32_t worker_epoch{0};

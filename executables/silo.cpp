@@ -55,6 +55,7 @@ int main(int argc, const char* argv[]) {
     Config& c = get_mutable_config();
     c.set_num_warehouses(num_warehouses);
     c.set_num_threads(num_threads);
+    c.enable_fixed_warehouse_per_thread();
 
     printf("Loading all tables with %" PRIu16 " warehouse(s)\n", num_warehouses);
     Initializer::load_all_tables();

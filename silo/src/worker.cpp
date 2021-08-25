@@ -14,3 +14,7 @@ std::unique_ptr<Silo> Worker::begin_tx() {
 uint32_t& Worker::get_worker_epoch() {
     return worker_epoch;
 }
+
+uint32_t Worker::get_id() {
+    return worker_id;
+}
