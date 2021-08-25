@@ -79,8 +79,8 @@ int main(int argc, const char* argv[]) {
 
     printf("%d warehouse(s), %d thread(s), %d second(s)\n", num_warehouses, num_threads, seconds);
     printf("    commits: %lu\n", total.num_commits);
-    printf("    sys aborts: %lu\n", total.num_sys_aborts);
-    printf("    usr aborts: %lu\n", total.num_usr_aborts);
+    printf("    usr_aborts: %lu\n", total.num_usr_aborts);
+    printf("    sys_aborts: %lu\n", total.num_sys_aborts);
     printf("Throughput: %lu txns/s\n", total.num_commits / seconds);
 
     printf("\nDetails:\n");
