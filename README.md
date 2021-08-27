@@ -30,7 +30,7 @@ Currently concurrency control protocols supported in this repository are
 - NAIVE
   - a naive protocol that locks the whole database on exeuction
 - SILO
-  - a scalable multi-core optimistic concurrency control protocol
+  - a scalable multi-core optimistic concurrency control protocol proposed in the paper: ["Speedy Transactions in Multicore In-Memory Databases"](http://people.csail.mit.edu/stephentu/papers/silo.pdf).
 
 To build, 
 
