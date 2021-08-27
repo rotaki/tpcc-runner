@@ -18,6 +18,9 @@ public:
         input.print();
     }
 
+    static constexpr char name[] = "OrderStatus";
+    static constexpr TxProfileID id = TxProfileID::ORDERSTATUS_TX;
+
     struct Input {
         uint16_t w_id;
         uint8_t d_id;
@@ -51,10 +54,35 @@ public:
 
     } input;
 
+    enum AbortID : uint8_t {
+        GET_CUSTOMER_BY_LAST_NAME = 0,
+        GET_CUSTOMER = 1,
+        GET_ORDER_BY_CUSTOMER_ID = 2,
+        RANGE_GET_ORDERLINE = 3,
+        PRECOMMIT = 4,
+        MAX = 5
+    };
+
+    template <AbortID a>
+    static constexpr const char* abort_reason() {
+        if constexpr (a == AbortID::GET_CUSTOMER_BY_LAST_NAME)
+            return "GET_CUSTOMER_BY_LAST_NAME";
+        else if constexpr (a == AbortID::GET_CUSTOMER)
+            return "GET_CUSTOMER";
+        else if constexpr (a == AbortID::GET_ORDER_BY_CUSTOMER_ID)
+            return "GET_ORDER_BY_CUSTOMER_ID";
+        else if constexpr (a == AbortID::RANGE_GET_ORDERLINE)
+            return "RANGE_GET_ORDERLINE";
+        else if constexpr (a == AbortID::PRECOMMIT)
+            return "PRECOMMIT";
+        else
+            static_assert(false_v<a>, "undefined abort reason");
+    }
+
     template <typename Transaction>
     Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
-        TxHelper<Transaction> helper(tx, stat[TxType::OrderStatus]);
+        TxHelper<Transaction> helper(tx, stat[TxProfileID::ORDERSTATUS_TX]);
 
         uint16_t c_w_id = input.w_id;
         uint8_t c_d_id = input.d_id;
@@ -70,12 +98,14 @@ public:
             LOG_TRACE("c_last: %s", c_last);
             assert(c_id == Customer::UNUSED_ID);
             res = tx.get_customer_by_last_name(c, c_w_id, c_d_id, c_last);
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return helper.kill(res, GET_CUSTOMER_BY_LAST_NAME);
         } else {
             assert(c_id != Customer::UNUSED_ID);
             res = tx.get_record(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return helper.kill(res, GET_CUSTOMER);
         }
-        LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
 
         c_id = c->c_id;
         out << c->c_first << c->c_middle << c->c_last << c->c_balance;
@@ -83,7 +113,7 @@ public:
         const Order* o = nullptr;
         res = tx.get_order_by_customer_id(o, c_w_id, c_d_id, c_id);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, GET_ORDER_BY_CUSTOMER_ID);
 
         out << o->o_id << o->o_entry_d << o->o_carrier_id;
 
@@ -96,8 +126,8 @@ public:
         });
 
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, RANGE_GET_ORDERLINE);
 
-        return helper.commit();
+        return helper.commit(PRECOMMIT);
     }
 };

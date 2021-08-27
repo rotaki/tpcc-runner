@@ -40,69 +40,90 @@ private:
     uint64_t out = 0;
 };
 
-
-struct TxType {
-    enum Value : uint8_t {
-        NewOrder = 0,
-        Payment = 1,
-        OrderStatus = 2,
-        Delivery = 3,
-        StockLevel = 4,
-        Max = 5,
-    };
-
-    Value value;
-
-    TxType() = default;
-    TxType(Value v)
-        : value(v){};
-    TxType(uint8_t i)
-        : value(Value(i)) {
-        assert(i < Max);
-    }
-
-    operator size_t() const { return size_t(value); }
-
-    static const char* name(TxType tx_type) {
-        assert(tx_type < Max);
-        constexpr const char* n[] = {
-            "NewOrder", "Payment", "OrderStatus", "Delivery", "StockLevel"};
-        return n[tx_type];
-    }
+enum TxProfileID : uint8_t {
+    NEWORDER_TX = 0,
+    PAYMENT_TX = 1,
+    ORDERSTATUS_TX = 2,
+    DELIVERY_TX = 3,
+    STOCKLEVEL_TX = 4,
+    MAX = 5,
 };
 
+class NewOrderTx;
+class PaymentTx;
+class OrderStatusTx;
+class DeliveryTx;
+class StockLevelTx;
+
+template <TxProfileID i>
+struct TxType;
+template <>
+struct TxType<TxProfileID::NEWORDER_TX> {
+    using Profile = NewOrderTx;
+};
+
+template <>
+struct TxType<TxProfileID::PAYMENT_TX> {
+    using Profile = PaymentTx;
+};
+
+template <>
+struct TxType<TxProfileID::ORDERSTATUS_TX> {
+    using Profile = OrderStatusTx;
+};
+
+template <>
+struct TxType<TxProfileID::DELIVERY_TX> {
+    using Profile = DeliveryTx;
+};
+
+template <>
+struct TxType<TxProfileID::STOCKLEVEL_TX> {
+    using Profile = StockLevelTx;
+};
+
+template <TxProfileID i>
+using TxProfile = typename TxType<i>::Profile;
 
 struct Stat {
+    static const size_t ABORT_DETAILS_SIZE = 20;
     struct PerTxType {
         size_t num_commits = 0;
         size_t num_usr_aborts = 0;
         size_t num_sys_aborts = 0;
+        size_t abort_details[ABORT_DETAILS_SIZE] = {};
 
-        void add(const PerTxType& rhs) {
+        void add(const PerTxType& rhs, bool with_abort_details) {
             num_commits += rhs.num_commits;
             num_usr_aborts += rhs.num_usr_aborts;
             num_sys_aborts += rhs.num_sys_aborts;
+
+            if (with_abort_details) {
+                for (size_t i = 0; i < ABORT_DETAILS_SIZE; ++i) {
+                    abort_details[i] += rhs.abort_details[i];
+                }
+            }
         }
     };
 
-    PerTxType& operator[](TxType tx_type) { return per_type_[tx_type]; }
-    const PerTxType& operator[](TxType tx_type) const { return per_type_[tx_type]; }
+    PerTxType& operator[](TxProfileID tx_type) { return per_type_[tx_type]; }
+    const PerTxType& operator[](TxProfileID tx_type) const { return per_type_[tx_type]; }
 
     void add(const Stat& rhs) {
-        for (size_t i = 0; i < TxType::Max; i++) {
-            per_type_[i].add(rhs.per_type_[i]);
+        for (size_t i = 0; i < TxProfileID::MAX; i++) {
+            per_type_[i].add(rhs.per_type_[i], true);
         }
     }
     PerTxType aggregate_perf() const {
         PerTxType out;
-        for (size_t i = 0; i < TxType::Max; i++) {
-            out.add(per_type_[i]);
+        for (size_t i = 0; i < TxProfileID::MAX; i++) {
+            out.add(per_type_[i], false);
         }
         return out;
     }
 
 private:
-    PerTxType per_type_[TxType::Max];
+    PerTxType per_type_[TxProfileID::MAX];
 };
 
 struct ThreadLocalData {
@@ -134,20 +155,24 @@ struct TxHelper {
         : tx_(tx)
         , per_type_(per_type_) {}
 
-    Status kill(typename Transaction::Result res) {
+    Status kill(typename Transaction::Result res, uint8_t abort_id) {
         switch (res) {
         case Transaction::Result::FAIL: return Status::BUG;
-        case Transaction::Result::ABORT: per_type_.num_sys_aborts++; return Status::SYSTEM_ABORT;
+        case Transaction::Result::ABORT:
+            per_type_.num_sys_aborts++;
+            per_type_.abort_details[abort_id]++;
+            return Status::SYSTEM_ABORT;
         default: throw std::runtime_error("wrong Transaction::Result");
         }
     }
 
-    Status commit() {
+    Status commit(uint8_t abort_id) {
         if (tx_.commit()) {
             per_type_.num_commits++;
             return Status::SUCCESS;
         } else {
             per_type_.num_sys_aborts++;
+            per_type_.abort_details[abort_id]++;
             return Status::SYSTEM_ABORT;
         }
     }

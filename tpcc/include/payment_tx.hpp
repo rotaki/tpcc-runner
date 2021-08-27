@@ -18,6 +18,9 @@ public:
         input.print();
     }
 
+    static constexpr char name[] = "Payment";
+    static constexpr TxProfileID id = TxProfileID::PAYMENT_TX;
+
     struct Input {
         uint16_t w_id;
         uint8_t d_id;
@@ -70,10 +73,50 @@ public:
 
     } input;
 
+    enum AbortID : uint8_t {
+        PREPARE_UPDATE_WAREHOUSE = 0,
+        FINISH_UPDATE_WAREHOUSE = 1,
+        PREPARE_UPDATE_DISTRICT = 2,
+        FINISH_UPDATE_DISTRICT = 3,
+        PREPARE_UPDATE_CUSTOMER_BY_LAST_NAME = 4,
+        PREPARE_UPDATE_CUSTOMER = 5,
+        FINISH_UPDATE_CUSTOMER = 6,
+        PREPARE_INSERT_HISTORY = 7,
+        FINISH_INSERT_HISTORY = 8,
+        PRECOMMIT = 9,
+        MAX = 10
+    };
+
+    template <AbortID a>
+    static constexpr const char* abort_reason() {
+        if constexpr (a == AbortID::PRECOMMIT)
+            return "PRECOMMIT";
+        else if constexpr (a == AbortID::PREPARE_UPDATE_WAREHOUSE)
+            return "PREPARE_UPDATE_WAREHOUSE";
+        else if constexpr (a == AbortID::FINISH_UPDATE_WAREHOUSE)
+            return "FINISH_UPDATE_WAREHOUSE";
+        else if constexpr (a == AbortID::PREPARE_UPDATE_DISTRICT)
+            return "PREPARE_UPDATE_DISTRICT";
+        else if constexpr (a == AbortID::FINISH_UPDATE_DISTRICT)
+            return "FINISH_UPDATE_DISTRICT";
+        else if constexpr (a == AbortID::PREPARE_UPDATE_CUSTOMER_BY_LAST_NAME)
+            return "PREPARE_UPDATE_CUSTOMER_BY_LAST_NAME";
+        else if constexpr (a == AbortID::PREPARE_UPDATE_CUSTOMER)
+            return "PREPARE_UPDATE_CUSTOMER";
+        else if constexpr (a == AbortID::FINISH_UPDATE_CUSTOMER)
+            return "FINISH_UPDATE_CUSTOMER";
+        else if constexpr (a == AbortID::PREPARE_INSERT_HISTORY)
+            return "PREPARE_INSERT_HISTORY";
+        else if constexpr (a == AbortID::FINISH_INSERT_HISTORY)
+            return "FINISH_INSERT_HISTORY";
+        else
+            static_assert(false_v<a>, "undefined abort reason");
+    }
+
     template <typename Transaction>
     Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
-        TxHelper<Transaction> helper(tx, stat[TxType::Payment]);
+        TxHelper<Transaction> helper(tx, stat[TxProfileID::PAYMENT_TX]);
 
         uint16_t w_id = input.w_id;
         uint8_t d_id = input.d_id;
@@ -91,21 +134,21 @@ public:
         Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
         res = tx.prepare_record_for_update(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, PREPARE_UPDATE_WAREHOUSE);
         w->w_ytd += h_amount;
         res = tx.finish_update(w);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, FINISH_UPDATE_WAREHOUSE);
 
         District* d;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.prepare_record_for_update(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, PREPARE_UPDATE_DISTRICT);
         d->d_ytd += h_amount;
         res = tx.finish_update(d);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, FINISH_UPDATE_DISTRICT);
 
         Customer* c = nullptr;
         LOG_TRACE("by_last_name %s", by_last_name ? "true" : "false");
@@ -113,12 +156,15 @@ public:
             LOG_TRACE("c_last: %s", c_last);
             assert(c_id == Customer::UNUSED_ID);
             res = tx.get_customer_by_last_name_and_prepare_for_update(c, c_w_id, c_d_id, c_last);
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res))
+                return helper.kill(res, PREPARE_UPDATE_CUSTOMER_BY_LAST_NAME);
         } else {
             assert(c_id != Customer::UNUSED_ID);
             res = tx.prepare_record_for_update(c, Customer::Key::create_key(c_w_id, c_d_id, c_id));
+            LOG_TRACE("res: %d", static_cast<int>(res));
+            if (not_succeeded(tx, res)) return helper.kill(res, PREPARE_UPDATE_CUSTOMER);
         }
-        LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
         c_id = c->c_id;
 
         out << c_id << c_d_id << c_w_id << h_amount << h_date;
@@ -137,18 +183,18 @@ public:
         }
         res = tx.finish_update(c);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, FINISH_UPDATE_CUSTOMER);
 
         History* h = nullptr;
         res = tx.prepare_record_for_insert(h);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, PREPARE_INSERT_HISTORY);
         create_history(*h, w_id, d_id, c_id, c_w_id, c_d_id, h_amount, w->w_name, d->d_name);
         res = tx.finish_insert(h);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, FINISH_INSERT_HISTORY);
 
-        return helper.commit();
+        return helper.commit(PRECOMMIT);
     }
 
 private:

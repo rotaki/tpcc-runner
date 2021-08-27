@@ -17,6 +17,9 @@ public:
         input.print();
     }
 
+    static constexpr char name[] = "NewOrder";
+    static constexpr TxProfileID id = TxProfileID::NEWORDER_TX;
+
     struct Input {
         uint16_t w_id;
         uint8_t d_id;
@@ -74,10 +77,62 @@ public:
 
     } input;
 
+    enum AbortID : uint8_t {
+        GET_WAREHOUSE = 0,
+        PREPARE_UPDATE_DISTRICT = 1,
+        FINISH_UPDATE_DISTRICT = 2,
+        GET_CUSTOMER = 3,
+        PREPARE_INSERT_NEWORDER = 4,
+        FINISH_INSERT_NEWORDER = 5,
+        PREPARE_INSERT_ORDER = 6,
+        FINISH_INSERT_ORDER = 7,
+        GET_ITEM = 8,
+        PREPARE_UPDATE_STOCK = 9,
+        FINISH_UPDATE_STOCK = 10,
+        PREPARE_INSERT_ORDERLINE = 11,
+        FINISH_INSERT_ORDERLINE = 12,
+        PRECOMMIT = 13,
+        MAX = 14,
+    };
+
+    template <AbortID a>
+    static constexpr const char* abort_reason() {
+        if constexpr (a == AbortID::GET_WAREHOUSE)
+            return "GET_WAREHOUSE";
+        else if constexpr (a == AbortID::PREPARE_UPDATE_DISTRICT)
+            return "PREPARE_UPDATE_DISTRICT";
+        else if constexpr (a == AbortID::FINISH_UPDATE_DISTRICT)
+            return "FINISH_UPDATE_DISTRICT";
+        else if constexpr (a == AbortID::GET_CUSTOMER)
+            return "GET_CUSTOMER";
+        else if constexpr (a == AbortID::PREPARE_INSERT_NEWORDER)
+            return "PREPARE_INSERT_NEWORDER";
+        else if constexpr (a == AbortID::FINISH_INSERT_NEWORDER)
+            return "FINISH_INSERT_NEWORDER";
+        else if constexpr (a == AbortID::PREPARE_INSERT_ORDER)
+            return "PREPARE_INSERT_ORDER";
+        else if constexpr (a == AbortID::FINISH_INSERT_ORDER)
+            return "FINISH_INSERT_ORDER";
+        else if constexpr (a == AbortID::GET_ITEM)
+            return "GET_ITEM";
+        else if constexpr (a == AbortID::PREPARE_UPDATE_STOCK)
+            return "PREPARE_UPDATE_STOCK";
+        else if constexpr (a == AbortID::FINISH_UPDATE_STOCK)
+            return "FINISH_UPDATE_STOCK";
+        else if constexpr (a == AbortID::PREPARE_INSERT_ORDERLINE)
+            return "PREPARE_INSERT_ORDERLINE";
+        else if constexpr (a == AbortID::FINISH_INSERT_ORDERLINE)
+            return "FINISH_INSERT_ORDERLINE";
+        else if constexpr (a == AbortID::PRECOMMIT)
+            return "PRECOMMIT";
+        else
+            static_assert(false_v<a>, "undefined abort reason");
+    }
+
     template <typename Transaction>
     Status run(Transaction& tx, Stat& stat, Output& out) {
         typename Transaction::Result res;
-        TxHelper<Transaction> helper(tx, stat[TxType::NewOrder]);
+        TxHelper<Transaction> helper(tx, stat[TxProfileID::NEWORDER_TX]);
 
         bool is_remote = input.is_remote;
         uint16_t w_id = input.w_id;
@@ -92,24 +147,24 @@ public:
         Warehouse::Key w_key = Warehouse::Key::create_key(w_id);
         res = tx.get_record(w, w_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, GET_WAREHOUSE);
 
         District* d = nullptr;
         District::Key d_key = District::Key::create_key(w_id, d_id);
         res = tx.prepare_record_for_update(d, d_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, PREPARE_UPDATE_DISTRICT);
         uint32_t o_id = d->d_next_o_id;
         d->d_next_o_id++;
         res = tx.finish_update(d);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, FINISH_UPDATE_DISTRICT);
 
         const Customer* c = nullptr;
         Customer::Key c_key = Customer::Key::create_key(w_id, d_id, c_id);
         res = tx.get_record(c, c_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, GET_CUSTOMER);
 
         out << c->c_last << c->c_credit << c->c_discount << w->w_tax << d->d_tax << ol_cnt
             << d->d_next_o_id << o_entry_d;
@@ -118,21 +173,21 @@ public:
         NewOrder::Key no_key = NewOrder::Key::create_key(w_id, d_id, o_id);
         res = tx.prepare_record_for_insert(no, no_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, PREPARE_INSERT_NEWORDER);
         create_neworder(*no, w_id, d_id, o_id);
         res = tx.finish_insert(no);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, FINISH_INSERT_NEWORDER);
 
         Order* o = nullptr;
         Order::Key o_key = Order::Key::create_key(w_id, d_id, o_id);
         res = tx.prepare_record_for_insert(o, o_key);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, PREPARE_INSERT_ORDER);
         create_order(*o, w_id, d_id, c_id, o_id, ol_cnt, is_remote);
         res = tx.finish_insert(o);
         LOG_TRACE("res: %d", static_cast<int>(res));
-        if (not_succeeded(tx, res)) return helper.kill(res);
+        if (not_succeeded(tx, res)) return helper.kill(res, FINISH_INSERT_ORDER);
 
         double total = 0;
 
@@ -147,13 +202,13 @@ public:
             Item::Key i_key = Item::Key::create_key(ol_i_id);
             res = tx.get_record(i, i_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return helper.kill(res);
+            if (not_succeeded(tx, res)) return helper.kill(res, GET_ITEM);
 
             Stock* s;
             Stock::Key s_key = Stock::Key::create_key(ol_supply_w_id, ol_i_id);
             res = tx.prepare_record_for_update(s, s_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return helper.kill(res);
+            if (not_succeeded(tx, res)) return helper.kill(res, PREPARE_UPDATE_STOCK);
             char brand_generic;
             if (strstr(i->i_data, "ORIGINAL") && strstr(s->s_data, "ORIGINAL")) {
                 brand_generic = 'B';
@@ -163,7 +218,7 @@ public:
             modify_stock(*s, ol_quantity, is_remote);
             res = tx.finish_update(s);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return helper.kill(res);
+            if (not_succeeded(tx, res)) return helper.kill(res, FINISH_UPDATE_STOCK);
 
             double ol_amount = ol_quantity * i->i_price;
             total += ol_amount;
@@ -172,12 +227,12 @@ public:
             OrderLine::Key ol_key = OrderLine::Key::create_key(w_id, d_id, o_id, ol_num);
             res = tx.prepare_record_for_insert(ol, ol_key);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return helper.kill(res);
+            if (not_succeeded(tx, res)) return helper.kill(res, PREPARE_INSERT_ORDERLINE);
             create_orderline(
                 *ol, w_id, d_id, o_id, ol_num, ol_i_id, ol_supply_w_id, ol_quantity, ol_amount, *s);
             res = tx.finish_insert(ol);
             LOG_TRACE("res: %d", static_cast<int>(res));
-            if (not_succeeded(tx, res)) return helper.kill(res);
+            if (not_succeeded(tx, res)) return helper.kill(res, FINISH_INSERT_ORDERLINE);
 
             out << ol_supply_w_id << ol_i_id << i->i_name << ol_quantity << s->s_quantity
                 << brand_generic << i->i_price << ol_amount;
@@ -186,7 +241,7 @@ public:
         total *= (1 - c->c_discount) * (1 + w->w_tax + d->d_tax);
         out << total;
 
-        return helper.commit();
+        return helper.commit(PRECOMMIT);
     }
 
 private:

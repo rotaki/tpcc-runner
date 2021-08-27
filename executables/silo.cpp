@@ -75,7 +75,6 @@ int main(int argc, const char* argv[]) {
     }
 
     em.start(seconds);
-    // sleep(seconds);
 
     __atomic_store_n(&flag, 0, __ATOMIC_RELEASE);
 
@@ -96,10 +95,25 @@ int main(int argc, const char* argv[]) {
     printf("Throughput: %lu txns/s\n", total.num_commits / seconds);
 
     printf("\nDetails:\n");
-    for (size_t i = 0; i < TxType::Max; i++) {
+    constexpr_for<TxProfileID::MAX>([&](auto i) {
+        constexpr auto p = static_cast<TxProfileID>(i.value);
+        using Profile = TxProfile<p>;
         printf(
-            "    %-11s c:%8lu(%.2f%%)   ua:%6lu  sa:%6lu\n", TxType::name(i), stat[i].num_commits,
-            stat[i].num_commits / (double)total.num_commits, stat[i].num_usr_aborts,
-            stat[i].num_sys_aborts);
-    }
+            "    %-11s c:%8lu(%.2f%%)   ua:%6lu  sa:%6lu\n", Profile::name, stat[p].num_commits,
+            stat[p].num_commits / (double)total.num_commits, stat[p].num_usr_aborts,
+            stat[p].num_sys_aborts);
+    });
+
+    printf("\nSystem Abort Details:\n");
+    constexpr_for<TxProfileID::MAX>([&](auto i) {
+        constexpr auto p = static_cast<TxProfileID>(i.value);
+        using Profile = TxProfile<p>;
+        printf("    %-11s\n", Profile::name);
+        constexpr_for<Profile::AbortID::MAX>([&](auto j) {
+            constexpr auto a = static_cast<typename Profile::AbortID>(j.value);
+            printf(
+                "        %-45s: %lu\n", Profile::template abort_reason<a>(),
+                stat[p].abort_details[a]);
+        });
+    });
 }

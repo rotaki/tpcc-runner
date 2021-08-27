@@ -3,6 +3,7 @@
 #include <cassert>
 #include <cstdint>
 #include <stdexcept>
+#include <utility>
 
 #include "random.hpp"
 
@@ -87,3 +88,21 @@ public:
 private:
     std::vector<size_t> perm;
 };
+
+template <std::size_t N>
+struct num {
+    static const constexpr auto value = N;
+};
+
+template <class F, std::size_t... Is>
+void constexpr_for(F func, std::index_sequence<Is...>) {
+    (func(num<Is>{}), ...);
+}
+
+template <std::size_t N, typename F>
+void constexpr_for(F func) {
+    constexpr_for(func, std::make_index_sequence<N>());
+}
+
+template <typename T>
+constexpr bool false_v = false;
