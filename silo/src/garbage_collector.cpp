@@ -9,7 +9,7 @@ void GarbageCollector::collect(uint32_t current_epoch, Rec* ptr) {
 
 void GarbageCollector::remove(uint32_t current_epoch) {
     auto& gc_container = get_gc_container();
-    if (current_epoch > 2) {
+    if (current_epoch >= 2) {
         auto end = gc_container.upper_bound(current_epoch - 2);
         LOG_DEBUG("Garbage removal epoch: %u", current_epoch - 2);
 
