@@ -33,6 +33,8 @@ public:
 
     Rec* update(TableID table_id, Key key);
 
+    Rec* upsert(TableID table_id, Key key);
+
     bool read_scan(
         TableID table_id, Key lkey, Key rkey, int64_t count, bool reverse,
         std::map<Key, Rec*>& kv_map);

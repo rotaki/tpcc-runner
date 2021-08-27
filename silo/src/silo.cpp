@@ -64,7 +64,6 @@ const Rec* Silo::read(TableID table_id, Key key) {
 
         if (!(tw.absent == 0 && tw.latest == 1)) {  // unable to read the value
             MemoryAllocator::deallocate(rec);
-
             return nullptr;
         }
 
@@ -110,7 +109,6 @@ Rec* Silo::insert(TableID table_id, Key key) {
     const Schema& sch = Schema::get_schema();
     Index& idx = Index::get_index();
 
-
     tables.insert(table_id);
     size_t record_size = sch.get_record_size(table_id);
 
@@ -121,7 +119,6 @@ Rec* Silo::insert(TableID table_id, Key key) {
     auto& vs_table = vs.get_table(table_id);
     auto& nm = ns.get_nodemap(table_id);
 
-
     if (rs_iter == rs_table.end() && ws_iter == ws_table.end()) {
         assert(vs_table.find(key) == vs_table.end());
         Value* val;
@@ -130,7 +127,6 @@ Rec* Silo::insert(TableID table_id, Key key) {
         Rec* rec = MemoryAllocator::aligned_allocate(record_size);
         Value* new_val = reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
         new_val->rec = nullptr;
-        // TODO: assign epoch and tid -> NO NEED?
         new_val->tidword.obj = 0;
         new_val->tidword.latest = 1;  // exist in index
         new_val->tidword.absent = 1;  // cannot be seen by others
@@ -202,12 +198,9 @@ Rec* Silo::update(TableID table_id, Key key) {
         read_record_and_tidword(*val, rec, tw, record_size);
 
         if (!(tw.absent == 0 && tw.latest == 1)) {  // unable to read the value
-
             MemoryAllocator::deallocate(rec);
-
             return nullptr;
         }
-
 
         rs_table.emplace_hint(
             rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
@@ -235,6 +228,100 @@ Rec* Silo::update(TableID table_id, Key key) {
         && ws_iter->second.wt == WriteType::DELETE) {
         assert(vs_table.find(key) != vs_table.end());
         return nullptr;  // abort
+    } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
+        assert(vs_table.find(key) != vs_table.end());
+        return ws_iter->second.rec;
+    }
+
+    assert(false);
+    return nullptr;
+}
+
+Rec* Silo::upsert(TableID table_id, Key key) {
+    LOG_INFO("UPSERT (e: %u, t: %lu, k: %lu)", starting_epoch, table_id, key);
+
+    const Schema& sch = Schema::get_schema();
+    Index& idx = Index::get_index();
+
+    size_t record_size = sch.get_record_size(table_id);
+    tables.insert(table_id);
+    auto& rs_table = rs.get_table(table_id);
+    auto rs_iter = rs_table.find(key);
+    auto& ws_table = ws.get_table(table_id);
+    auto ws_iter = ws_table.find(key);
+    auto& vs_table = vs.get_table(table_id);
+    auto& nm = ns.get_nodemap(table_id);
+
+    if (rs_iter == rs_table.end() && ws_iter == ws_table.end()) {
+        Value* val;
+        Index::Result res = idx.find(table_id, key, val, nm);
+        if (res == Index::Result::NOT_FOUND) {
+            // INSERT into index
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            Value* new_val =
+                reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
+            new_val->rec = nullptr;
+            new_val->tidword.obj = 0;
+            new_val->tidword.latest = 1;  // exist in index
+            new_val->tidword.absent = 1;  // cannot be seen by others
+
+            res = idx.insert(table_id, key, new_val, nm);
+            if (res == Index::Result::NOT_INSERTED) {
+                MemoryAllocator::deallocate(new_val);
+                MemoryAllocator::deallocate(rec);
+                return nullptr;  // abort
+            } else if (res == Index::Result::BAD_INSERT) {
+                return nullptr;  // abort
+            }
+
+            assert(res == Index::Result::OK);
+            ws_table.emplace_hint(
+                ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(rec, WriteType::INSERT, true));
+            vs_table.emplace(key, new_val);
+
+            return rec;
+        } else {
+            assert(res == Index::Result::OK);
+            // UPDATE
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            TidWord tw;
+            read_record_and_tidword(*val, rec, tw, record_size);
+
+            if (!(tw.absent == 0 && tw.latest == 1)) {  // unable to read the value
+                MemoryAllocator::deallocate(rec);
+                return nullptr;
+            }
+
+            rs_table.emplace_hint(
+                rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(rec, tw));
+            ws_table.emplace_hint(
+                ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(rec, WriteType::UPDATE, false));
+            vs_table.emplace(key, val);
+
+            return rec;
+        }
+    } else if (rs_iter == rs_table.end() && ws_iter != ws_table.end()) {
+        assert(vs_table.find(key) != vs_table.end());
+        return ws_iter->second.rec;
+    } else if (rs_iter != rs_table.end() && ws_iter == ws_table.end()) {
+        assert(vs_table.find(key) != vs_table.end());
+        Rec* rec = rs_iter->second.rec;
+        ws_table.emplace_hint(
+            ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
+            std::forward_as_tuple(rec, WriteType::UPDATE, false));
+        return rec;
+    } else if (
+        rs_iter != rs_table.end() && ws_iter != ws_table.end()
+        && ws_iter->second.wt == WriteType::DELETE) {
+        assert(vs_table.find(key) != vs_table.end());
+        assert(rs_iter->second.rec == ws_iter->second.rec);
+        Rec* rec = ws_iter->second.rec;
+        memset(rec, 0, record_size);  // clear contents
+        ws_iter->second.wt = WriteType::UPDATE;
+        return rec;
     } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
         assert(vs_table.find(key) != vs_table.end());
         return ws_iter->second.rec;
