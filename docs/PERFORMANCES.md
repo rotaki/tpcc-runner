@@ -15,7 +15,7 @@ The following is a list of optimizations and cheats which have been applied or n
     
 ## Transaction Concurrency
 
-Executing `./main 1 1 20` yields the following output on `8 core Intel(R) Core(TM) i9-9900 CPU @ 3.10GHz` with `32GB RAM`
+Executing `./naive 1 1 20` yields the following output on `8 core Intel(R) Core(TM) i9-9900 CPU @ 3.10GHz` with `32GB RAM`
 
 ```
 Loading all tables with 1 warehouse(s)
@@ -70,6 +70,3 @@ Details:
     Delivery    c:   79834(0.04%)   ua:     0  sa:     0
     StockLevel  c:   80886(0.04%)   ua:     0  sa:     0
 ```
-
-Implementing concurrent transactions is left for future work.
-
