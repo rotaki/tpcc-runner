@@ -21,14 +21,16 @@ To address this issue, tpcc-runner provides an implementation of TPC-C where tra
 
 ## Dependencies
 - Ubuntu 20.04
-- gcc 10
-- C++20 NAIVE
-- C++17 SILO
+- g++ >= 10
+- C++20 (for NAIVE protocol)
+- C++17 (for SILO protocol)
 ## Build
 
-Currently concurrency control protocols support in this repository are
-- NAIVE: a naive protocol that locks the whole database on exeuction
-- SILO: a scalable multi-core optimistic concurrency control protocol
+Currently concurrency control protocols supported in this repository are
+- NAIVE
+  - a naive protocol that locks the whole database on exeuction
+- SILO
+  - a scalable multi-core optimistic concurrency control protocol
 
 To build, 
 
@@ -38,6 +40,9 @@ cd build
 cmake .. -DLOG_LEVEL=0 -DCMAKE_BUILD_TYPE=Release -DCC_ALG=SILO
 make
 ```
+
+Choose the protocol you want to compile in `-DCC_ALG=` argument.
+
 ## Execute
 After building, the executable will be stored into the `build/bin` directory.
 To execute, 
