@@ -82,15 +82,15 @@ The performance of silo was measured for 3 seconds using `16 core Intel(R) Xeon(
 ### Single Warehouse
 ![Single Warehouse](./docs/images/single_warehouse.png)
 
-In single warehouse, the performance scales until 5 threads. (The maxima of throughput could be in any number between 2 to 9 threads.) The performance degrades rapidly after that because of high contention. The abort rate is calculated as num_aborts/num_trials = num_aborts/(num_aborts + num_commits). The abort rate approaches to 1 as the number threads increases.
+In single warehouse, the performance scales until 5 threads. (The maxima of throughput could be in any number between 2 to 9 threads.) The performance degrades rapidly after that because of high contention. The abort rate is calculated as `num_aborts/num_trials = num_aborts/(num_aborts + num_commits)`. The abort rate approaches to 1 as the number threads increases.
 
 ### Thread Count = Num Warehouse
 
 ![Thread Count = Num Warehouse](./docs/images/multiple_warehouse.png)
 
-In thread count = num warehouse, the performance seems to scale well. The abort rate is much smaller than that of a single warehouse. The reason why silo scales is that it is cache-friendly (= it has fewer updates to shared memory). The OCC style read does not modify the shared memory when accessing data. The group commit (epoch) allows fewer updates to shared counter.
+In `thread count = num warehouse`, the performance seems to scale well. The abort rate is much smaller than that of a single warehouse. The reason why silo scales is that it is cache-friendly (= it has fewer updates to shared memory). The OCC style read does not modify the shared memory when accessing data. The group commit (epoch) allows fewer updates to shared counter.
 
-
+Reproducing this graph is possible by running `run_experiment.py` in the scripts directory. (Make sure to execute it in the base directory: `tpcc-runner/`)
 # Author
 
 Riki Otaki
