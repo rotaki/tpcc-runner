@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cassert>
+#include <cstring>
 #include <map>
 #include <set>
+#include <stdexcept>
 #include <unordered_map>
 #include <utility>
 
@@ -15,6 +17,7 @@
 template <typename Index>
 class Silo {
 public:
+    using Key = typename Index::Key;
     class NodeSet {
     public:
         typename Index::NodeMap& get_nodemap(TableID table_id) { return ns[table_id]; }
@@ -176,7 +179,7 @@ public:
             assert(vs_table.find(key) != vs_table.end());
             assert(rs_iter->second.rec == ws_iter->second.rec);
             Rec* rec = ws_iter->second.rec;
-            memset(rec, 0, record_size);  // clear contents
+            ::memset(rec, 0, record_size);  // clear contents
             ws_iter->second.wt = WriteType::UPDATE;
             return rec;
         } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
@@ -726,9 +729,9 @@ public:
 private:
     uint32_t starting_epoch;
     std::set<TableID> tables;
-    ReadSet rs;
-    WriteSet ws;
-    ValidationSet vs;
+    ReadSet<Key> rs;
+    WriteSet<Key> ws;
+    ValidationSet<Key> vs;
     NodeSet ns;
 
     void read_record_and_tidword(Value& val, Rec* rec, TidWord& tw, size_t rec_size) {

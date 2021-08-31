@@ -4,7 +4,6 @@
 #include <string>
 #include <unordered_map>
 
-#include "indexes/masstree.hpp"
 #include "protocols/common/schema.hpp"
 #include "protocols/silo/include/value.hpp"
 
@@ -22,6 +21,8 @@ struct WriteElement {
                           // followed by Read or Delete operation.)
 };
 
+
+template <typename Key>
 class WriteSet {
 public:
     std::map<Key, WriteElement>& get_table(TableID table_id) { return ws[table_id]; }
@@ -39,6 +40,7 @@ struct ReadElement {
     TidWord tw;
 };
 
+template <typename Key>
 class ReadSet {
 public:
     std::map<Key, ReadElement>& get_table(TableID table_id) { return rs[table_id]; }
@@ -47,6 +49,8 @@ private:
     std::unordered_map<TableID, std::map<Key, ReadElement>> rs;
 };
 
+
+template <typename Key>
 class ValidationSet {
 public:
     std::unordered_map<Key, Value*>& get_table(TableID table_id) { return vs[table_id]; }

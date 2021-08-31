@@ -5,11 +5,10 @@
 #include "indexes/masstree_wrapper.hpp"
 #include "utils/logger.hpp"
 
-using Key = uint64_t;
-
 template <typename Value>
 class MasstreeIndexes {
 public:
+    using Key = uint64_t;
     using MT = MasstreeWrapper<Value>;
     using KVMap = std::map<Key, Value*>;
     using NodeInfo = typename MT::node_info_t;
