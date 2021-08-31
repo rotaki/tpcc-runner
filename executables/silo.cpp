@@ -1,11 +1,15 @@
+#include "silo/include/silo.hpp"
+
 #include <unistd.h>
 
 #include <string>
 #include <thread>
 
+#include "common/epoch_manager.hpp"
+#include "index/masstree.hpp"
 #include "silo/glue_code/initializer.hpp"
 #include "silo/glue_code/transaction.hpp"
-#include "silo/include/epoch_manager.hpp"
+#include "silo/include/value.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/tx_runner.hpp"
 #include "tpcc/include/tx_utils.hpp"
@@ -16,8 +20,9 @@ volatile mrcu_epoch_type active_epoch = 1;
 volatile std::uint64_t globalepoch = 1;
 volatile bool recovering = false;
 
-void run_tx(int* flag, ThreadLocalData& t_data, uint32_t worker_id, EpochManager& em) {
-    Worker w(worker_id);
+template <typename Protocol>
+void run_tx(int* flag, ThreadLocalData& t_data, uint32_t worker_id, EpochManager<Protocol>& em) {
+    Worker<Protocol> w(worker_id);
     em.set_worker(worker_id, &w);
     while (__atomic_load_n(flag, __ATOMIC_ACQUIRE)) {
         Transaction tx(w);
@@ -58,20 +63,24 @@ int main(int argc, const char* argv[]) {
     c.enable_fixed_warehouse_per_thread();
 
     printf("Loading all tables with %" PRIu16 " warehouse(s)\n", num_warehouses);
-    Initializer::load_all_tables();
+
+    using Index = MasstreeIndexes<Value>;
+    using Protocol = Silo<Index>;
+
+    Initializer<Index>::load_all_tables();
     printf("Loaded\n");
 
     std::vector<std::thread> threads;
     threads.reserve(num_threads);
 
-    EpochManager em(num_threads);
+    EpochManager<Protocol> em(num_threads, 40);
 
     alignas(64) int flag = 1;
 
     std::vector<ThreadLocalData> t_data(num_threads);
 
     for (int i = 0; i < num_threads; i++) {
-        threads.emplace_back(run_tx, &flag, std::ref(t_data[i]), i, std::ref(em));
+        threads.emplace_back(run_tx<Protocol>, &flag, std::ref(t_data[i]), i, std::ref(em));
     }
 
     em.start(seconds);

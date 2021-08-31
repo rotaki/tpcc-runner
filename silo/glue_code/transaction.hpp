@@ -6,26 +6,26 @@
 #include <cassert>
 #include <deque>
 
+#include "common/epoch_manager.hpp"
 #include "silo/glue_code/record_misc.hpp"
-#include "silo/include/silo.hpp"
-#include "silo/include/worker.hpp"
 #include "tpcc/include/record_key.hpp"
 #include "tpcc/include/record_layout.hpp"
 
+template <typename Protocol>
 class Transaction {
 public:
     uint32_t thread_id = 0;
 
-    Transaction(Worker& worker)
+    Transaction(Worker<Protocol>& worker)
         : thread_id(worker.get_id())
-        , silo(std::move(worker.begin_tx())) {}
+        , protocol(std::move(worker.begin_tx())) {}
 
     ~Transaction() {}
 
-    void abort() { silo->abort(); }
+    void abort() { protocol->abort(); }
 
     bool commit() {
-        if (silo->precommit()) {
+        if (protocol->precommit()) {
             return true;
         } else {
             abort();
@@ -44,8 +44,8 @@ public:
     template <typename Record>
     Result get_record(const Record*& rec_ptr, typename Record::Key rec_key) {
         // We assume the write set does not hold the corresponding record.
-        rec_ptr =
-            reinterpret_cast<const Record*>(silo->read(get_id<Record>(), rec_key.get_raw_key()));
+        rec_ptr = reinterpret_cast<const Record*>(
+            protocol->read(get_id<Record>(), rec_key.get_raw_key()));
         return rec_ptr == nullptr ? Result::ABORT : Result::SUCCESS;
     }
 
@@ -59,7 +59,8 @@ public:
     template <typename Record>
     Result prepare_record_for_insert(Record*& rec_ptr, typename Record::Key rec_key) {
         // rec_ptr points to data in writeset
-        rec_ptr = reinterpret_cast<Record*>(silo->insert(get_id<Record>(), rec_key.get_raw_key()));
+        rec_ptr =
+            reinterpret_cast<Record*>(protocol->insert(get_id<Record>(), rec_key.get_raw_key()));
         return rec_ptr == nullptr ? Result::ABORT : Result::SUCCESS;
     }
 
@@ -81,7 +82,8 @@ public:
     template <typename Record>
     Result prepare_record_for_update(Record*& rec_ptr, typename Record::Key rec_key) {
         // rec_ptr points to data in writeset copied from db
-        rec_ptr = reinterpret_cast<Record*>(silo->update(get_id<Record>(), rec_key.get_raw_key()));
+        rec_ptr =
+            reinterpret_cast<Record*>(protocol->update(get_id<Record>(), rec_key.get_raw_key()));
         return rec_ptr == nullptr ? Result::ABORT : Result::SUCCESS;
     }
 
@@ -93,7 +95,8 @@ public:
 
     template <typename Record>
     Result prepare_record_for_delete(const Record*& rec_ptr, typename Record::Key rec_key) {
-        rec_ptr = reinterpret_cast<Record*>(silo->remove(get_id<Record>(), rec_key.get_raw_key()));
+        rec_ptr =
+            reinterpret_cast<Record*>(protocol->remove(get_id<Record>(), rec_key.get_raw_key()));
         return rec_ptr == nullptr ? Result::ABORT : Result::SUCCESS;
     }
 
@@ -157,7 +160,7 @@ public:
         OrderSecondary::Key o_sec_high_key =
             OrderSecondary::Key::create_key(w_id, d_id, c_id + 1, 0);
         std::map<uint64_t, void*> kr_map;
-        bool scanned = silo->read_scan(
+        bool scanned = protocol->read_scan(
             get_id<OrderSecondary>(), o_sec_low_key.get_raw_key(), o_sec_high_key.get_raw_key(), 1,
             true, kr_map);
 
@@ -175,8 +178,8 @@ public:
 
     Result get_neworder_with_smallest_key_no_less_than(const NewOrder*& no, NewOrder::Key low) {
         std::map<uint64_t, void*> kr_map;
-        bool scanned =
-            silo->read_scan(get_id<NewOrder>(), low.get_raw_key(), UINT64_MAX, 1, false, kr_map);
+        bool scanned = protocol->read_scan(
+            get_id<NewOrder>(), low.get_raw_key(), UINT64_MAX, 1, false, kr_map);
         if (scanned) {
             for (auto& [k, r]: kr_map) {
                 assert(r);
@@ -197,7 +200,7 @@ public:
     template <typename Record, typename Func>
     Result range_query(typename Record::Key low, typename Record::Key up, Func&& func) {
         std::map<uint64_t, void*> kr_map;
-        bool scanned = silo->read_scan(
+        bool scanned = protocol->read_scan(
             get_id<Record>(), low.get_raw_key(), up.get_raw_key(), -1, false, kr_map);
         if (scanned) {
             for (auto& [k, r]: kr_map) {
@@ -215,7 +218,7 @@ public:
     template <typename Record, typename Func>
     Result range_update(typename Record::Key low, typename Record::Key up, Func&& func) {
         std::map<uint64_t, void*> kr_map;
-        bool scanned = silo->update_scan(
+        bool scanned = protocol->update_scan(
             get_id<Record>(), low.get_raw_key(), up.get_raw_key(), -1, false, kr_map);
         Result res;
         if (scanned) {
@@ -233,5 +236,5 @@ public:
     }
 
 private:
-    std::unique_ptr<Silo> silo = nullptr;
+    std::unique_ptr<Protocol> protocol = nullptr;
 };

@@ -272,6 +272,7 @@ else()
     ${CMAKE_CURRENT_SOURCE_DIR}/executables
     ${CMAKE_CURRENT_SOURCE_DIR}/naive
     ${CMAKE_CURRENT_SOURCE_DIR}/silo
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
     -i                          # format file instead of printing diff
     -q
     USES_TERMINAL
@@ -288,6 +289,7 @@ else()
     ${CMAKE_CURRENT_SOURCE_DIR}/executables
     ${CMAKE_CURRENT_SOURCE_DIR}/naive
     ${CMAKE_CURRENT_SOURCE_DIR}/silo
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
     USES_TERMINAL
     )
 

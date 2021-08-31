@@ -2,9 +2,7 @@
 
 #include <cstdint>
 
-using Key = uint64_t;
 using Rec = void;
-using TableID = uint64_t;
 
 struct TidWord {
     union {

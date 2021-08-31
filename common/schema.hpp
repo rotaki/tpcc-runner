@@ -5,6 +5,8 @@
 #include <unordered_map>
 #include <vector>
 
+using TableID = uint64_t;
+
 struct TableInfo {
     size_t rec_size = 0;
     TableID secondary = 0;

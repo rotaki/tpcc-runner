@@ -4,7 +4,9 @@
 #include <string>
 #include <unordered_map>
 
-#include "silo/include/keyvalue.hpp"
+#include "common/schema.hpp"
+#include "index/masstree.hpp"
+#include "silo/include/value.hpp"
 
 enum WriteType { UPDATE = 0, INSERT, DELETE };
 

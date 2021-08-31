@@ -2,19 +2,20 @@
 
 #include <map>
 
-#include "silo/include/keyvalue.hpp"
-#include "silo/include/masstree_wrapper.hpp"
-#include "utils/atomic_wrapper.hpp"
+#include "index/masstree_wrapper.hpp"
 #include "utils/logger.hpp"
 
-using MT = MasstreeWrapper<Value>;
-using KVMap = std::map<Key, Value*>;
-using NodeInfo = MT::node_info_t;
-using NodeMap =
-    std::unordered_map<const MT::leaf_type*, uint64_t>;  // key: node pointer, value: version
+using Key = uint64_t;
 
-class Index {
+template<typename Value>
+class MasstreeIndexes {
 public:
+    using MT = MasstreeWrapper<Value>;
+    using KVMap = std::map<Key, Value*>;
+    using NodeInfo = typename MT::node_info_t;
+    using NodeMap =
+        std::unordered_map<const typename MT::leaf_type*, uint64_t>;  // key: node pointer, value: version
+
     enum Result {
         OK = 0,
         NOT_FOUND,
@@ -59,7 +60,7 @@ public:
             reinterpret_cast<char*>(&key_buf), sizeof(Key), ni);
         if (val == nullptr) {
             // node that would contain the missing key is added
-            nm.emplace(reinterpret_cast<const MT::leaf_type*>(ni.node), ni.new_version);
+            nm.emplace(reinterpret_cast<const typename MT::leaf_type*>(ni.node), ni.new_version);
             return NOT_FOUND;
         } else {
             return OK;
@@ -74,7 +75,7 @@ public:
         bool inserted = mt.insert_value_and_get_nodeinfo_on_success(
             reinterpret_cast<char*>(&key_buf), sizeof(Key), val, ni);
         if (inserted) {
-            auto itr = nm.find(reinterpret_cast<const MT::leaf_type*>(ni.node));
+            auto itr = nm.find(reinterpret_cast<const typename MT::leaf_type*>(ni.node));
             if (itr == nm.end()) {
                 return OK;
             }
@@ -106,7 +107,7 @@ public:
             reinterpret_cast<char*>(&lkey_buf), sizeof(Key), lexclusive,
             reinterpret_cast<char*>(&rkey_buf), sizeof(Key), rexclusive,
             {[&nm, &exception_caught](
-                 const MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
+                 const typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
                  auto it = nm.find(leaf);
                  if (it == nm.end())
                      nm.emplace_hint(it, leaf, version);
@@ -115,7 +116,7 @@ public:
                      continue_flag = false;
                  }
              },
-             [&kv_map](const MT::Str& key, Value* val, bool& continue_flag) {
+             [&kv_map](const typename MT::Str& key, Value* val, bool& continue_flag) {
                  (void)continue_flag;
                  Key actual_key{__builtin_bswap64(*(reinterpret_cast<const uint64_t*>(key.s)))};
                  kv_map.emplace(actual_key, val);
@@ -142,7 +143,7 @@ public:
             reinterpret_cast<char*>(&lkey_buf), sizeof(Key), lexclusive,
             reinterpret_cast<char*>(&rkey_buf), sizeof(Key), rexclusive,
             {[&nm, &exception_caught](
-                 const MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
+                 const typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
                  auto it = nm.find(leaf);
                  if (it == nm.end())
                      nm.emplace_hint(it, leaf, version);
@@ -151,7 +152,7 @@ public:
                      continue_flag = false;
                  }
              },
-             [&kv_map](const MT::Str& key, Value* val, bool& continue_flag) {
+             [&kv_map](const typename MT::Str& key, Value* val, bool& continue_flag) {
                  (void)continue_flag;
                  Key actual_key{__builtin_bswap64(*(reinterpret_cast<const uint64_t*>(key.s)))};
                  kv_map.emplace(actual_key, val);
@@ -174,15 +175,15 @@ public:
         }
     }
 
-    uint64_t get_version_value(TableID table_id, const MT::leaf_type* node) {
+    uint64_t get_version_value(TableID table_id, const typename MT::leaf_type* node) {
         auto& mt = indexes[table_id];
         mt.thread_init(0);
         return mt.get_version_value(node);
     }
 
     // Other
-    static Index& get_index() {
-        static Index idx;
+    static MasstreeIndexes<Value>& get_index() {
+        static MasstreeIndexes<Value> idx;
         return idx;
     }
 
