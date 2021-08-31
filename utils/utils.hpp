@@ -106,3 +106,6 @@ void constexpr_for(F func) {
 
 template <typename T>
 constexpr bool false_v = false;
+
+template <typename... Args>
+void unused(Args&&...) {}

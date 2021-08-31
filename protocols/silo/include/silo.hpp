@@ -612,7 +612,7 @@ public:
             }
         }
 
-        commit_tw.epoch = load_acquire(EpochManager<Silo>::get_global_epoch());
+        commit_tw.epoch = load_acquire(EpochManager<Silo<Index>>::get_global_epoch());
         LOG_INFO("  SERIAL POINT (se: %u, ce: %u)", starting_epoch, commit_tw.epoch);
 
         // Phase 2.1 (Validate ReadSet)

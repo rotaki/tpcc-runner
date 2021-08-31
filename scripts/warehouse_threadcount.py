@@ -12,8 +12,8 @@ NUM_EXPERIMENTS_PER_SETUP = 5
 NUM_SECONDS = 3
 
 def gen_setups():
-    protocols = ["silo"]
-    threads = [1, 2, 10, 20, 30]
+    protocols = ["silo", "nowait"]
+    threads = [1, 5, 10, 15, 20, 25, 30]
     return [[protocol, thread] for protocol in protocols for thread in threads]
 
 def build():
@@ -116,6 +116,8 @@ def plot_all():
     ax2.set_xlabel("Thread Count")
     ax1.set_ylabel("Throughput (Million txns/s)")
     ax2.set_ylabel("Abort Rate")
+    ax1.set_title("Thread Count = Num Warehouse")
+    ax2.set_title("Thread Count = Num Warehouse")
     ax1.grid()
     ax2.grid()
     fig.legend(loc="upper center", ncol=len(throughputs.keys()))

@@ -2,7 +2,7 @@
 
 #include "protocols/common/memory_allocator.hpp"
 #include "protocols/common/schema.hpp"
-#include "protocols/silo/include/value.hpp"
+#include "protocols/nowait/include/value.hpp"
 #include "protocols/tpcc_common/record_misc.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/record_key.hpp"
@@ -13,15 +13,9 @@ template <typename Index>
 class Initializer {
 private:
     static void insert_into_index(TableID table_id, uint64_t key, void* rec) {
-        TidWord tw;
-        tw.lock = 0;
-        tw.latest = 1;
-        tw.absent = 0;
-        tw.tid = 0;
-        tw.epoch = 0;
         Value* val = reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
         val->rec = rec;
-        val->tidword.obj = tw.obj;
+        val->rwl.initialize();
         Index::get_index().insert(table_id, key, val);
     }
 
@@ -182,6 +176,7 @@ private:
         }
     }
 
+
 public:
     static void load_all_tables() {
         Schema& sch = Schema::get_mutable_schema();
@@ -194,6 +189,17 @@ public:
         sch.set_record_size(get_id<OrderSecondary>(), sizeof(OrderSecondary));
         sch.set_record_size(get_id<OrderLine>(), sizeof(OrderLine));
         sch.set_record_size(get_id<NewOrder>(), sizeof(NewOrder));
+
+        // Insert sentinel
+        insert_into_index(get_id<Item>(), UINT64_MAX, nullptr);
+        insert_into_index(get_id<Warehouse>(), UINT64_MAX, nullptr);
+        insert_into_index(get_id<Stock>(), UINT64_MAX, nullptr);
+        insert_into_index(get_id<District>(), UINT64_MAX, nullptr);
+        insert_into_index(get_id<Customer>(), UINT64_MAX, nullptr);
+        insert_into_index(get_id<Order>(), UINT64_MAX, nullptr);
+        insert_into_index(get_id<OrderSecondary>(), UINT64_MAX, nullptr);
+        insert_into_index(get_id<OrderLine>(), UINT64_MAX, nullptr);
+        insert_into_index(get_id<NewOrder>(), UINT64_MAX, nullptr);
 
         load_items_table();
         load_warehouses_table();

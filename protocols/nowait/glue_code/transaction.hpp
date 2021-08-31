@@ -95,8 +95,8 @@ public:
 
     template <typename Record>
     Result prepare_record_for_delete(const Record*& rec_ptr, typename Record::Key rec_key) {
-        rec_ptr =
-            reinterpret_cast<Record*>(protocol->remove(get_id<Record>(), rec_key.get_raw_key()));
+        rec_ptr = reinterpret_cast<const Record*>(
+            protocol->remove(get_id<Record>(), rec_key.get_raw_key()));
         return rec_ptr == nullptr ? Result::ABORT : Result::SUCCESS;
     }
 
@@ -160,17 +160,17 @@ public:
         OrderSecondary::Key o_sec_high_key =
             OrderSecondary::Key::create_key(w_id, d_id, c_id + 1, 0);
         std::map<uint64_t, void*> kr_map;
+
         bool scanned = protocol->read_scan(
-            get_id<OrderSecondary>(), o_sec_low_key.get_raw_key(), o_sec_high_key.get_raw_key(), 1,
-            true, kr_map);
+            get_id<OrderSecondary>(), o_sec_low_key.get_raw_key(), o_sec_high_key.get_raw_key(), -1,
+            false, kr_map);
 
         if (scanned) {
-            for (auto& [k, r]: kr_map) {
-                assert(r);
-                auto o_sec = reinterpret_cast<OrderSecondary*>(r);
-                Order::Key o_key = o_sec->key;
-                return get_record(o, o_key);
-            }
+            auto iter = kr_map.rbegin();
+            assert(iter->second);
+            auto o_sec = reinterpret_cast<OrderSecondary*>(iter->second);
+            Order::Key o_key = o_sec->key;
+            return get_record(o, o_key);
             assert(false);
         }
         return Result::ABORT;

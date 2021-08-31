@@ -110,7 +110,7 @@ endfunction()
 
 set(CC_ALG
   "NAIVE"
-  CACHE STRING "NAIVE, SILO")
+  CACHE STRING "NAIVE, SILO, NOWAIT")
 
 # CC specific paramters
 set(CC_EXECUTABLE "")
@@ -123,9 +123,9 @@ if ("${CC_ALG}" STREQUAL "NAIVE")
   set(CMAKE_CXX_STANDARD 20)
   list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
   list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/naive.cpp")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/naive/include")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/naive/src")
-  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/naive/include/*.hpp" "${PROJECT_SOURCE_DIR}/naive/src/*.cpp")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/naive/include")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/naive/src")
+  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/protocols/naive/include/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/naive/src/*.cpp")
   list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/naive")
 elseif ("${CC_ALG}" STREQUAL "SILO")
   set(CMAKE_CXX_STANDARD 17)
@@ -133,12 +133,24 @@ elseif ("${CC_ALG}" STREQUAL "SILO")
   add_dep(masstree https://github.com/kohler/masstree-beta.git master)
   list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/silo.cpp")
   list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/silo/glue_code")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/silo/include")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/silo/src")
-  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/silo/glue_code/*.hpp" "${PROJECT_SOURCE_DIR}/silo/include/*.hpp" "${PROJECT_SOURCE_DIR}/silo/src/*.cpp")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/silo/glue_code")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/silo/include")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/silo/src")
+  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/protocols/silo/glue_code/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/silo/include/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/silo/src/*.cpp")
   list(APPEND CC_LINK_LIBRARIES "masstree")
   list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/silo")
+elseif ("${CC_ALG}" STREQUAL "NOWAIT")
+  set(CMAKE_CXX_STANDARD 17)
+  list(APPEND COMMON_COMPILE_FLAGS "-W" "-Wall" "-fPIC")
+  add_dep(masstree https://github.com/kohler/masstree-beta.git master)
+  list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/nowait.cpp")
+  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/nowait/glue_code")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/nowait/include")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/nowait/src")
+  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/protocols/nowait/glue_code/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/nowait/include/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/nowait/src/*.cpp")
+  list(APPEND CC_LINK_LIBRARIES "masstree")
+  list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/nowait")
 endif()
 
 add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
@@ -149,6 +161,7 @@ add_dep(googletest https://github.com/google/googletest.git master)
 ###############################################################################
 
 set(TPCCRUNNER_COMPILE_DEFINITIONS "")
+list(APPEND TPCCRUNNER_COMPILE_DEFINITIONS "-DLOG_LEVEL=${LOG_LEVEL}")
 list(APPEND TPCCRUNNER_COMPILE_OPTIONS ${COMMON_COMPILE_FLAGS})
 
 set(TPCCRUNNER_LINK_OPTIONS "")
