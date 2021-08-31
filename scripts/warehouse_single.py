@@ -121,8 +121,8 @@ def plot_all():
     ax1.grid()
     ax2.grid()
     fig.legend(loc="upper center", ncol=len(throughputs.keys()))
-    fig.savefig("./plots/throughput.pdf")
-    print("throughput.pdf is saved in ./build/bin/res/plots/")
+    fig.savefig("./plots/warehouse_single.pdf")
+    print("warehouse_single.pdf is saved in ./build/bin/res/plots/")
     os.chdir("../../../") # go back to base directory
 
 if __name__ == "__main__":
