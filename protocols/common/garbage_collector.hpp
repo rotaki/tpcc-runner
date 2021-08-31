@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <map>
 
-#include "common/memory_allocator.hpp"
+#include "protocols/common/memory_allocator.hpp"
 #include "utils/logger.hpp"
 
 class GarbageCollector {

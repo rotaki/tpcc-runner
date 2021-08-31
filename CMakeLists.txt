@@ -270,9 +270,8 @@ else()
     ${CMAKE_CURRENT_SOURCE_DIR}/test
     ${CMAKE_CURRENT_SOURCE_DIR}/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/executables
-    ${CMAKE_CURRENT_SOURCE_DIR}/naive
-    ${CMAKE_CURRENT_SOURCE_DIR}/silo
-    ${CMAKE_CURRENT_SOURCE_DIR}/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/protocols
+    ${CMAKE_CURRENT_SOURCE_DIR}/indexes
     -i                          # format file instead of printing diff
     -q
     USES_TERMINAL
@@ -287,9 +286,8 @@ else()
     ${CMAKE_CURRENT_SOURCE_DIR}/test
     ${CMAKE_CURRENT_SOURCE_DIR}/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/executables
-    ${CMAKE_CURRENT_SOURCE_DIR}/naive
-    ${CMAKE_CURRENT_SOURCE_DIR}/silo
-    ${CMAKE_CURRENT_SOURCE_DIR}/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/protocols
+    ${CMAKE_CURRENT_SOURCE_DIR}/indexes
     USES_TERMINAL
     )
 

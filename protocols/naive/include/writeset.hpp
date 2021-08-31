@@ -1,7 +1,7 @@
 #pragma once
-#include "naive/include/cache.hpp"
-#include "naive/include/database.hpp"
-#include "naive/include/type_tuple.hpp"
+#include "protocols/naive/include/cache.hpp"
+#include "protocols/naive/include/database.hpp"
+#include "protocols/naive/include/type_tuple.hpp"
 #include "tpcc/include/record_layout.hpp"
 #include "utils/logger.hpp"
 

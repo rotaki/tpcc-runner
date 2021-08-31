@@ -1,9 +1,9 @@
 #pragma once
 
-#include "common/memory_allocator.hpp"
-#include "common/schema.hpp"
-#include "silo/glue_code/record_misc.hpp"
-#include "silo/include/value.hpp"
+#include "protocols/common/memory_allocator.hpp"
+#include "protocols/common/schema.hpp"
+#include "protocols/silo/glue_code/record_misc.hpp"
+#include "protocols/silo/include/value.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/record_key.hpp"
 #include "tpcc/include/record_layout.hpp"

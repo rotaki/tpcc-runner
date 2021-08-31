@@ -1,6 +1,6 @@
 #include "gtest/gtest.h"
-#include "naive/include/database.hpp"
-#include "naive/include/initializer.hpp"
+#include "protocols/naive/include/database.hpp"
+#include "protocols/naive/include/initializer.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/record_key.hpp"
 #include "tpcc/include/record_layout.hpp"

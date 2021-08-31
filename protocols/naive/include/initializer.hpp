@@ -2,7 +2,7 @@
 
 #include <utility>
 
-#include "naive/include/database.hpp"
+#include "protocols/naive/include/database.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/record_key.hpp"
 #include "tpcc/include/record_layout.hpp"

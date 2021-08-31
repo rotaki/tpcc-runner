@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <thread>
+#include <vector>
 
 #include "utils/atomic_wrapper.hpp"
 #include "utils/logger.hpp"

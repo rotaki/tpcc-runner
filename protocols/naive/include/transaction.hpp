@@ -4,9 +4,9 @@
 #include <cassert>
 #include <deque>
 
-#include "naive/include/concurrency_manager.hpp"
-#include "naive/include/database.hpp"
-#include "naive/include/writeset.hpp"
+#include "protocols/naive/include/concurrency_manager.hpp"
+#include "protocols/naive/include/database.hpp"
+#include "protocols/naive/include/writeset.hpp"
 #include "utils/logger.hpp"
 
 

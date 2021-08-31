@@ -2,19 +2,20 @@
 
 #include <map>
 
-#include "index/masstree_wrapper.hpp"
+#include "indexes/masstree_wrapper.hpp"
 #include "utils/logger.hpp"
 
 using Key = uint64_t;
 
-template<typename Value>
+template <typename Value>
 class MasstreeIndexes {
 public:
     using MT = MasstreeWrapper<Value>;
     using KVMap = std::map<Key, Value*>;
     using NodeInfo = typename MT::node_info_t;
     using NodeMap =
-        std::unordered_map<const typename MT::leaf_type*, uint64_t>;  // key: node pointer, value: version
+        std::unordered_map<const typename MT::leaf_type*, uint64_t>;  // key: node pointer, value:
+                                                                      // version
 
     enum Result {
         OK = 0,

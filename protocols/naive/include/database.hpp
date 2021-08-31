@@ -9,8 +9,8 @@
 #include <unordered_map>
 #include <vector>
 
-#include "naive/include/cache.hpp"
-#include "naive/include/type_tuple.hpp"
+#include "protocols/naive/include/cache.hpp"
+#include "protocols/naive/include/type_tuple.hpp"
 #include "tpcc/include/record_key.hpp"
 #include "tpcc/include/record_layout.hpp"
 #include "utils/logger.hpp"

@@ -6,11 +6,11 @@
 #include <unordered_map>
 #include <utility>
 
-#include "common/epoch_manager.hpp"
-#include "common/garbage_collector.hpp"
-#include "common/schema.hpp"
-#include "silo/include/readwriteset.hpp"
-#include "silo/include/value.hpp"
+#include "protocols/common/epoch_manager.hpp"
+#include "protocols/common/garbage_collector.hpp"
+#include "protocols/common/schema.hpp"
+#include "protocols/silo/include/readwriteset.hpp"
+#include "protocols/silo/include/value.hpp"
 
 template <typename Index>
 class Silo {

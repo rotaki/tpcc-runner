@@ -3,8 +3,8 @@
 #include <string>
 #include <thread>
 
-#include "naive/include/initializer.hpp"
-#include "naive/include/transaction.hpp"
+#include "protocols/naive/include/initializer.hpp"
+#include "protocols/naive/include/transaction.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/tx_runner.hpp"
 #include "tpcc/include/tx_utils.hpp"

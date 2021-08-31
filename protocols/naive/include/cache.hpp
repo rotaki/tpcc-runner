@@ -5,7 +5,7 @@
 #include <stdexcept>
 
 #include "mimalloc/include/mimalloc-new-delete.h"
-#include "naive/include/type_tuple.hpp"
+#include "protocols/naive/include/type_tuple.hpp"
 #include "tpcc/include/record_layout.hpp"
 
 template <typename Record>

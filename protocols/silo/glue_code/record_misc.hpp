@@ -3,7 +3,6 @@
 #include <deque>
 #include <map>
 
-#include "silo/include/value.hpp"
 #include "tpcc/include/record_key.hpp"
 #include "tpcc/include/record_layout.hpp"
 

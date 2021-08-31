@@ -6,8 +6,8 @@
 #include <cassert>
 #include <deque>
 
-#include "common/epoch_manager.hpp"
-#include "silo/glue_code/record_misc.hpp"
+#include "protocols/common/epoch_manager.hpp"
+#include "protocols/silo/glue_code/record_misc.hpp"
 #include "tpcc/include/record_key.hpp"
 #include "tpcc/include/record_layout.hpp"
 

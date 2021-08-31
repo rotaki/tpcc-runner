@@ -1,15 +1,15 @@
-#include "silo/include/silo.hpp"
+#include "protocols/silo/include/silo.hpp"
 
 #include <unistd.h>
 
 #include <string>
 #include <thread>
 
-#include "common/epoch_manager.hpp"
-#include "index/masstree.hpp"
-#include "silo/glue_code/initializer.hpp"
-#include "silo/glue_code/transaction.hpp"
-#include "silo/include/value.hpp"
+#include "indexes/masstree.hpp"
+#include "protocols/common/epoch_manager.hpp"
+#include "protocols/silo/glue_code/initializer.hpp"
+#include "protocols/silo/glue_code/transaction.hpp"
+#include "protocols/silo/include/value.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/tx_runner.hpp"
 #include "tpcc/include/tx_utils.hpp"
