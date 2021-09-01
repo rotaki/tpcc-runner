@@ -12,7 +12,6 @@ class MasstreeIndexes {
 public:
     using Key = uint64_t;
     using MT = MasstreeWrapper<Value>;
-    using KVMap = std::map<Key, Value*>;
     using NodeInfo = typename MT::node_info_t;
     using NodeMap =
         std::unordered_map<const typename MT::leaf_type*, uint64_t>;  // key: node pointer, value:
@@ -116,7 +115,8 @@ public:
     }
 
     // [lkey --> rkey)
-    Result get_kv_in_range(TableID table_id, Key lkey, Key rkey, int64_t count, KVMap& kv_map) {
+    Result get_kv_in_range(
+        TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map) {
         auto& mt = indexes[table_id];
         mt.thread_init(0);
         Key lkey_buf = byte_swap(lkey);
@@ -143,7 +143,8 @@ public:
 
     // [lkey --> rkey) with NodeInfo
     Result get_kv_in_range(
-        TableID table_id, Key lkey, Key rkey, int64_t count, KVMap& kv_map, NodeMap& nm) {
+        TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map,
+        NodeMap& nm) {
         auto& mt = indexes[table_id];
         mt.thread_init(0);
         Key lkey_buf = byte_swap(lkey);
@@ -178,7 +179,8 @@ public:
     }
 
     // (lkey <-- rkey]
-    Result get_kv_in_rev_range(TableID table_id, Key lkey, Key rkey, int64_t count, KVMap& kv_map) {
+    Result get_kv_in_rev_range(
+        TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map) {
         auto& mt = indexes[table_id];
         mt.thread_init(0);
         Key lkey_buf = byte_swap(lkey);
@@ -205,7 +207,8 @@ public:
 
     // (lkey <-- rkey] with NodeInfo
     Result get_kv_in_rev_range(
-        TableID table_id, Key lkey, Key rkey, int64_t count, KVMap& kv_map, NodeMap& nm) {
+        TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map,
+        NodeMap& nm) {
         auto& mt = indexes[table_id];
         mt.thread_init(0);
         Key lkey_buf = byte_swap(lkey);

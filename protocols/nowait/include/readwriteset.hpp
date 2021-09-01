@@ -15,10 +15,11 @@ struct ReadWriteElement {
         , rwt(rwt)
         , is_new(is_new)
         , val(val){};
-    Rec* rec = nullptr;
+    Rec* rec = nullptr;  // nullptr when rwt is READ or DELETE
+                         // points to local record when rwt is UPDATE or INSERT
     ReadWriteType rwt = READ;
-    bool is_new;
-    Value* val;
+    bool is_new;  // if newly inserted
+    Value* val;   // pointer to index
 };
 
 

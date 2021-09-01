@@ -1,8 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <cstring>
-#include <map>
 #include <set>
 #include <stdexcept>
 #include <unordered_map>
@@ -31,95 +31,50 @@ public:
         LOG_INFO("START Tx, e: %u", starting_epoch);
     }
 
-    ~Silo() {
-        for (TableID table_id: tables) {
-            auto& rs_table = rs.get_table(table_id);
-            auto& ws_table = ws.get_table(table_id);
-            auto& vs_table = vs.get_table(table_id);
-            auto& nm = ns.get_nodemap(table_id);
-
-            for (auto r_iter = rs_table.begin(); r_iter != rs_table.end(); r_iter++) {
-                // Deallocate ReadSet that is not in WriteSet
-                if (ws_table.find(r_iter->first) == ws_table.end())
-                    GarbageCollector::collect(starting_epoch, r_iter->second.rec);
-            }
-
-            ws_table.clear();
-            rs_table.clear();
-            vs_table.clear();
-            nm.clear();
-        }
-        GarbageCollector::remove(starting_epoch);
-    }
+    ~Silo() { GarbageCollector::remove(starting_epoch); }
 
     const Rec* read(TableID table_id, Key key) {
         LOG_INFO("READ (e: %u, t: %lu, k: %lu)", starting_epoch, table_id, key);
 
-        const Schema& sch = Schema::get_schema();
         Index& idx = Index::get_index();
-
-        size_t record_size = sch.get_record_size(table_id);
         tables.insert(table_id);
-        auto& rs_table = rs.get_table(table_id);
-        auto rs_iter = rs_table.find(key);
-        auto& ws_table = ws.get_table(table_id);
-        auto ws_iter = ws_table.find(key);
-        auto& vs_table = vs.get_table(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        auto rw_iter = rw_table.find(key);
         auto& nm = ns.get_nodemap(table_id);
 
-        if (rs_iter == rs_table.end() && ws_iter == ws_table.end()) {
-            // key is not in local set (read/write set)
-            // 1. find key from shared index and abort if not found
+        if (rw_iter == rw_table.end()) {
+            // Abort if key is not found in index
             Value* val;
             typename Index::Result res = idx.find(table_id, key, val, nm);
-
-            if (res == Index::Result::NOT_FOUND) return nullptr;  // abort
-
-            // 2. copy record and tidword from shared memory
-            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-
+            if (res == Index::Result::NOT_FOUND) return nullptr;
+            // Read record pointer and tidword from index
+            Rec* rec = nullptr;
             TidWord tw;
-            read_record_and_tidword(*val, rec, tw, record_size);
-
-            if (!(tw.absent == 0 && tw.latest == 1)) {  // unable to read the value
-                MemoryAllocator::deallocate(rec);
-                return nullptr;
-            }
-
-            // 3. place it in readset
-            rs_table.emplace_hint(
-                rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, tw));
-
-            // 4. place it in validationset
-            vs_table[key] = val;
-
+            get_record_pointer(*val, rec, tw);
+            // Null check
+            if (!is_readable(tw)) return nullptr;
+            rw_table.emplace_hint(
+                rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(nullptr, tw, ReadWriteType::READ, false, val));
             return rec;
-        } else if (rs_iter == rs_table.end() && ws_iter != ws_table.end()) {
-            // key is not in readset but is in writeset
-            // -> key is in validation set (whether it is insert or update)
-            auto vs_iter = vs_table.find(key);
-            assert(vs_iter != vs_table.end());
-            Rec* rec = ws_iter->second.rec;
-            TidWord tw;
-            // copy tidword from shared memory
-            read_tidword(*(vs_iter->second), tw);
-            if (!(tw.absent == 0 && tw.latest == 1)) return nullptr;  // unable to read the value
-            rs_table.emplace_hint(
-                rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, tw));
-            return rec;
-        } else if (rs_iter != rs_table.end() && ws_iter == ws_table.end()) {
-            return rs_iter->second.rec;
-        } else if (
-            rs_iter != rs_table.end() && ws_iter != ws_table.end()
-            && ws_iter->second.wt == WriteType::DELETE) {
-            return nullptr;  // abort
-        } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
-            return rs_iter->second.rec;
         }
-        assert(false);
-        return nullptr;
+
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ) {
+            // Read record poitner and tidword from index
+            Rec* rec = nullptr;
+            TidWord tw;
+            get_record_pointer(*(rw_iter->second.val), rec, tw);
+            if (!is_same(tw, rw_iter->second.tw)) return nullptr;
+            return rec;
+        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+            if (!is_tidword_latest(*(rw_iter->second.val), rw_iter->second.tw)) return nullptr;
+            return rw_iter->second.rec;
+        } else if (rwt == ReadWriteType::DELETE) {
+            return nullptr;
+        } else {
+            throw std::runtime_error("invalid state");
+        }
     }
 
     Rec* insert(TableID table_id, Key key) {
@@ -130,65 +85,57 @@ public:
 
         tables.insert(table_id);
         size_t record_size = sch.get_record_size(table_id);
-
-        auto& rs_table = rs.get_table(table_id);
-        auto rs_iter = rs_table.find(key);
-        auto& ws_table = ws.get_table(table_id);
-        auto ws_iter = ws_table.find(key);
-        auto& vs_table = vs.get_table(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        auto rw_iter = rw_table.find(key);
         auto& nm = ns.get_nodemap(table_id);
 
-        if (rs_iter == rs_table.end() && ws_iter == ws_table.end()) {
-            assert(vs_table.find(key) == vs_table.end());
+        if (rw_iter == rw_table.end()) {
             Value* val;
             typename Index::Result res = idx.find(table_id, key, val);
             if (res == Index::Result::OK) return nullptr;  // abort
-            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+
             Value* new_val =
                 reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
             new_val->rec = nullptr;
             new_val->tidword.obj = 0;
             new_val->tidword.latest = 1;  // exist in index
             new_val->tidword.absent = 1;  // cannot be seen by others
-
             res = idx.insert(table_id, key, new_val, nm);
+
             if (res == Index::Result::NOT_INSERTED) {
                 MemoryAllocator::deallocate(new_val);
-                MemoryAllocator::deallocate(rec);
-                return nullptr;  // abort
-            } else if (res == Index::Result::BAD_INSERT) {
                 return nullptr;  // abort
             }
 
-            assert(res == Index::Result::OK);
-            ws_table.emplace_hint(
-                ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, WriteType::INSERT, true));
-            vs_table.emplace(key, new_val);
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            auto new_iter = rw_table.emplace_hint(
+                rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(rec, new_val->tidword, ReadWriteType::INSERT, true, new_val));
+
+            auto& w_table = ws.get_table(table_id);
+            w_table.emplace_back(key, new_iter);
+
+            if (res == Index::Result::BAD_INSERT) return nullptr;
 
             return rec;
-        } else if (rs_iter == rs_table.end() && ws_iter != ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            return nullptr;  // abort
-        } else if (rs_iter != rs_table.end() && ws_iter == ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            return nullptr;  // abort
-        } else if (
-            rs_iter != rs_table.end() && ws_iter != ws_table.end()
-            && ws_iter->second.wt == WriteType::DELETE) {
-            assert(vs_table.find(key) != vs_table.end());
-            assert(rs_iter->second.rec == ws_iter->second.rec);
-            Rec* rec = ws_iter->second.rec;
-            ::memset(rec, 0, record_size);  // clear contents
-            ws_iter->second.wt = WriteType::UPDATE;
-            return rec;
-        } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            return nullptr;  // abort
         }
 
-        assert(false);
-        return nullptr;
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ || rwt == ReadWriteType::UPDATE
+            || rwt == ReadWriteType::INSERT) {
+            return nullptr;
+        } else if (rwt == ReadWriteType::DELETE) {
+            assert(rw_iter->second.rec == nullptr);
+            // Check if tidword stored locally is the latest
+            if (!is_tidword_latest(*(rw_iter->second.val), rw_iter->second.tw)) return nullptr;
+            // Allocate memory for write
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            rw_iter->second.rec = rec;
+            rw_iter->second.rwt = ReadWriteType::UPDATE;
+            return rec;
+        } else {
+            throw std::runtime_error("invalid state");
+        }
     }
 
     Rec* update(TableID table_id, Key key) {
@@ -199,62 +146,60 @@ public:
 
         tables.insert(table_id);
         size_t record_size = sch.get_record_size(table_id);
-        auto& rs_table = rs.get_table(table_id);
-        auto rs_iter = rs_table.find(key);
-        auto& ws_table = ws.get_table(table_id);
-        auto ws_iter = ws_table.find(key);
-        auto& vs_table = vs.get_table(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        auto rw_iter = rw_table.find(key);
 
-        if (rs_iter == rs_table.end() && ws_iter == ws_table.end()) {
-            assert(vs_table.find(key) == vs_table.end());
+        if (rw_iter == rw_table.end()) {
+            // Abort if key not found in index
             Value* val;
             typename Index::Result res = idx.find(table_id, key, val);
-
             if (res == Index::Result::NOT_FOUND) return nullptr;
+            // Copy record and tidword from index
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-
             TidWord tw;
-
-            read_record_and_tidword(*val, rec, tw, record_size);
-
-            if (!(tw.absent == 0 && tw.latest == 1)) {  // unable to read the value
+            copy_record(*val, rec, tw, record_size);
+            // Null check
+            if (!is_readable(tw)) {
                 MemoryAllocator::deallocate(rec);
                 return nullptr;
             }
-
-            rs_table.emplace_hint(
-                rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, tw));
-
-            ws_table.emplace_hint(
-                ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, WriteType::UPDATE, false));
-
-            vs_table.emplace(key, val);
-
+            // Place it in readwrite set
+            auto new_iter = rw_table.emplace_hint(
+                rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(rec, tw, ReadWriteType::UPDATE, false, val));
+            // Place it in write set
+            auto& w_table = ws.get_table(table_id);
+            w_table.emplace_back(key, new_iter);
             return rec;
-        } else if (rs_iter == rs_table.end() && ws_iter != ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            return ws_iter->second.rec;
-        } else if (rs_iter != rs_table.end() && ws_iter == ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            Rec* rec = rs_iter->second.rec;
-            ws_table.emplace_hint(
-                ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, WriteType::UPDATE, false));
-            return rec;
-        } else if (
-            rs_iter != rs_table.end() && ws_iter != ws_table.end()
-            && ws_iter->second.wt == WriteType::DELETE) {
-            assert(vs_table.find(key) != vs_table.end());
-            return nullptr;  // abort
-        } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            return ws_iter->second.rec;
         }
 
-        assert(false);
-        return nullptr;
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ) {
+            assert(rw_iter->second.rec == nullptr);
+            // Local set will point to allocated record
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            TidWord tw;
+            copy_record(*rw_iter->second.val, rec, tw, record_size);
+            // Check if tidword stored locally is the latest
+            if (!is_same(tw, rw_iter->second.tw)) {
+                MemoryAllocator::deallocate(rec);
+                return nullptr;
+            }
+            rw_iter->second.rec = rec;
+            rw_iter->second.rwt = ReadWriteType::UPDATE;
+            // Place it in writeset
+            auto& w_table = ws.get_table(table_id);
+            w_table.emplace_back(key, rw_iter);
+            return rec;
+        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+            // Check if tidword stored locally is the latest
+            if (!is_tidword_latest(*(rw_iter->second.val), rw_iter->second.tw)) return nullptr;
+            return rw_iter->second.rec;
+        } else if (rwt == ReadWriteType::DELETE) {
+            return nullptr;
+        } else {
+            throw std::runtime_error("invalid state");
+        }
     }
 
     Rec* upsert(TableID table_id, Key key) {
@@ -263,21 +208,18 @@ public:
         const Schema& sch = Schema::get_schema();
         Index& idx = Index::get_index();
 
-        size_t record_size = sch.get_record_size(table_id);
         tables.insert(table_id);
-        auto& rs_table = rs.get_table(table_id);
-        auto rs_iter = rs_table.find(key);
-        auto& ws_table = ws.get_table(table_id);
-        auto ws_iter = ws_table.find(key);
-        auto& vs_table = vs.get_table(table_id);
+        size_t record_size = sch.get_record_size(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        auto rw_iter = rw_table.find(key);
         auto& nm = ns.get_nodemap(table_id);
 
-        if (rs_iter == rs_table.end() && ws_iter == ws_table.end()) {
+        if (rw_iter == rw_table.end()) {
             Value* val;
-            typename Index::Result res = idx.find(table_id, key, val, nm);
+            typename Index::Result res = idx.find(table_id, key, val);
+
             if (res == Index::Result::NOT_FOUND) {
-                // INSERT into index
-                Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+                // Insert if not found in index
                 Value* new_val =
                     reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
                 new_val->rec = nullptr;
@@ -288,67 +230,83 @@ public:
                 res = idx.insert(table_id, key, new_val, nm);
                 if (res == Index::Result::NOT_INSERTED) {
                     MemoryAllocator::deallocate(new_val);
-                    MemoryAllocator::deallocate(rec);
-                    return nullptr;  // abort
-                } else if (res == Index::Result::BAD_INSERT) {
                     return nullptr;  // abort
                 }
 
-                assert(res == Index::Result::OK);
-                ws_table.emplace_hint(
-                    ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                    std::forward_as_tuple(rec, WriteType::INSERT, true));
-                vs_table.emplace(key, new_val);
+                Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+                auto new_iter = rw_table.emplace_hint(
+                    rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                    std::forward_as_tuple(
+                        rec, new_val->tidword, ReadWriteType::INSERT, true, new_val));
+
+                auto& w_table = ws.get_table(table_id);
+                w_table.emplace_back(key, new_iter);
+
+                if (res == Index::Result::BAD_INSERT) return nullptr;
 
                 return rec;
-            } else {
-                assert(res == Index::Result::OK);
-                // UPDATE
+            } else if (res == Index::Result::OK) {
+                // Update if found in index
+                // Copy record and tidword from index
                 Rec* rec = MemoryAllocator::aligned_allocate(record_size);
                 TidWord tw;
-                read_record_and_tidword(*val, rec, tw, record_size);
-
-                if (!(tw.absent == 0 && tw.latest == 1)) {  // unable to read the value
+                copy_record(*val, rec, tw, record_size);
+                // Null check
+                if (!is_readable(tw)) {
                     MemoryAllocator::deallocate(rec);
                     return nullptr;
                 }
-
-                rs_table.emplace_hint(
-                    rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                    std::forward_as_tuple(rec, tw));
-                ws_table.emplace_hint(
-                    ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                    std::forward_as_tuple(rec, WriteType::UPDATE, false));
-                vs_table.emplace(key, val);
+                // Place it in readwrite set
+                auto new_iter = rw_table.emplace_hint(
+                    rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                    std::forward_as_tuple(rec, tw, ReadWriteType::UPDATE, false, val));
+                // Place it in write set
+                auto& w_table = ws.get_table(table_id);
+                w_table.emplace_back(key, new_iter);
 
                 return rec;
+            } else {
+                throw std::runtime_error("invalid state");
             }
-        } else if (rs_iter == rs_table.end() && ws_iter != ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            return ws_iter->second.rec;
-        } else if (rs_iter != rs_table.end() && ws_iter == ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            Rec* rec = rs_iter->second.rec;
-            ws_table.emplace_hint(
-                ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, WriteType::UPDATE, false));
-            return rec;
-        } else if (
-            rs_iter != rs_table.end() && ws_iter != ws_table.end()
-            && ws_iter->second.wt == WriteType::DELETE) {
-            assert(vs_table.find(key) != vs_table.end());
-            assert(rs_iter->second.rec == ws_iter->second.rec);
-            Rec* rec = ws_iter->second.rec;
-            memset(rec, 0, record_size);  // clear contents
-            ws_iter->second.wt = WriteType::UPDATE;
-            return rec;
-        } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            return ws_iter->second.rec;
         }
 
-        assert(false);
-        return nullptr;
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ) {
+            assert(rw_iter->second.rec == nullptr);
+            // Local set will point to allocated record
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            TidWord tw;
+            copy_record(*rw_iter->second.val, rec, tw, record_size);
+
+            // Check if tidword stored locally is the latest
+            if (!is_same(tw, rw_iter->second.tw)) {
+                MemoryAllocator::deallocate(rec);
+                return nullptr;
+            }
+            rw_iter->second.rec = rec;
+            rw_iter->second.rwt = ReadWriteType::UPDATE;
+
+            // Place it in writeset
+            auto& w_table = ws.get_table(table_id);
+            w_table.emplace_back(key, rw_iter);
+
+            return rec;
+        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+            // Check if tidword stored locally is the latest
+            if (!is_tidword_latest(*(rw_iter->second.val), rw_iter->second.tw)) return nullptr;
+            return rw_iter->second.rec;
+        } else if (rwt == ReadWriteType::DELETE) {
+            assert(rw_iter->second.rec == nullptr);
+            // Check if tidword stored locally is the latest
+            if (!is_tidword_latest(*(rw_iter->second.val), rw_iter->second.tw)) return nullptr;
+            // Allocate memory for write
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            rw_iter->second.rec = rec;
+            rw_iter->second.rwt = ReadWriteType::UPDATE;
+            return rec;
+        } else {
+            throw std::runtime_error("invalid state");
+        }
     }
 
     bool read_scan(
@@ -357,19 +315,13 @@ public:
         LOG_INFO(
             "READ_SCAN (e: %u, t: %lu, lk: %lu, rk: %lu, c: %ld)", starting_epoch, table_id, lkey,
             rkey, count);
-        const Schema& sch = Schema::get_schema();
         Index& idx = Index::get_index();
 
         tables.insert(table_id);
-
-        size_t record_size = sch.get_record_size(table_id);
-        auto& rs_table = rs.get_table(table_id);
-        auto& ws_table = ws.get_table(table_id);
-        auto& vs_table = vs.get_table(table_id);
+        auto& rw_table = rws.get_table(table_id);
         auto& nm = ns.get_nodemap(table_id);
 
-        typename Index::KVMap kv_map;
-
+        std::map<Key, Value*> kv_map;
         typename Index::Result res;
         if (reverse) {
             res = idx.get_kv_in_rev_range(table_id, lkey, rkey, count, kv_map, nm);
@@ -379,55 +331,39 @@ public:
         if (res == Index::Result::BAD_SCAN) return false;
 
         for (auto& [key, val]: kv_map) {
-            auto rs_iter = rs_table.find(key);
-            auto ws_iter = ws_table.find(key);
+            auto rw_iter = rw_table.find(key);
 
-            // do read
-            if (rs_iter == rs_table.end() && ws_iter == ws_table.end()) {
-                if (val == nullptr) return false;  // abort
-
-                Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            if (rw_iter == rw_table.end()) {
+                // Read record pointer and tidword from index
+                Rec* rec = nullptr;
                 TidWord tw;
-                read_record_and_tidword(*val, rec, tw, record_size);
-                if (!(tw.absent == 0 && tw.latest == 1)) {  // unable to read the value
-                    MemoryAllocator::deallocate(rec);
-                    return false;
-                }
-                // 3. place it in readset
-                rs_table.emplace_hint(
-                    rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                    std::forward_as_tuple(rec, tw));
-
-                // 4. place it in validationset
-                vs_table[key] = val;
-
+                get_record_pointer(*val, rec, tw);
+                // Null check
+                if (!is_readable(tw)) return false;
+                // Place it into readwrite set
+                rw_table.emplace_hint(
+                    rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                    std::forward_as_tuple(nullptr, tw, ReadWriteType::READ, false, val));
                 kr_map.emplace(key, rec);
-                continue;
-            } else if (rs_iter == rs_table.end() && ws_iter != ws_table.end()) {
-                // key is not in readset but is in writeset
-                Rec* rec = ws_iter->second.rec;
-                TidWord tw;
-                // copy tidword from shared memory
-                read_tidword(*val, tw);
-                if (!(tw.absent == 0 && tw.latest == 1)) return false;  // unable to read the value
-                rs_table.emplace_hint(
-                    rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                    std::forward_as_tuple(rec, tw));
-                kr_map.emplace(key, rec);
-                continue;
-            } else if (rs_iter != rs_table.end() && ws_iter == ws_table.end()) {
-                kr_map.emplace(key, rs_iter->second.rec);
-                continue;
-            } else if (
-                rs_iter != rs_table.end() && ws_iter != ws_table.end()
-                && ws_iter->second.wt == WriteType::DELETE) {
-                return false;  // abort
-            } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
-                kr_map.emplace(key, rs_iter->second.rec);
                 continue;
             }
-            assert(false);
-            return false;
+
+            auto rwt = rw_iter->second.rwt;
+            if (rwt == ReadWriteType::READ) {
+                // Read record poitner and tidword from index
+                Rec* rec = nullptr;
+                TidWord tw;
+                get_record_pointer(*(rw_iter->second.val), rec, tw);
+                if (!is_same(tw, rw_iter->second.tw)) return false;
+                kr_map.emplace(key, rec);
+            } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+                if (!is_tidword_latest(*(rw_iter->second.val), rw_iter->second.tw)) return false;
+                kr_map.emplace(key, rw_iter->second.rec);
+            } else if (rwt == ReadWriteType::DELETE) {
+                return false;
+            } else {
+                throw std::runtime_error("invalid state");
+            }
         }
         return true;
     }
@@ -443,15 +379,11 @@ public:
         Index& idx = Index::get_index();
 
         tables.insert(table_id);
-
         size_t record_size = sch.get_record_size(table_id);
-        auto& rs_table = rs.get_table(table_id);
-        auto& ws_table = ws.get_table(table_id);
-        auto& vs_table = vs.get_table(table_id);
+        auto& rw_table = rws.get_table(table_id);
         auto& nm = ns.get_nodemap(table_id);
 
-        typename Index::KVMap kv_map;
-
+        std::map<Key, Value*> kv_map;
         typename Index::Result res;
         if (reverse) {
             res = idx.get_kv_in_rev_range(table_id, lkey, rkey, count, kv_map, nm);
@@ -461,54 +393,56 @@ public:
         if (res == Index::Result::BAD_SCAN) return false;
 
         for (auto& [key, val]: kv_map) {
-            auto rs_iter = rs_table.find(key);
-            auto ws_iter = ws_table.find(key);
+            auto rw_iter = rw_table.find(key);
 
-            // do update
-            if (rs_iter == rs_table.end() && ws_iter == ws_table.end()) {
-                if (val == nullptr) return false;
+            if (rw_iter == rw_table.end()) {
+                // Copy record and tidword from index
                 Rec* rec = MemoryAllocator::aligned_allocate(record_size);
                 TidWord tw;
-                read_record_and_tidword(*val, rec, tw, record_size);
-                if (!(tw.absent == 0 && tw.latest == 1)) {  // unable to read the value
+                copy_record(*val, rec, tw, record_size);
+                // Null check
+                if (!is_readable(tw)) {
                     MemoryAllocator::deallocate(rec);
                     return false;
                 }
-                rs_table.emplace_hint(
-                    rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                    std::forward_as_tuple(rec, tw));
-
-                ws_table.emplace_hint(
-                    ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                    std::forward_as_tuple(rec, WriteType::UPDATE, false));
-
-                vs_table.emplace(key, val);
+                // Place it in readwrite set
+                auto new_iter = rw_table.emplace_hint(
+                    rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                    std::forward_as_tuple(rec, tw, ReadWriteType::UPDATE, false, val));
+                // Place it in write set
+                auto& w_table = ws.get_table(table_id);
+                w_table.emplace_back(key, new_iter);
                 kr_map.emplace(key, rec);
-                continue;
-            } else if (rs_iter == rs_table.end() && ws_iter != ws_table.end()) {
-                assert(vs_table.find(key) != vs_table.end());
-                kr_map.emplace(key, ws_iter->second.rec);
-                continue;
-            } else if (rs_iter != rs_table.end() && ws_iter == ws_table.end()) {
-                assert(vs_table.find(key) != vs_table.end());
-                Rec* rec = rs_iter->second.rec;
-                ws_table.emplace_hint(
-                    ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                    std::forward_as_tuple(rec, WriteType::UPDATE, false));
-                kr_map.emplace(key, rec);
-                continue;
-            } else if (
-                rs_iter != rs_table.end() && ws_iter != ws_table.end()
-                && ws_iter->second.wt == WriteType::DELETE) {
-                assert(vs_table.find(key) != vs_table.end());
-                return false;  // abort
-            } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
-                assert(vs_table.find(key) != vs_table.end());
-                kr_map.emplace(key, ws_iter->second.rec);
                 continue;
             }
-            assert(false);
-            return false;
+
+            auto rwt = rw_iter->second.rwt;
+            if (rwt == ReadWriteType::READ) {
+                assert(rw_iter->second.rec == nullptr);
+                // Local set will point to allocated record
+                Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+                TidWord tw;
+                copy_record(*rw_iter->second.val, rec, tw, record_size);
+                // Check if tidword stored locally is the latest
+                if (!is_same(tw, rw_iter->second.tw)) {
+                    MemoryAllocator::deallocate(rec);
+                    return false;
+                }
+                rw_iter->second.rec = rec;
+                rw_iter->second.rwt = ReadWriteType::UPDATE;
+                // Place it in writeset
+                auto& w_table = ws.get_table(table_id);
+                w_table.emplace_back(key, rw_iter);
+                kr_map.emplace(key, rec);
+            } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+                if (!is_tidword_latest(*(rw_iter->second.val), rw_iter->second.tw)) return false;
+                kr_map.emplace(key, rw_iter->second.rec);
+            } else if (rwt == ReadWriteType::DELETE) {
+                assert(rw_iter->second.rec == nullptr);
+                return false;
+            } else {
+                throw std::runtime_error("invalid state");
+            }
         }
         return true;
     }
@@ -516,69 +450,66 @@ public:
     Rec* remove(TableID table_id, Key key) {
         LOG_INFO("REMOVE (e: %u, t: %lu, k: %lu)", starting_epoch, table_id, key);
 
-        const Schema& sch = Schema::get_schema();
         Index& idx = Index::get_index();
 
         tables.insert(table_id);
-        size_t record_size = sch.get_record_size(table_id);
-        auto& rs_table = rs.get_table(table_id);
-        auto rs_iter = rs_table.find(key);
-        auto& ws_table = ws.get_table(table_id);
-        auto ws_iter = ws_table.find(key);
-        auto& vs_table = vs.get_table(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        auto rw_iter = rw_table.find(key);
 
-        if (rs_iter == rs_table.end() && ws_iter == ws_table.end()) {
-            assert(vs_table.find(key) == vs_table.end());
+        if (rw_iter == rw_table.end()) {
+            // Abort if not found in index
             Value* val;
             typename Index::Result res = idx.find(table_id, key, val);
             if (res == Index::Result::NOT_FOUND) return nullptr;
 
-            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            // Read record pointer and tidword from index
+            Rec* rec = nullptr;
             TidWord tw;
-            read_record_and_tidword(*val, rec, tw, record_size);
-            if (!(tw.absent == 0 && tw.latest == 1)) {  // unable to read the value
-                MemoryAllocator::deallocate(rec);
-                return nullptr;
-            }
+            get_record_pointer(*val, rec, tw);
 
-            rs_table.emplace_hint(
-                rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, tw));
-            ws_table.emplace_hint(
-                ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, WriteType::DELETE, false));
-            vs_table.emplace(key, val);
+            // Null check
+            if (!is_readable(tw)) return nullptr;
+            auto new_iter = rw_table.emplace_hint(
+                rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(nullptr, tw, ReadWriteType::DELETE, false, val));
+
+            auto& w_table = ws.get_table(table_id);
+            w_table.emplace_back(key, new_iter);
+
             return rec;
-        } else if (rs_iter == rs_table.end() && ws_iter != ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            Value* val = vs_table.at(key);
-            TidWord tw;
-            read_tidword(*val, tw);
-            assert(tw.absent == 1 && tw.latest == 1);  // Previous operation should be INSERT
-            rs_table.emplace_hint(
-                rs_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(ws_iter->second.rec, tw));
-            ws_iter->second.wt = WriteType::DELETE;
-            return ws_iter->second.rec;
-        } else if (rs_iter != rs_table.end() && ws_iter == ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            Rec* rec = rs_iter->second.rec;
-            ws_table.emplace_hint(
-                ws_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(rec, WriteType::DELETE, false));
-            return rec;
-        } else if (
-            rs_iter != rs_table.end() && ws_iter != ws_table.end()
-            && ws_iter->second.wt == WriteType::DELETE) {
-            assert(vs_table.find(key) != vs_table.end());
-            return nullptr;  // abort
-        } else if (rs_iter != rs_table.end() && ws_iter != ws_table.end()) {
-            assert(vs_table.find(key) != vs_table.end());
-            ws_iter->second.wt = WriteType::DELETE;
-            return ws_iter->second.rec;
         }
-        assert(false);
-        return nullptr;
+
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ) {
+            assert(rw_iter->second.rec == nullptr);
+            // Read record pointer and tidword from index
+            Rec* rec = nullptr;
+            TidWord tw;
+            get_record_pointer(*(rw_iter->second.val), rec, tw);
+            // Check if tidword stored locally is the latest
+            if (!is_same(tw, rw_iter->second.tw)) return nullptr;
+            // Place it in writeset
+            auto& w_table = ws.get_table(table_id);
+            w_table.emplace_back(key, rw_iter);
+            rw_iter->second.rwt = ReadWriteType::DELETE;
+            return rec;
+        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+            // Read record pointer and tidword from index
+            Rec* rec = nullptr;
+            TidWord tw;
+            get_record_pointer(*(rw_iter->second.val), rec, tw);
+            // Check if tidword stored locally is the latest
+            if (!is_same(tw, rw_iter->second.tw)) return nullptr;
+            // Deallocate locally allocated record
+            MemoryAllocator::deallocate(rw_iter->second.rec);
+            rw_iter->second.rec = nullptr;
+            rw_iter->second.rwt = ReadWriteType::DELETE;
+            return rec;
+        } else if (rwt == ReadWriteType::DELETE) {
+            return nullptr;
+        } else {
+            throw std::runtime_error("invalid state");
+        }
     }
 
     bool precommit() {
@@ -592,17 +523,17 @@ public:
         LOG_INFO("  P1 (Lock WriteSet)");
 
         for (TableID table_id: tables) {
-            auto& ws_table = ws.get_table(table_id);
-            auto& vs_table = vs.get_table(table_id);
-            for (auto w_iter = ws_table.begin(); w_iter != ws_table.end(); ++w_iter) {
-                auto v_iter = vs_table.find(w_iter->first);
-                assert(v_iter != vs_table.end());
+            auto& w_table = ws.get_table(table_id);
+            std::sort(w_table.begin(), w_table.end(), [](const auto& lhs, const auto& rhs) {
+                return lhs.first <= rhs.first;
+            });
+            for (auto w_iter = w_table.begin(); w_iter != w_table.end(); ++w_iter) {
                 LOG_DEBUG("     LOCK (t: %lu, k: %lu)", table_id, w_iter->first);
-                lock(*(v_iter->second));
+                auto rw_iter = w_iter->second;
+                lock(*(rw_iter->second.val));
                 TidWord current;
-                current.obj = load_acquire(v_iter->second->tidword.obj);
-
-                if (!w_iter->second.is_new && !is_readable(current)) {
+                current.obj = load_acquire(rw_iter->second.val->tidword.obj);
+                if (!rw_iter->second.is_new && !is_readable(current)) {
                     LOG_DEBUG("     UNREADABLE (t: %lu, k: %lu)", table_id, w_iter->first);
                     ++w_iter;
                     unlock_writeset(table_id, w_iter->first);
@@ -618,17 +549,15 @@ public:
         // Phase 2.1 (Validate ReadSet)
         LOG_INFO("  P2.1 (Validate ReadSet)");
         for (TableID table_id: tables) {
-            auto& rs_table = rs.get_table(table_id);
-            auto& ws_table = ws.get_table(table_id);
-            auto& vs_table = vs.get_table(table_id);
-            for (auto r_iter = rs_table.begin(); r_iter != rs_table.end(); ++r_iter) {
-                auto v_iter = vs_table.find(r_iter->first);
-                assert(v_iter != vs_table.end());
+            auto& rw_table = rws.get_table(table_id);
+            for (auto rw_iter = rw_table.begin(); rw_iter != rw_table.end(); ++rw_iter) {
+                auto rwt = rw_iter->second.rwt;
+                if (rwt == ReadWriteType::INSERT) continue;
+                // rwt is either READ or UPDATE or DELETE
                 TidWord current, expected;
-                current.obj = load_acquire(v_iter->second->tidword.obj);
-                expected.obj = r_iter->second.tw.obj;
-                if (!is_valid(current, expected)
-                    || (current.lock && ws_table.find(r_iter->first) == ws_table.end())) {
+                current.obj = load_acquire(rw_iter->second.val->tidword.obj);
+                expected.obj = rw_iter->second.tw.obj;
+                if (!is_valid(current, expected) || (current.lock && rwt == ReadWriteType::READ)) {
                     unlock_writeset();
                     return false;
                 }
@@ -659,24 +588,22 @@ public:
         // Phase 3 (Write to Shared Memory)
         LOG_INFO("  P3 (Write to Shared Memory)");
         for (TableID table_id: tables) {
-            auto& ws_table = ws.get_table(table_id);
-            auto& vs_table = vs.get_table(table_id);
-            for (auto w_iter = ws_table.begin(); w_iter != ws_table.end(); w_iter++) {
-                auto v_iter = vs_table.find(w_iter->first);
-                assert(v_iter != vs_table.end());
-                Rec* old = exchange(v_iter->second->rec, w_iter->second.rec);
+            auto& w_table = ws.get_table(table_id);
+            for (auto w_iter = w_table.begin(); w_iter != w_table.end(); ++w_iter) {
+                auto rw_iter = w_iter->second;
+                auto rwt = rw_iter->second.rwt;
+                Rec* old = exchange(rw_iter->second.val->rec, rw_iter->second.rec);
                 TidWord new_tw;
                 new_tw.epoch = commit_tw.epoch;
                 new_tw.tid = commit_tw.tid;
-                new_tw.latest = !(w_iter->second.wt == WriteType::DELETE);
-                new_tw.absent = (w_iter->second.wt == WriteType::DELETE);
+                new_tw.latest = !(rwt == ReadWriteType::DELETE);
+                new_tw.absent = (rwt == ReadWriteType::DELETE);
                 new_tw.lock = 0;  // unlock
-                store_release(v_iter->second->tidword.obj, new_tw.obj);
+                store_release(rw_iter->second.val->tidword.obj, new_tw.obj);
                 GarbageCollector::collect(commit_tw.epoch, old);
-                if (w_iter->second.wt == WriteType::DELETE) {
+                if (rwt == ReadWriteType::DELETE) {
                     idx.remove(table_id, w_iter->first);
-                    GarbageCollector::collect(commit_tw.epoch, load_acquire(v_iter->second->rec));
-                    GarbageCollector::collect(commit_tw.epoch, load_acquire(v_iter->second));
+                    GarbageCollector::collect(commit_tw.epoch, rw_iter->second.val);
                 }
             }
         }
@@ -689,39 +616,32 @@ public:
         Index& idx = Index::get_index();
 
         for (TableID table_id: tables) {
-            auto& rs_table = rs.get_table(table_id);
-            auto& ws_table = ws.get_table(table_id);
-            auto& vs_table = vs.get_table(table_id);
-            auto& nm = ns.get_nodemap(table_id);
-
-            for (auto w_iter = ws_table.begin(); w_iter != ws_table.end(); w_iter++) {
+            auto& w_table = ws.get_table(table_id);
+            for (auto w_iter = w_table.begin(); w_iter != w_table.end(); ++w_iter) {
+                auto rw_iter = w_iter->second;
                 // For failed inserts
-                if (w_iter->second.is_new) {
-                    auto v_iter = vs_table.find(w_iter->first);
-                    assert(v_iter != vs_table.end());
-                    lock(*(v_iter->second));
+                if (rw_iter->second.is_new) {
+                    lock(*(rw_iter->second.val));
+                    assert(load_acquire(rw_iter->second.val->rec) == nullptr);
                     TidWord tw;
-                    tw.obj = load_acquire(v_iter->second->tidword.obj);
+                    tw.obj = load_acquire(rw_iter->second.val->tidword.obj);
                     tw.absent = 1;
                     tw.latest = 0;
                     tw.lock = 0;
-                    store_release(v_iter->second->tidword.obj, tw.obj);
+                    store_release(rw_iter->second.val->tidword.obj, tw.obj);
                     idx.remove(table_id, w_iter->first);
-                    GarbageCollector::collect(starting_epoch, load_acquire(v_iter->second->rec));
-                    GarbageCollector::collect(starting_epoch, load_acquire(v_iter->second));
+                    GarbageCollector::collect(starting_epoch, rw_iter->second.val);
                 }
-                GarbageCollector::collect(starting_epoch, w_iter->second.rec);
-            }
 
-            for (auto r_iter = rs_table.begin(); r_iter != rs_table.end(); ++r_iter) {
-                // Deallocate ReadSet that is not in WriteSet
-                if (ws_table.find(r_iter->first) == ws_table.end())
-                    GarbageCollector::collect(starting_epoch, r_iter->second.rec);
+                auto rwt = rw_iter->second.rwt;
+                if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+                    MemoryAllocator::deallocate(rw_iter->second.rec);
+                }
             }
-
-            ws_table.clear();
-            rs_table.clear();
-            vs_table.clear();
+            w_table.clear();
+            auto& rw_table = rws.get_table(table_id);
+            rw_table.clear();
+            auto& nm = ns.get_nodemap(table_id);
             nm.clear();
         }
     }
@@ -729,43 +649,47 @@ public:
 private:
     uint32_t starting_epoch;
     std::set<TableID> tables;
-    ReadSet<Key> rs;
+    ReadWriteSet<Key> rws;
     WriteSet<Key> ws;
-    ValidationSet<Key> vs;
     NodeSet ns;
 
-    void read_record_and_tidword(Value& val, Rec* rec, TidWord& tw, size_t rec_size) {
-        TidWord expected, check;
-        if (rec == nullptr) throw std::runtime_error("memory not allocated");
+    void get_record_pointer(Value& val, Rec*& rec, TidWord& tw) {
+        TidWord expected;
         expected.obj = load_acquire(val.tidword.obj);
         while (true) {
+            // loop while locked
             while (expected.lock) {
                 expected.obj = load_acquire(val.tidword.obj);
             }
-            if (val.rec) memcpy(rec, val.rec, rec_size);
-            check.obj = load_acquire(val.tidword.obj);
-            if (expected.obj == check.obj) {
-                tw.obj = check.obj;
-                return;
-            }
-            expected.obj = check.obj;
+            // read record and tidword
+            rec = load_acquire(val.rec);  // val.rec could be nullptr
+            tw.obj = load_acquire(val.tidword.obj);
+
+            // check if not changed
+            if (is_same(tw, expected)) return;
+
+            expected.obj = tw.obj;
         }
     }
 
-    void read_tidword(Value& val, TidWord& tw) {
-        TidWord expected, check;
+    void copy_record(Value& val, Rec* rec, TidWord& tw, uint64_t rec_size) {
+        if (rec == nullptr) throw std::runtime_error("memory not allocated");
+        TidWord expected;
         expected.obj = load_acquire(val.tidword.obj);
         while (true) {
+            // loop while locked
             while (expected.lock) {
                 expected.obj = load_acquire(val.tidword.obj);
             }
-            // memcpy(rec, val.rec, rec_size);
-            check.obj = load_acquire(val.tidword.obj);
-            if (expected.obj == check.obj) {
-                tw.obj = check.obj;
-                return;
-            }
-            expected.obj = check.obj;
+            // copy record and tidword
+            Rec* temp = load_acquire(val.rec);
+            if (temp) memcpy(rec, temp, rec_size);
+            tw.obj = load_acquire(val.tidword.obj);
+
+            // check if not changed
+            if (is_same(tw, expected)) return;
+
+            expected.obj = tw.obj;
         }
     }
 
@@ -787,14 +711,12 @@ private:
 
     void unlock_writeset(TableID end_table_id, Key end_key) {
         for (TableID table_id: tables) {
-            auto& ws_table = ws.get_table(table_id);
-            auto& vs_table = vs.get_table(table_id);
-            for (auto w_iter = ws_table.begin(); w_iter != ws_table.end(); ++w_iter) {
+            auto& w_table = ws.get_table(table_id);
+            for (auto w_iter = w_table.begin(); w_iter != w_table.end(); ++w_iter) {
                 if (table_id == end_table_id && w_iter->first == end_key) return;
                 LOG_DEBUG("UNLOCK (t: %lu, k: %lu)", table_id, w_iter->first);
-                auto v_iter = vs_table.find(w_iter->first);
-                assert(v_iter != vs_table.end());
-                unlock(*(v_iter->second));
+                auto rw_iter = w_iter->second;
+                unlock(*(rw_iter->second.val));
             }
         }
     }
@@ -806,6 +728,15 @@ private:
         desired.lock = 0;
         store_release(val.tidword.obj, desired.obj);
     }
+
+    bool is_tidword_latest(Value& val, const TidWord& current) {
+        Rec* rec = nullptr;
+        TidWord tw;
+        get_record_pointer(val, rec, tw);
+        return is_same(tw, current);
+    }
+
+    bool is_same(const TidWord& lhs, const TidWord& rhs) { return lhs.obj == rhs.obj; }
 
     bool is_readable(const TidWord& tw) { return !tw.absent && tw.latest; }
 

@@ -15,6 +15,20 @@ struct TidWord {
             uint64_t epoch : 32;
         };
     };
+
+    TidWord()
+        : obj(0){};
+
+    TidWord(uint64_t obj)
+        : obj(obj) {}
+
+    TidWord(const TidWord& tidword)
+        : obj(tidword.obj) {}
+
+    TidWord& operator=(const TidWord& tidword) {
+        obj = tidword.obj;
+        return *this;
+    }
 };
 
 struct Value {

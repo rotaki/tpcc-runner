@@ -49,13 +49,14 @@ public:
             // Place it into readwriteset
             rw_table.emplace_hint(
                 rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(val->rec, ReadWriteType::READ, false, val));
+                std::forward_as_tuple(nullptr, ReadWriteType::READ, false, val));
             return val->rec;
         }
 
         auto rwt = rw_iter->second.rwt;
-        if (rwt == ReadWriteType::READ || rwt == ReadWriteType::UPDATE
-            || rwt == ReadWriteType::INSERT) {
+        if (rwt == ReadWriteType::READ) {
+            return rw_iter->second.val->rec;
+        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
             return rw_iter->second.rec;
         } else if (rwt == ReadWriteType::DELETE) {
             return nullptr;
@@ -169,7 +170,7 @@ public:
             if (!rw_iter->second.val->rwl.try_lock_upgrade()) return nullptr;
             // Localset will point to allocated record
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-            memcpy(rec, rw_iter->second.rec, record_size);
+            memcpy(rec, rw_iter->second.val->rec, record_size);
             rw_iter->second.rec = rec;
             rw_iter->second.rwt = ReadWriteType::UPDATE;
             return rec;
@@ -247,18 +248,17 @@ public:
             }
         }
 
-        if (rw_iter->second.rwt == ReadWriteType::READ) {
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ) {
             // Upgrade lock
             if (!rw_iter->second.val->rwl.try_lock_upgrade()) return nullptr;
             // Localset will point to allocated record
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-            memcpy(rec, rw_iter->second.rec, record_size);
+            memcpy(rec, rw_iter->second.val->rec, record_size);
             rw_iter->second.rec = rec;
             rw_iter->second.rwt = ReadWriteType::UPDATE;
             return rec;
-        } else if (rw_iter->second.rwt == ReadWriteType::UPDATE) {
-            return rw_iter->second.rec;
-        } else if (rw_iter->second.rwt == ReadWriteType::INSERT) {
+        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
             return rw_iter->second.rec;
         } else if (rw_iter->second.rwt == ReadWriteType::DELETE) {
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
@@ -282,7 +282,7 @@ public:
 
         tables.insert(table_id);
         auto& rw_table = rws.get_table(table_id);
-        typename Index::KVMap kv_map;
+        std::map<Key, Value*> kv_map;
 
         [[maybe_unused]] typename Index::Result res;
         res = idx.get_kv_in_range(table_id, lkey, rkey, count, kv_map);
@@ -301,14 +301,15 @@ public:
                 // Place it into readwriteset
                 rw_table.emplace_hint(
                     rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                    std::forward_as_tuple(val->rec, ReadWriteType::READ, false, val));
+                    std::forward_as_tuple(nullptr, ReadWriteType::READ, false, val));
                 kr_map.emplace(key, val->rec);
                 continue;
             }
 
             auto rwt = rw_iter->second.rwt;
-            if (rwt == ReadWriteType::READ || rwt == ReadWriteType::UPDATE
-                || rwt == ReadWriteType::INSERT) {
+            if (rwt == ReadWriteType::READ) {
+                kr_map.emplace(key, rw_iter->second.val->rec);
+            } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
                 kr_map.emplace(key, rw_iter->second.rec);
             } else if (rwt == ReadWriteType::DELETE) {
                 return false;
@@ -333,7 +334,7 @@ public:
         size_t record_size = sch.get_record_size(table_id);
         tables.insert(table_id);
         auto& rw_table = rws.get_table(table_id);
-        typename Index::KVMap kv_map;
+        std::map<Key, Value*> kv_map;
 
         [[maybe_unused]] typename Index::Result res;
         res = idx.get_kv_in_range(table_id, lkey, rkey, count, kv_map);
@@ -361,7 +362,7 @@ public:
                 if (!rw_iter->second.val->rwl.try_lock_upgrade()) return false;
                 // Localset will point to allocated record
                 Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-                memcpy(rec, rw_iter->second.rec, record_size);
+                memcpy(rec, rw_iter->second.val->rec, record_size);
                 rw_iter->second.rec = rec;
                 rw_iter->second.rwt = ReadWriteType::UPDATE;
                 kr_map.emplace(key, rec);
@@ -396,7 +397,7 @@ public:
 
             rw_table.emplace_hint(
                 rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(val->rec, ReadWriteType::DELETE, false, val));
+                std::forward_as_tuple(nullptr, ReadWriteType::DELETE, false, val));
             return val->rec;
         }
 
@@ -405,12 +406,12 @@ public:
             // Upgrade lock
             if (!rw_iter->second.val->rwl.try_lock_upgrade()) return nullptr;
             rw_iter->second.rwt = ReadWriteType::DELETE;
-            return rw_iter->second.rec;
+            return rw_iter->second.val->rec;
         } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
             MemoryAllocator::deallocate(rw_iter->second.rec);
-            rw_iter->second.rec = rw_iter->second.val->rec;
+            rw_iter->second.rec = nullptr;
             rw_iter->second.rwt = ReadWriteType::DELETE;
-            return rw_iter->second.rec;
+            return rw_iter->second.val->rec;
         } else if (rwt == ReadWriteType::DELETE) {
             return nullptr;
         } else {
@@ -448,7 +449,7 @@ public:
                     GarbageCollector::collect(commit_epoch, old);
                 } else if (rwt == ReadWriteType::DELETE) {
                     idx.remove(table_id, rw_iter->first);
-                    MemoryAllocator::deallocate(rw_iter->second.rec);
+                    MemoryAllocator::deallocate(rw_iter->second.val->rec);
                     GarbageCollector::collect(starting_epoch, rw_iter->second.val);
                 } else {
                     throw std::runtime_error("invalid state");
