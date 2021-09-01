@@ -13,7 +13,7 @@ NUM_SECONDS = 3
 
 def gen_setups():
     protocols = ["silo", "nowait"]
-    threads = [1, 5, 10, 15, 20, 25, 30]
+    threads = [1, 2, 4, 6, 8, 10, 15, 20]
     return [[protocol, thread] for protocol in protocols for thread in threads]
 
 def build():
@@ -112,12 +112,10 @@ def plot_all():
     ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax2.xaxis.set_major_locator(MaxNLocator(integer=True))    
 
-    ax1.set_xlabel("Thread Count")
-    ax2.set_xlabel("Thread Count")
+    ax1.set_xlabel("Thread Count (1 Warehouse)")
+    ax2.set_xlabel("Thread Count (1 Warehouse)")
     ax1.set_ylabel("Throughput (Million txns/s)")
     ax2.set_ylabel("Abort Rate")
-    ax1.set_title("Thread Count (1 Warehouse)")
-    ax2.set_title("Thread Count (1 Warehouse)")
     ax1.grid()
     ax2.grid()
     fig.legend(loc="upper center", ncol=len(throughputs.keys()))
