@@ -31,7 +31,9 @@ Currently concurrency control protocols supported in this repository are
   - a naive protocol that locks the whole database on exeuction
 - SILO
   - a scalable multi-core optimistic concurrency control protocol proposed in the paper: ["Speedy Transactions in Multicore In-Memory Databases"](http://people.csail.mit.edu/stephentu/papers/silo.pdf).
-
+- NOWAIT
+  - S2PL protocol which does not wait for locks
+  
 To build, 
 
 ```sh
@@ -80,20 +82,20 @@ Details:
 ```
 
 Read more about performance in the docs directory.
-## SILO
+## Protocols
 
-The performance of silo was measured for 3 seconds using `16 core Intel(R) Xeon(R) CPU E5-2630 v3 @ 2.40GHz`, 2 threads per core.
+The performance of the protocols was measured for 10 seconds using `20 core Intel(R) Xeon(R) Silver 4114 CPU @ 2.20GHz`, 2 threads per core.
 
 ### Single Warehouse
-![Single Warehouse](./docs/images/single_warehouse.png)
+![Single Warehouse](./docs/images/warehouse_single.JPG)
 
-In single warehouse, the performance scales until 5 threads. (The maxima of throughput could be in any number between 2 to 9 threads.) The performance degrades rapidly after that because of high contention. The abort rate is calculated as `num_aborts/num_trials = num_aborts/(num_aborts + num_commits)`. The abort rate approaches to 1 as the number threads increases.
+In single warehouse, the performance scales until a few threads. The performance of nowait degrades rapidly after that because of high contention. The abort rate is calculated as `num_aborts/num_trials = num_aborts/(num_aborts + num_commits)`. The abort rate approaches to 1 as the number threads increases.
 
 ### Thread Count = Num Warehouse
 
-![Thread Count = Num Warehouse](./docs/images/multiple_warehouse.png)
+![Thread Count = Num Warehouse](./docs/images/warehouse_threadcount.JPG)
 
-In `thread count = num warehouse`, the performance seems to scale well. The abort rate is much smaller than that of a single warehouse. The reason why silo scales is that it is cache-friendly (= it has fewer updates to shared memory). The OCC style read does not modify the shared memory when accessing data. The group commit (epoch) allows fewer updates to shared counter.
+In `thread count = num warehouse`, the performance seems to scale well. The abort rate is much smaller than that of a single warehouse. 
 
 Reproducing this graph is possible by running `run_experiment.py` in the scripts directory. (Make sure to execute it in the base directory: `tpcc-runner/`)
 # Author
