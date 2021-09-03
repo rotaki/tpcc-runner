@@ -5,10 +5,12 @@
 #include <unordered_map>
 
 #include "protocols/common/schema.hpp"
-#include "protocols/nowait/include/value.hpp"
+
+using Rec = void;
 
 enum ReadWriteType { READ = 0, UPDATE, INSERT, DELETE };
 
+template <typename Value>
 struct ReadWriteElement {
     ReadWriteElement(Rec* rec, ReadWriteType rwt, bool is_new, Value* val)
         : rec(rec)
@@ -22,12 +24,12 @@ struct ReadWriteElement {
     Value* val;   // pointer to index
 };
 
-
-template <typename Key>
+template <typename Key, typename Value>
 class ReadWriteSet {
 public:
-    std::unordered_map<Key, ReadWriteElement>& get_table(TableID table_id) { return rws[table_id]; }
+    using Table = std::unordered_map<Key, ReadWriteElement<Value>>;
+    Table& get_table(TableID table_id) { return rws[table_id]; }
 
 private:
-    std::unordered_map<TableID, std::unordered_map<Key, ReadWriteElement>> rws;
+    std::unordered_map<TableID, Table> rws;
 };

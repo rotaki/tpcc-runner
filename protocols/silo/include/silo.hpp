@@ -12,12 +12,13 @@
 #include "protocols/common/garbage_collector.hpp"
 #include "protocols/common/schema.hpp"
 #include "protocols/silo/include/readwriteset.hpp"
-#include "protocols/silo/include/value.hpp"
+#include "protocols/silo/include/tidword.hpp"
 
 template <typename Index>
 class Silo {
 public:
     using Key = typename Index::Key;
+    using Value = typename Index::Value;
     class NodeSet {
     public:
         typename Index::NodeMap& get_nodemap(TableID table_id) { return ns[table_id]; }
@@ -26,8 +27,9 @@ public:
         std::unordered_map<TableID, typename Index::NodeMap> ns;
     };
 
-    Silo(uint32_t epoch)
-        : starting_epoch(epoch) {
+    Silo(TxID txid, uint32_t epoch)
+        : txid(txid)
+        , starting_epoch(epoch) {
         LOG_INFO("START Tx, e: %u", starting_epoch);
     }
 
@@ -647,10 +649,11 @@ public:
     }
 
 private:
+    TxID txid;
     uint32_t starting_epoch;
     std::set<TableID> tables;
-    ReadWriteSet<Key> rws;
-    WriteSet<Key> ws;
+    ReadWriteSet<Key, Value> rws;
+    WriteSet<Key, Value> ws;
     NodeSet ns;
 
     void get_record_pointer(Value& val, Rec*& rec, TidWord& tw) {

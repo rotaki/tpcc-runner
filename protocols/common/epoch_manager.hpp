@@ -7,6 +7,7 @@
 #include <thread>
 #include <vector>
 
+#include "protocols/common/transaction_id.hpp"
 #include "utils/atomic_wrapper.hpp"
 #include "utils/logger.hpp"
 
@@ -59,7 +60,7 @@ public:
     }
 
     static uint32_t& get_global_epoch() {
-        static uint32_t e{0};
+        static uint32_t e{1};  // starts from 1
         return e;
     }
 
@@ -72,12 +73,14 @@ template <typename Protocol>
 class Worker {
 public:
     Worker(uint32_t worker_id)
-        : worker_id(worker_id) {}
-
+        : worker_id(worker_id)
+        , tx_counter(0) {}
 
     std::unique_ptr<Protocol> begin_tx() {
         store_release(get_worker_epoch(), load_acquire(EpochManager<Protocol>::get_global_epoch()));
-        return std::make_unique<Protocol>(load_acquire(get_worker_epoch()));
+        TxID txid(worker_id, tx_counter);
+        ++tx_counter;
+        return std::make_unique<Protocol>(txid, load_acquire(get_worker_epoch()));
     }
 
     uint32_t& get_worker_epoch() { return worker_epoch; }
@@ -85,6 +88,7 @@ public:
     uint32_t get_id() { return worker_id; }
 
 private:
-    alignas(64) uint32_t worker_id{0};
-    uint32_t worker_epoch{0};
+    uint32_t worker_id{0};
+    uint32_t tx_counter{1};  // starts from 1
+    alignas(64) uint32_t worker_epoch;
 };

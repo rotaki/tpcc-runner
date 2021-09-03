@@ -9,15 +9,16 @@
 #include "protocols/common/epoch_manager.hpp"
 #include "protocols/common/garbage_collector.hpp"
 #include "protocols/nowait/include/readwriteset.hpp"
-#include "protocols/nowait/include/value.hpp"
 
 template <typename Index>
 class NoWait {
 public:
     using Key = typename Index::Key;
+    using Value = typename Index::Value;
 
-    NoWait(uint32_t epoch)
-        : starting_epoch(epoch) {
+    NoWait(TxID txid, uint32_t epoch)
+        : txid(txid)
+        , starting_epoch(epoch) {
         LOG_INFO("START Tx, e: %u", starting_epoch);
     }
 
@@ -489,7 +490,8 @@ public:
     }
 
 private:
+    TxID txid;
     uint32_t starting_epoch;
     std::set<TableID> tables;
-    ReadWriteSet<Key> rws;
+    ReadWriteSet<Key, Value> rws;
 };

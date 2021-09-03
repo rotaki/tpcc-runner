@@ -7,10 +7,11 @@
 #include "utils/logger.hpp"
 #include "utils/utils.hpp"
 
-template <typename Value>
+template <typename Value_>
 class MasstreeIndexes {
 public:
     using Key = uint64_t;
+    using Value = Value_;
     using MT = MasstreeWrapper<Value>;
     using NodeInfo = typename MT::node_info_t;
     using NodeMap =

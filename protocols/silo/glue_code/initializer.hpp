@@ -2,7 +2,6 @@
 
 #include "protocols/common/memory_allocator.hpp"
 #include "protocols/common/schema.hpp"
-#include "protocols/silo/include/value.hpp"
 #include "protocols/tpcc_common/record_misc.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/record_key.hpp"
@@ -12,7 +11,10 @@
 template <typename Index>
 class Initializer {
 private:
-    static void insert_into_index(TableID table_id, uint64_t key, void* rec) {
+    using Key = typename Index::Key;
+    using Value = typename Index::Value;
+
+    static void insert_into_index(TableID table_id, Key key, void* rec) {
         TidWord tw;
         tw.lock = 0;
         tw.latest = 1;
