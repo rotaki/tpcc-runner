@@ -113,6 +113,7 @@ set(CC_ALG
   CACHE STRING "NAIVE, SILO, NOWAIT")
 
 # CC specific paramters
+set(CC_NAME "")
 set(CC_EXECUTABLE "")
 set(CC_SRCS_DIRECTORIES "")
 set(CC_SRCS "")
@@ -121,6 +122,7 @@ set(CC_TEST_DIRECTORY "")
 
 if ("${CC_ALG}" STREQUAL "NAIVE")
   set(CMAKE_CXX_STANDARD 20)
+  list(APPEND CC_NAME "naive")
   list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
   list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/naive.cpp")
   list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/naive/include")
@@ -129,6 +131,7 @@ if ("${CC_ALG}" STREQUAL "NAIVE")
   list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/naive")
 elseif ("${CC_ALG}" STREQUAL "SILO")
   set(CMAKE_CXX_STANDARD 17)
+  list(APPEND CC_NAME "silo")
   list(APPEND COMMON_COMPILE_FLAGS "-W" "-Wall" "-fPIC")
   add_dep(masstree https://github.com/kohler/masstree-beta.git master)
   list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/silo.cpp")
@@ -141,6 +144,7 @@ elseif ("${CC_ALG}" STREQUAL "SILO")
   list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/silo")
 elseif ("${CC_ALG}" STREQUAL "NOWAIT")
   set(CMAKE_CXX_STANDARD 17)
+  list(APPEND CC_NAME "nowait")
   list(APPEND COMMON_COMPILE_FLAGS "-W" "-Wall" "-fPIC")
   add_dep(masstree https://github.com/kohler/masstree-beta.git master)
   list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/nowait.cpp")
@@ -255,7 +259,7 @@ foreach (TPCC_TEST ${TPCC_TESTS})
     set_target_properties(
       ${FILENAME}
       PROPERTIES
-      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/"
+      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/${CC_NAME}"
       )
   endif ()
 endforeach (TPCC_TEST ${TPCC_TESTS})
