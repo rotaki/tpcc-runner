@@ -5,7 +5,7 @@
 #include "protocols/common/transaction_id.hpp"
 #include "protocols/silo/include/tidword.hpp"
 
-struct Value {
+struct ValueSimple {
     alignas(64) TidWord tidword;
     void* rec;
 };

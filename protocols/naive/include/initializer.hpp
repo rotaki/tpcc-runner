@@ -2,12 +2,12 @@
 
 #include <utility>
 
+#include "indexes/masstree.hpp"
 #include "protocols/naive/include/database.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/record_key.hpp"
 #include "tpcc/include/record_layout.hpp"
 #include "utils/utils.hpp"
-
 namespace Initializer {
 
 inline void create_and_insert_item_record(uint32_t i_id) {

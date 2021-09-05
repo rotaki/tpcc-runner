@@ -4,7 +4,7 @@
 
 #include "protocols/common/readwritelock.hpp"
 
-struct Value {
+struct ValueSimple {
     alignas(64) RWLock rwl;
     void* rec;
 };

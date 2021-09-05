@@ -2,6 +2,7 @@
 
 #include "protocols/common/memory_allocator.hpp"
 #include "protocols/common/schema.hpp"
+#include "protocols/silo/include/tidword.hpp"
 #include "protocols/tpcc_common/record_misc.hpp"
 #include "tpcc/include/config.hpp"
 #include "tpcc/include/record_key.hpp"

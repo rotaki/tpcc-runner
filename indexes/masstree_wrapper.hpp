@@ -177,6 +177,23 @@ public:
         return 0;           // not removed
     }
 
+    bool remove_value_and_get_nodeinfo_on_success(
+        const char* key, std::size_t len_key, node_info_t& node_info) {
+        cursor_type lp(table_, key, len_key);
+        bool found = lp.find_locked(*ti);
+
+        if (found) {
+            // node info is only obtained on success of delete
+            node_info.node = lp.node();
+            node_info.old_version = lp.previous_full_version_value();
+            node_info.new_version = lp.next_full_version_value(-1);
+            lp.finish(-1, *ti);
+            return 1;
+        }
+        lp.finish(0, *ti);  // release lock
+        return 0;           // not removed
+    }
+
     class Callback {
     public:
         std::function<void(const leaf_type*, uint64_t, bool&)> per_node_func;

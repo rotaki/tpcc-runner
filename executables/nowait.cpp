@@ -66,7 +66,7 @@ int main(int argc, const char* argv[]) {
 
     printf("Loading all tables with %" PRIu16 " warehouse(s)\n", num_warehouses);
 
-    using Index = MasstreeIndexes<Value>;
+    using Index = MasstreeIndexes<ValueSimple>;
     using Protocol = NoWait<Index>;
 
     Initializer<Index>::load_all_tables();
