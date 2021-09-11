@@ -192,6 +192,7 @@ public:
                 }
                 assert(false);
             }
+            return Result::FAIL;
         }
         return Result::ABORT;
     }
