@@ -110,20 +110,46 @@ TEST(SILO_SerializationTest, T15W15C100000) {
 
     // For conflict graph of record
     Graph gr;
+
+    RWHistory<Protocol> all;
     for (uint32_t i = 0; i < num_threads; i++) {
-        RWHistory<Protocol>& rwh = rw_data[i];
-        for (auto iter = rwh.begin(); iter != rwh.end(); ++iter) {
-            uint64_t dest = iter->first.id;
-            auto& per_tx_rwhistory = iter->second;
-            for (auto& tracked_rw_info: per_tx_rwhistory) {
+        all.merge(rw_data[i]);
+    }
+
+    // For w-r 
+    std::unordered_map<uint64_t, std::deque<uint64_t>> wr;
+    for (auto iter = all.begin(); iter != all.end(); ++iter) {
+        uint64_t dest = iter->first.id;
+        auto& per_tx_rwhistory = iter->second;
+        for (auto& tracked_rw_info: per_tx_rwhistory) {
+            if (tracked_rw_info.ot == OperationType::R) {
                 uint64_t src = tracked_rw_info.txid.id;
                 gr.add_edge(src, dest);
                 g.add_edge(src, dest);
+                wr[src].push_back(dest);
             }
         }
     }
+
+    // For w-w and r-w
+    for (auto iter = all.begin(); iter != all.end(); ++iter) {
+        uint64_t dest = iter->first.id;
+        auto& per_tx_rwhistory = iter->second;
+        for (auto& tracked_rw_info: per_tx_rwhistory) {
+            if (tracked_rw_info.ot == OperationType::W) {
+                uint64_t src = tracked_rw_info.txid.id;
+                gr.add_edge(src, dest);
+                g.add_edge(src, dest);
+                for (uint64_t r_src: wr[src]) {
+                    gr.add_edge(r_src, dest);
+                    g.add_edge(r_src, dest);
+                }
+            }
+        }
+    }
+
     ASSERT_TRUE(gr.topological_sort());
-    // gr.visualize("record_conflict.dot", "Record Level Conflict Graph");
+    gr.visualize("record_conflict.dot", "Record Level Conflict Graph");
 
     // For conflict graph of node
     Graph gn;
