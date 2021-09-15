@@ -537,7 +537,6 @@ public:
                 current.obj = load_acquire(rw_iter->second.val->tidword.obj);
                 if (!rw_iter->second.is_new && !is_readable(current)) {
                     LOG_DEBUG("     UNREADABLE (t: %lu, k: %lu)", table_id, w_iter->first);
-                    ++w_iter;
                     unlock_writeset(table_id, w_iter->first);
                     return false;
                 }
@@ -646,6 +645,7 @@ public:
             auto& nm = ns.get_nodemap(table_id);
             nm.clear();
         }
+        tables.clear();
     }
 
 private:
@@ -716,10 +716,10 @@ private:
         for (TableID table_id: tables) {
             auto& w_table = ws.get_table(table_id);
             for (auto w_iter = w_table.begin(); w_iter != w_table.end(); ++w_iter) {
-                if (table_id == end_table_id && w_iter->first == end_key) return;
                 LOG_DEBUG("UNLOCK (t: %lu, k: %lu)", table_id, w_iter->first);
                 auto rw_iter = w_iter->second;
                 unlock(*(rw_iter->second.val));
+                if (table_id == end_table_id && w_iter->first == end_key) return;
             }
         }
     }

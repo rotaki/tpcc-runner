@@ -74,7 +74,7 @@ class Worker {
 public:
     Worker(uint32_t worker_id)
         : worker_id(worker_id)
-        , tx_counter(0) {}
+        , tx_counter(1) {}
 
     std::unique_ptr<Protocol> begin_tx() {
         store_release(get_worker_epoch(), load_acquire(EpochManager<Protocol>::get_global_epoch()));
@@ -88,7 +88,7 @@ public:
     uint32_t get_id() { return worker_id; }
 
 private:
-    uint32_t worker_id{0};
-    uint32_t tx_counter{1};  // starts from 1
+    uint32_t worker_id;
+    uint32_t tx_counter;
     alignas(64) uint32_t worker_epoch;
 };
