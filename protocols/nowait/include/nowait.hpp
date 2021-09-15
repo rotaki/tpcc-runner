@@ -275,7 +275,7 @@ public:
         TableID table_id, Key lkey, Key rkey, int64_t count, [[maybe_unused]] bool rev,
         std::map<Key, Rec*>& kr_map) {
         // no reverse scan in nowait
-        assert(rev == false);
+        if (rev == true) throw std::runtime_error("reverse scan not supported in nowait");
         LOG_INFO(
             "READ_SCAN (e: %u, t: %lu, lk: %lu, rk: %lu, c: %ld)", starting_epoch, table_id, lkey,
             rkey, count);
@@ -325,7 +325,7 @@ public:
         TableID table_id, Key lkey, Key rkey, int64_t count, [[maybe_unused]] bool rev,
         std::map<Key, Rec*>& kr_map) {
         // no reverse scan in nowait
-        assert(rev == false);
+        if (rev == true) throw std::runtime_error("reverse scan not supported in nowait");
         LOG_INFO(
             "UPDATE_SCAN (e: %u, t: %lu, lk: %lu, rk: %lu, c: %ld)", starting_epoch, table_id, lkey,
             rkey, count);
@@ -487,6 +487,7 @@ public:
 
             rw_table.clear();
         }
+        tables.clear();
     }
 
 private:
