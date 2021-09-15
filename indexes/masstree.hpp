@@ -14,9 +14,8 @@ public:
     using Value = Value_;
     using MT = MasstreeWrapper<Value>;
     using NodeInfo = typename MT::node_info_t;
-    using NodeMap =
-        std::unordered_map<const typename MT::leaf_type*, uint64_t>;  // key: node pointer, value:
-                                                                      // version
+    using NodeMap = std::unordered_map<typename MT::leaf_type*, uint64_t>;  // key: node pointer,
+                                                                            // value: version
 
     enum Result {
         OK = 0,
@@ -48,7 +47,7 @@ public:
             reinterpret_cast<char*>(&key_buf), sizeof(Key), ni);
         if (val == nullptr) {
             // node that would contain the missing key is added
-            nm.emplace(reinterpret_cast<const typename MT::leaf_type*>(ni.node), ni.new_version);
+            nm.emplace(reinterpret_cast<typename MT::leaf_type*>(ni.node), ni.new_version);
             return NOT_FOUND;
         } else {
             return OK;
@@ -72,7 +71,7 @@ public:
         bool inserted = mt.insert_value_and_get_nodeinfo_on_success(
             reinterpret_cast<char*>(&key_buf), sizeof(Key), val, ni);
         if (inserted) {
-            auto itr = nm.find(reinterpret_cast<const typename MT::leaf_type*>(ni.node));
+            auto itr = nm.find(reinterpret_cast<typename MT::leaf_type*>(ni.node));
             if (itr == nm.end()) {
                 return OK;
             }
@@ -99,7 +98,7 @@ public:
         mt.scan(
             reinterpret_cast<char*>(&lkey_buf), sizeof(Key), lexclusive,
             reinterpret_cast<char*>(&rkey_buf), sizeof(Key), rexclusive,
-            {[](const typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
+            {[](typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
                  unused(leaf, version, continue_flag);
              },
              [&next_key, &next_value](
@@ -115,9 +114,9 @@ public:
         return OK;
     }
 
-    // [lkey --> rkey)
+    template <typename NodeFunc, typename KVFunc>
     Result get_kv_in_range(
-        TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map) {
+        TableID table_id, Key lkey, Key rkey, NodeFunc&& per_node_func, KVFunc&& per_kv_func) {
         auto& mt = indexes[table_id];
         mt.thread_init(0);
         Key lkey_buf = byte_swap(lkey);
@@ -128,60 +127,63 @@ public:
         mt.scan(
             reinterpret_cast<char*>(&lkey_buf), sizeof(Key), lexclusive,
             reinterpret_cast<char*>(&rkey_buf), sizeof(Key), rexclusive,
-            {[](const typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
-                 unused(leaf, version, continue_flag);
+            {[&per_node_func](typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
+                 per_node_func(leaf, version, continue_flag);
              },
-             [&kv_map](const typename MT::Str& key, Value* val, bool& continue_flag) {
-                 unused(continue_flag);
+             [&per_kv_func](const typename MT::Str& key, Value* val, bool& continue_flag) {
                  Key actual_key{__builtin_bswap64(*(reinterpret_cast<const uint64_t*>(key.s)))};
-                 kv_map.emplace(actual_key, val);
+                 per_kv_func(actual_key, val, continue_flag);
                  return;
              }},
-            count);
+            -1);
 
         return OK;
     }
 
-    // [lkey --> rkey) with NodeInfo
+    // [lkey --> rkey)
+    Result get_kv_in_range(
+        TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map) {
+        get_kv_in_range(
+            table_id, lkey, rkey,
+            [](typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
+                unused(leaf, version, continue_flag);
+            },
+            [&kv_map, &count](Key key, Value* val, bool& continue_flag) {
+                kv_map.emplace(key, val);
+                if (count != -1 && static_cast<int64_t>(kv_map.size()) >= count)
+                    continue_flag = false;
+            });
+        return OK;
+    }
+
     Result get_kv_in_range(
         TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map,
         NodeMap& nm) {
-        auto& mt = indexes[table_id];
-        mt.thread_init(0);
-        Key lkey_buf = byte_swap(lkey);
-        bool lexclusive = false;
-        Key rkey_buf = byte_swap(rkey);
-        bool rexclusive = true;
-
         bool exception_caught = false;
-
-        mt.scan(
-            reinterpret_cast<char*>(&lkey_buf), sizeof(Key), lexclusive,
-            reinterpret_cast<char*>(&rkey_buf), sizeof(Key), rexclusive,
-            {[&nm, &exception_caught](
-                 const typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
-                 auto it = nm.find(leaf);
-                 if (it == nm.end())
-                     nm.emplace_hint(it, leaf, version);
-                 else if (it->second != version) {
-                     exception_caught = true;
-                     continue_flag = false;
-                 }
-             },
-             [&kv_map](const typename MT::Str& key, Value* val, bool& continue_flag) {
-                 (void)continue_flag;
-                 Key actual_key{__builtin_bswap64(*(reinterpret_cast<const uint64_t*>(key.s)))};
-                 kv_map.emplace(actual_key, val);
-                 return;
-             }},
-            count);
+        get_kv_in_range(
+            table_id, lkey, rkey,
+            [&nm, &exception_caught](
+                typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
+                auto it = nm.find(leaf);
+                if (it == nm.end())
+                    nm.emplace_hint(it, leaf, version);
+                else if (it->second != version) {
+                    exception_caught = true;
+                    continue_flag = false;
+                }
+            },
+            [&kv_map, &count](Key key, Value* val, bool& continue_flag) {
+                kv_map.emplace(key, val);
+                if (count != -1 && static_cast<int64_t>(kv_map.size()) >= count)
+                    continue_flag = false;
+            });
 
         return exception_caught ? BAD_SCAN : OK;
     }
 
-    // (lkey <-- rkey]
+    template <typename NodeFunc, typename KVFunc>
     Result get_kv_in_rev_range(
-        TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map) {
+        TableID table_id, Key lkey, Key rkey, NodeFunc&& per_node_func, KVFunc&& per_kv_func) {
         auto& mt = indexes[table_id];
         mt.thread_init(0);
         Key lkey_buf = byte_swap(lkey);
@@ -192,17 +194,32 @@ public:
         mt.rscan(
             reinterpret_cast<char*>(&lkey_buf), sizeof(Key), lexclusive,
             reinterpret_cast<char*>(&rkey_buf), sizeof(Key), rexclusive,
-            {[](const typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
-                 unused(leaf, version, continue_flag);
+            {[&per_node_func](typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
+                 per_node_func(leaf, version, continue_flag);
              },
-             [&kv_map](const typename MT::Str& key, Value* val, bool& continue_flag) {
-                 unused(continue_flag);
+             [&per_kv_func](const typename MT::Str& key, Value* val, bool& continue_flag) {
                  Key actual_key{__builtin_bswap64(*(reinterpret_cast<const uint64_t*>(key.s)))};
-                 kv_map.emplace(actual_key, val);
+                 per_kv_func(actual_key, val, continue_flag);
                  return;
              }},
-            count);
+            -1);
 
+        return OK;
+    }
+
+    // (lkey <-- rkey]
+    Result get_kv_in_rev_range(
+        TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map) {
+        get_kv_in_rev_range(
+            table_id, lkey, rkey,
+            [](typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
+                unused(leaf, version, continue_flag);
+            },
+            [&kv_map, &count](Key key, Value* val, bool& continue_flag) {
+                kv_map.emplace(key, val);
+                if (count != -1 && static_cast<int64_t>(kv_map.size()) >= count)
+                    continue_flag = false;
+            });
         return OK;
     }
 
@@ -210,35 +227,24 @@ public:
     Result get_kv_in_rev_range(
         TableID table_id, Key lkey, Key rkey, int64_t count, std::map<Key, Value*>& kv_map,
         NodeMap& nm) {
-        auto& mt = indexes[table_id];
-        mt.thread_init(0);
-        Key lkey_buf = byte_swap(lkey);
-        bool lexclusive = true;
-        Key rkey_buf = byte_swap(rkey);
-        bool rexclusive = false;
-
         bool exception_caught = false;
-
-        mt.rscan(
-            reinterpret_cast<char*>(&lkey_buf), sizeof(Key), lexclusive,
-            reinterpret_cast<char*>(&rkey_buf), sizeof(Key), rexclusive,
-            {[&nm, &exception_caught](
-                 const typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
-                 auto it = nm.find(leaf);
-                 if (it == nm.end())
-                     nm.emplace_hint(it, leaf, version);
-                 else if (it->second != version) {
-                     exception_caught = true;
-                     continue_flag = false;
-                 }
-             },
-             [&kv_map](const typename MT::Str& key, Value* val, bool& continue_flag) {
-                 (void)continue_flag;
-                 Key actual_key{__builtin_bswap64(*(reinterpret_cast<const uint64_t*>(key.s)))};
-                 kv_map.emplace(actual_key, val);
-                 return;
-             }},
-            count);
+        get_kv_in_rev_range(
+            table_id, lkey, rkey,
+            [&nm, &exception_caught](
+                typename MT::leaf_type* leaf, uint64_t version, bool& continue_flag) {
+                auto it = nm.find(leaf);
+                if (it == nm.end())
+                    nm.emplace_hint(it, leaf, version);
+                else if (it->second != version) {
+                    exception_caught = true;
+                    continue_flag = false;
+                }
+            },
+            [&kv_map, &count](Key key, Value* val, bool& continue_flag) {
+                kv_map.emplace(key, val);
+                if (count != -1 && static_cast<int64_t>(kv_map.size()) >= count)
+                    continue_flag = false;
+            });
 
         return exception_caught ? BAD_SCAN : OK;
     }
@@ -254,7 +260,7 @@ public:
         }
     }
 
-    uint64_t get_version_value(TableID table_id, const typename MT::leaf_type* node) {
+    uint64_t get_version_value(TableID table_id, typename MT::leaf_type* node) {
         auto& mt = indexes[table_id];
         mt.thread_init(0);
         return mt.get_version_value(node);

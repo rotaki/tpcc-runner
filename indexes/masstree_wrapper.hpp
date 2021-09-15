@@ -41,7 +41,7 @@ public:
 
     static __thread typename table_params::threadinfo_type* ti;
     struct node_info_t {
-        const node_type* node = nullptr;
+        node_type* node = nullptr;
         uint64_t old_version = 0;
         uint64_t new_version = 0;
     };
@@ -179,7 +179,7 @@ public:
 
     class Callback {
     public:
-        std::function<void(const leaf_type*, uint64_t, bool&)> per_node_func;
+        std::function<void(leaf_type*, uint64_t, bool&)> per_node_func;
         std::function<void(const Str&, T*, bool&)> per_kv_func;
     };
     class SearchRangeScanner {
@@ -323,7 +323,7 @@ public:
         table_.rscan(mtkey, !r_exclusive, scanner, *ti);
     }
 
-    uint64_t get_version_value(const leaf_type* n) { return n->full_version_value(); }
+    uint64_t get_version_value(leaf_type* n) { return n->full_version_value(); }
 
 private:
     table_type table_;
