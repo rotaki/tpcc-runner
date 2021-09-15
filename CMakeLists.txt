@@ -110,7 +110,7 @@ endfunction()
 
 set(CC_ALG
   "NAIVE"
-  CACHE STRING "NAIVE, SILO, NOWAIT")
+  CACHE STRING "NAIVE, SILO, NOWAIT, MVTO")
 
 # CC specific paramters
 set(CC_NAME "")
@@ -155,6 +155,19 @@ elseif ("${CC_ALG}" STREQUAL "NOWAIT")
   file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/protocols/nowait/glue_code/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/nowait/include/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/nowait/src/*.cpp")
   list(APPEND CC_LINK_LIBRARIES "masstree")
   list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/nowait")
+elseif ("${CC_ALG}" STREQUAL "MVTO")
+  set(CMAKE_CXX_STANDARD 17)
+  list(APPEND CC_NAME "mvto")
+  list(APPEND COMMON_COMPILE_FLAGS "-W" "-Wall" "-fPIC")
+  add_dep(masstree https://github.com/wattlebirdaz/masstree-beta.git MVTO)
+  list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/mvto.cpp")
+  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/mvto/glue_code")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/mvto/include")
+  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/mvto/src")
+  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/protocols/mvto/glue_code/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/mvto/include/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/mvto/src/*.cpp")
+  list(APPEND CC_LINK_LIBRARIES "masstree")
+  list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/mvto")
 endif()
 
 add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
