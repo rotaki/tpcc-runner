@@ -9,7 +9,6 @@
 #include <utility>
 
 #include "protocols/common/epoch_manager.hpp"
-#include "protocols/common/garbage_collector.hpp"
 #include "protocols/common/schema.hpp"
 #include "protocols/silo/include/readwriteset.hpp"
 #include "protocols/silo/include/tidword.hpp"

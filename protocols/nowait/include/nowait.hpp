@@ -7,7 +7,6 @@
 #include <unordered_map>
 
 #include "protocols/common/epoch_manager.hpp"
-#include "protocols/common/garbage_collector.hpp"
 #include "protocols/nowait/include/readwriteset.hpp"
 
 template <typename Index>
