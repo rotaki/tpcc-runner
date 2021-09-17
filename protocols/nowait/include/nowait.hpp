@@ -183,6 +183,11 @@ public:
         }
     }
 
+    Rec* write(TableID table_id, Key key) {
+        LOG_INFO("WRITE (e: %u, t: %lu, k: %lu)", starting_epoch, table_id, key);
+        return upsert(table_id, key);
+    }
+
     Rec* upsert(TableID table_id, Key key) {
         LOG_INFO("UPSERT (e: %u, t: %lu, k: %lu)", starting_epoch, table_id, key);
 

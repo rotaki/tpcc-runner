@@ -4,9 +4,9 @@
 #include <memory>
 #include <stdexcept>
 
+#include "benchmarks/tpcc/include/record_layout.hpp"
 #include "mimalloc/include/mimalloc-new-delete.h"
 #include "protocols/naive/include/type_tuple.hpp"
-#include "tpcc/include/record_layout.hpp"
 
 template <typename Record>
 struct RecordMemoryCache {

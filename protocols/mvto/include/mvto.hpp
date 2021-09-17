@@ -248,6 +248,13 @@ public:
         }
     }
 
+    Rec* write(TableID table_id, Key key) {
+        LOG_INFO(
+            "WRITE (ts: %lu, s_ts: %lu, l_ts: %lu, t: %lu, k: %lu)", start_ts, smallest_ts,
+            largest_ts, table_id, key);
+        return upsert(table_id, key);
+    }
+
     Rec* upsert(TableID table_id, Key key) {
         LOG_INFO(
             "UPDATE (ts: %lu, s_ts: %lu, l_ts: %lu, t: %lu, k: %lu)", start_ts, smallest_ts,
@@ -263,7 +270,7 @@ public:
         if (rw_iter == rw_table.end()) {
             Value* val;
             typename Index::Result res = idx.find(table_id, key, val);
-            if (res = Index::Result::NOT_FOUND) {
+            if (res == Index::Result::NOT_FOUND) {
                 // Create new value to insert
                 Value* new_val =
                     reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
@@ -304,7 +311,7 @@ public:
                 }
                 version->update_readts(start_ts);  // update read timestamp
                 val->unlock();
-                if (head_version == version && version.deleted) {
+                if (head_version == version && version->deleted) {
                     // Insert
                     Rec* rec = MemoryAllocator::aligned_allocate(record_size);
                     auto new_iter = rw_table.emplace_hint(
@@ -313,7 +320,7 @@ public:
                     auto& w_table = ws.get_table(table_id);
                     w_table.emplace_back(key, new_iter);
                     return rec;
-                } else if (!version.deleted) {
+                } else if (!version->deleted) {
                     // Update
                     Rec* rec = MemoryAllocator::aligned_allocate(record_size);
                     memcpy(rec, version->rec, record_size);

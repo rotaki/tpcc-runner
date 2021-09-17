@@ -1,9 +1,9 @@
+#include "benchmarks/tpcc/include/config.hpp"
+#include "benchmarks/tpcc/include/record_key.hpp"
+#include "benchmarks/tpcc/include/record_layout.hpp"
 #include "gtest/gtest.h"
 #include "protocols/naive/include/database.hpp"
 #include "protocols/naive/include/initializer.hpp"
-#include "tpcc/include/config.hpp"
-#include "tpcc/include/record_key.hpp"
-#include "tpcc/include/record_layout.hpp"
 #include "utils/utils.hpp"
 
 class InitialPopulationTest : public ::testing::Test {

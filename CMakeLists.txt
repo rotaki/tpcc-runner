@@ -50,12 +50,12 @@ set(CMAKE_CXX_FLAGS_RELEASE        "-Ofast -DNDEBUG")
 set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-Ofast -DNDEBUG -g")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
+list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # For language server.
 
-set(LOG_LEVEL
-  "1"
-  CACHE STRING "0(off) 1(error) 2(warn) 3(into) 4(debug) 5(trace)")
+set(LOG_LEVEL "1" CACHE STRING "0(off) 1(error) 2(warn) 3(into) 4(debug) 5(trace)")
+set_property(CACHE LOG_LEVEL PROPERTY STRINGS "0" "1" "2" "3" "4" "5")
 
 set(LOG_LEVEL_DEFINITION "-DLOG_LEVEL=${LOG_LEVEL}")
 if ("${LOG_LEVEL}" STREQUAL "0")
@@ -107,118 +107,113 @@ function(add_dep NAME GIT_URL GIT_TAG)
     message(STATUS "[FOUND] ${NAME} (${GIT_URL} ${GIT_TAG} ${GIT_LAST_COMMIT})")
 endfunction()
 
+###############################################################################
+#                          Bench Specific Parameters                          #
+###############################################################################
 
-set(CC_ALG
-  "NAIVE"
-  CACHE STRING "NAIVE, SILO, NOWAIT, MVTO")
+set(BENCHMARK "TPCC" CACHE STRING "TPCC, YCSB")
+set_property(CACHE BENCHMARK PROPERTY STRINGS "TPCC" "YCSB")
 
-# CC specific paramters
-set(CC_NAME "")
-set(CC_EXECUTABLE "")
-set(CC_SRCS_DIRECTORIES "")
-set(CC_SRCS "")
-set(CC_LINK_LIBRARIES "")
-set(CC_TEST_DIRECTORY "")
+string(TOLOWER "${BENCHMARK}" BENCH_NAME)
+# Benchmark Specific Parameters
+file(GLOB_RECURSE BENCH_SRCS
+"${PROJECT_SOURCE_DIR}/benchmarks/${BENCH_NAME}/*.hpp"
+"${PROJECT_SOURCE_DIR}/benchmarks/${BENCH_NAME}/*.cpp"
+)
 
-if ("${CC_ALG}" STREQUAL "NAIVE")
-  set(CMAKE_CXX_STANDARD 20)
-  list(APPEND CC_NAME "naive")
-  list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
-  list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/naive.cpp")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/naive/include")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/naive/src")
-  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/protocols/naive/include/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/naive/src/*.cpp")
-  list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/naive")
-elseif ("${CC_ALG}" STREQUAL "SILO")
-  set(CMAKE_CXX_STANDARD 17)
-  list(APPEND CC_NAME "silo")
-  list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
-  add_dep(masstree https://github.com/wattlebirdaz/masstree-beta.git master)
-  list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/silo.cpp")
-  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/silo/glue_code")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/silo/include")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/silo/src")
-  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/protocols/silo/glue_code/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/silo/include/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/silo/src/*.cpp")
-  list(APPEND CC_LINK_LIBRARIES "masstree")
-  list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/silo")
-elseif ("${CC_ALG}" STREQUAL "NOWAIT")
-  set(CMAKE_CXX_STANDARD 17)
-  list(APPEND CC_NAME "nowait")
-  list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
-  add_dep(masstree https://github.com/wattlebirdaz/masstree-beta.git master)
-  list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/nowait.cpp")
-  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/nowait/glue_code")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/nowait/include")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/nowait/src")
-  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/protocols/nowait/glue_code/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/nowait/include/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/nowait/src/*.cpp")
-  list(APPEND CC_LINK_LIBRARIES "masstree")
-  list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/nowait")
-elseif ("${CC_ALG}" STREQUAL "MVTO")
-  set(CMAKE_CXX_STANDARD 17)
-  list(APPEND CC_NAME "mvto")
-  list(APPEND COMMON_COMPILE_FLAGS "-Werror" "-Wall" "-Wextra" "-fPIC")
-  add_dep(masstree https://github.com/wattlebirdaz/masstree-beta.git MVTO)
-  list(APPEND CC_EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/mvto.cpp")
-  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/mvto/glue_code")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/mvto/include")
-  list(APPEND CC_SRCS_DIRECTORIES "${PROJECT_SOURCE_DIR}/protocols/mvto/src")
-  file(GLOB_RECURSE CC_SRCS "${PROJECT_SOURCE_DIR}/protocols/mvto/glue_code/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/mvto/include/*.hpp" "${PROJECT_SOURCE_DIR}/protocols/mvto/src/*.cpp")
-  list(APPEND CC_LINK_LIBRARIES "masstree")
-  list(APPEND CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/mvto")
+set(BENCHMARK_DEFINITION "")
+if (BENCHMARK STREQUAL "YCSB")
+  set(PAYLOAD_SIZE 1024 CACHE STRING "Choose payload size for YCSB")
+  list(APPEND BENCHMARK_DEFINITION "-DPAYLOAD_SIZE=${PAYLOAD_SIZE}")
 endif()
 
+###############################################################################
+#                            CC Specific Parameters                           #
+###############################################################################
+
+set(CC_ALG "NAIVE" CACHE STRING "Choose CC Algorithm: NAIVE, SILO, NOWAIT, MVTO")
+set_property(CACHE CC_ALG PROPERTY STRINGS "NAIVE" "SILO" "NOWAIT" "MVTO")
+
+set(CC_LINK_LIBRARIES "")
+set(CC_INCLUDE_DIRECTORIES "")
+  
+if ("${CC_ALG}" STREQUAL "NAIVE")
+  set(CMAKE_CXX_STANDARD 20)
+elseif ("${CC_ALG}" STREQUAL "SILO")
+  set(CMAKE_CXX_STANDARD 17)
+  list(APPEND CC_LINK_LIBRARIES "masstree")
+  add_dep(masstree https://github.com/wattlebirdaz/masstree-beta.git master)
+  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
+elseif ("${CC_ALG}" STREQUAL "NOWAIT")
+  set(CMAKE_CXX_STANDARD 17)
+  list(APPEND CC_LINK_LIBRARIES "masstree")
+  add_dep(masstree https://github.com/wattlebirdaz/masstree-beta.git master)
+  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
+elseif ("${CC_ALG}" STREQUAL "MVTO")
+  set(CMAKE_CXX_STANDARD 17)
+  list(APPEND CC_LINK_LIBRARIES "masstree")
+  add_dep(masstree https://github.com/wattlebirdaz/masstree-beta.git MVTO) # MVTO branch
+  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
+endif()
+
+string(TOLOWER "${CC_ALG}" CC_NAME)
+file(GLOB_RECURSE CC_SRCS 
+"${PROJECT_SOURCE_DIR}/protocols/common/*.hpp"
+"${PROJECT_SOURCE_DIR}/protocols/${BENCH_NAME}_common/*.hpp"
+"${PROJECT_SOURCE_DIR}/protocols/${CC_NAME}/include/*.hpp" 
+"${PROJECT_SOURCE_DIR}/protocols/${CC_NAME}/${BENCH_NAME}/*.hpp"
+)
+set(CC_TEST_DIRECTORY "${PROJECT_SOURCE_DIR}/test/${CC_NAME}")
+
+###############################################################################
+#                                   Utils                                     #
+###############################################################################
+
+file(GLOB_RECURSE UTILS_SRCS
+  "${PROJECT_SOURCE_DIR}/utils/*.hpp"
+)
+
+###############################################################################
+#                       Static library of main project                        #
+###############################################################################
+
+# Add common dependencies
 add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
 add_dep(googletest https://github.com/google/googletest.git master)
 
-###############################################################################
-#                            Static library of tpcc                           #
-###############################################################################
-
+set(TPCCRUNNER_SRCS "")
 set(TPCCRUNNER_COMPILE_DEFINITIONS "")
-list(APPEND TPCCRUNNER_COMPILE_DEFINITIONS "-DLOG_LEVEL=${LOG_LEVEL}")
-list(APPEND TPCCRUNNER_COMPILE_OPTIONS ${COMMON_COMPILE_FLAGS})
-
+set(TPCCRUNNER_COMPILE_OPTIONS "")
+set(TPCCRUNNER_INCLUDE_DIRECTORIES "")
+set(TPCCRUNNER_LINK_LIBRARIES "")
 set(TPCCRUNNER_LINK_OPTIONS "")
 
-set(TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/")
+list(APPEND TPCCRUNNER_SRCS "${BENCH_SRCS}" "${CC_SRCS}" "${UTILS_SRCS}")
+list(APPEND TPCCRUNNER_COMPILE_DEFINITIONS "${LOG_LEVEL_DEFINITION}")
+list(APPEND TPCCRUNNER_COMPILE_OPTIONS "${COMMON_COMPILE_FLAGS}")
+list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${PROJECT_SOURCE_DIR}/")
 list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/mimalloc/include")
 list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/")
 list(APPEND TPCCRUNNER_INCLUDE_DIRECTORIES "${CC_INCLUDE_DIRECTORIES}")
-
-set(TPCCRUNNER_LINK_LIBRARIES "mimalloc")
+list(APPEND TPCCRUNNER_LINK_LIBRARIES "mimalloc")
 list(APPEND TPCCRUNNER_LINK_LIBRARIES "${CC_LINK_LIBRARIES}")
-
 if (APPLE)
   list(APPEND TPCCRUNNER_COMPILE_OPTIONS "-fvisibility=hidden")
   list(APPEND TPCCRUNNER_LINK_OPTIONS "-fvisibility=hidden")
 endif ()
 
 # Create an objectlib, which can be used for creating both static and dynamic library
-file(GLOB_RECURSE
-  TPCCRUNNER_SRCS
-  ${PROJECT_SOURCE_DIR}/tpcc/src/*.cpp
-  ${PROJECT_SOURCE_DIR}/tpcc/include/*.hpp
-  ${PROJECT_SOURCE_DIR}/utils/*.hpp
-)
-list(APPEND TPCCRUNNER_SRCS "${CC_SRCS}")
-
-add_library(tpccrunner_objlib OBJECT ${TPCCRUNNER_SRCS})
-target_link_libraries(tpccrunner_objlib PRIVATE ${TPCCRUNNER_LINK_LIBRARIES})
+add_library(tpccrunner_objlib OBJECT "${TPCCRUNNER_SRCS}")
 target_compile_definitions(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_DEFINITIONS})
 target_compile_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_COMPILE_OPTIONS})
-target_link_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_LINK_OPTIONS})
-target_include_directories(tpccrunner_objlib PUBLIC ${TPCCRUNNER_INCLUDE_DIRECTORIES})
-
 target_compile_options(tpccrunner_objlib PRIVATE ${COMMON_COMPILE_FLAGS})
+target_include_directories(tpccrunner_objlib PUBLIC ${TPCCRUNNER_INCLUDE_DIRECTORIES})
+target_link_libraries(tpccrunner_objlib PRIVATE ${TPCCRUNNER_LINK_LIBRARIES})
+target_link_options(tpccrunner_objlib PUBLIC ${TPCCRUNNER_LINK_OPTIONS})
 
 # create static library
 add_library(tpccrunner_static STATIC $<TARGET_OBJECTS:tpccrunner_objlib>)
-
 target_link_libraries(tpccrunner_static PUBLIC tpccrunner_objlib)
-
 set_target_properties(
   tpccrunner_static
   PROPERTIES
@@ -226,15 +221,20 @@ set_target_properties(
   LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
   )
-
 message(STATUS "[ADDED] tpccrunner_static")
 
 ###############################################################################
 #                                Main binaries                                #
 ###############################################################################
 
-get_filename_component(FILENAME "${CC_EXECUTABLE}" NAME_WE)
-add_executable(${FILENAME} ${CC_EXECUTABLE})
+set(EXECUTABLE "${PROJECT_SOURCE_DIR}/executables/${BENCH_NAME}_${CC_NAME}.cpp")
+if ("${BENCH_NAME}" STREQUAL "ycsb")
+  set(FILENAME "${BENCH_NAME}${PAYLOAD_SIZE}_${CC_NAME}")
+else ()
+  set(FILENAME "${BENCH_NAME}_${CC_NAME}")
+endif ()
+add_executable(${FILENAME} ${EXECUTABLE})
+target_compile_definitions(${FILENAME} PUBLIC "${BENCHMARK_DEFINITION}") 
 target_link_options(${FILENAME} PUBLIC "-pthread")
 target_compile_options(${FILENAME} PUBLIC "-pthread")
 target_compile_options(${FILENAME} PRIVATE ${COMMON_COMPILE_FLAGS})
@@ -252,32 +252,32 @@ set_target_properties(
 #                                 Test binaries                                #
 ###############################################################################
 
-# Ref: https://google.github.io/googletest/quickstart-cmake.html
-enable_testing()
+# # Ref: https://google.github.io/googletest/quickstart-cmake.html
+# enable_testing()
 
-include(GoogleTest)
+# include(GoogleTest)
 
-# test for tpcc
+# # test for tpcc
 
-file(GLOB_RECURSE TPCC_TESTS "${CC_TEST_DIRECTORY}/*.cpp")
-foreach (TPCC_TEST ${TPCC_TESTS})
-  get_filename_component(FILENAME ${TPCC_TEST} NAME_WE)
-  if (${FILENAME} MATCHES "test")
-    add_executable(${FILENAME} ${TPCC_TEST})
-    gtest_discover_tests(${FILENAME})
-    target_compile_options(${FILENAME} PRIVATE ${COMMON_COMPILE_FLAGS})
-    target_include_directories(${FILENAME} PRIVATE "${CC_TEST_DIRECTORY}")
-    target_link_libraries(${FILENAME} tpccrunner_static gtest_main)
-    set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
-    set_target_properties(
-      ${FILENAME}
-      PROPERTIES
-      RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/${CC_NAME}"
-      )
-  endif ()
-endforeach (TPCC_TEST ${TPCC_TESTS})
+# file(GLOB_RECURSE TPCC_TESTS "${CC_TEST_DIRECTORY}/*.cpp")
+# foreach (TPCC_TEST ${TPCC_TESTS})
+#   get_filename_component(FILENAME ${TPCC_TEST} NAME_WE)
+#   if (${FILENAME} MATCHES "test")
+#     add_executable(${FILENAME} ${TPCC_TEST})
+#     gtest_discover_tests(${FILENAME})
+#     target_compile_options(${FILENAME} PRIVATE ${COMMON_COMPILE_FLAGS})
+#     target_include_directories(${FILENAME} PRIVATE "${CC_TEST_DIRECTORY}")
+#     target_link_libraries(${FILENAME} tpccrunner_static gtest_main)
+#     set_target_properties(${FILENAME} PROPERTIES CXX_EXTENTIONS OFF ENABLE_EXPORTS ON)
+#     set_target_properties(
+#       ${FILENAME}
+#       PROPERTIES
+#       RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/test/${CC_NAME}"
+#       )
+#   endif ()
+# endforeach (TPCC_TEST ${TPCC_TESTS})
 
-set(STATUS "[ADDED] tpccrunner tests")
+# set(STATUS "[ADDED] tpccrunner tests")
 
 ###############################################################################
 #                                 Clang-format                                #
@@ -296,7 +296,7 @@ else()
     COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
     --clang-format-executable ${CLANG_FORMAT_BIN}
     -r
-    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc
+    ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks
     ${CMAKE_CURRENT_SOURCE_DIR}/test
     ${CMAKE_CURRENT_SOURCE_DIR}/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/executables
@@ -312,7 +312,7 @@ else()
     COMMAND ${BUILD_SUPPORT_DIR}/run-clang-format.py
     --clang-format-executable ${CLANG_FORMAT_BIN}
     -r
-    ${CMAKE_CURRENT_SOURCE_DIR}/tpcc
+    ${CMAKE_CURRENT_SOURCE_DIR}/benchmarks
     ${CMAKE_CURRENT_SOURCE_DIR}/test
     ${CMAKE_CURRENT_SOURCE_DIR}/utils
     ${CMAKE_CURRENT_SOURCE_DIR}/executables

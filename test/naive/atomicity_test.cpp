@@ -1,10 +1,10 @@
+#include "benchmarks/tpcc/include/payment_tx.hpp"
+#include "benchmarks/tpcc/include/record_layout.hpp"
+#include "benchmarks/tpcc/include/tx_runner.hpp"
 #include "gtest/gtest.h"
 #include "protocols/naive/include/database.hpp"
 #include "protocols/naive/include/initializer.hpp"
 #include "protocols/naive/include/transaction.hpp"
-#include "tpcc/include/payment_tx.hpp"
-#include "tpcc/include/record_layout.hpp"
-#include "tpcc/include/tx_runner.hpp"
 #include "utils/logger.hpp"
 
 class AtomicityTest : public ::testing::Test {

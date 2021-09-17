@@ -203,6 +203,113 @@ public:
         }
     }
 
+    Rec* write(TableID table_id, Key key) {
+        LOG_INFO("WRITE (e: %u, t: %lu, k: %lu)", starting_epoch, table_id, key);
+
+        const Schema& sch = Schema::get_schema();
+        Index& idx = Index::get_index();
+
+        tables.insert(table_id);
+        size_t record_size = sch.get_record_size(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        auto rw_iter = rw_table.find(key);
+        auto& nm = ns.get_nodemap(table_id);
+
+        if (rw_iter == rw_table.end()) {
+            Value* val;
+            typename Index::Result res = idx.find(table_id, key, val);
+
+            if (res == Index::Result::NOT_FOUND) {
+                // Insert if not found in index
+                Value* new_val =
+                    reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
+                new_val->rec = nullptr;
+                new_val->tidword.obj = 0;
+                new_val->tidword.latest = 1;  // exist in index
+                new_val->tidword.absent = 1;  // cannot be seen by others
+
+                res = idx.insert(table_id, key, new_val, nm);
+                if (res == Index::Result::NOT_INSERTED) {
+                    MemoryAllocator::deallocate(new_val);
+                    return nullptr;  // abort
+                }
+
+                Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+                auto new_iter = rw_table.emplace_hint(
+                    rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                    std::forward_as_tuple(
+                        rec, new_val->tidword, ReadWriteType::INSERT, true, new_val));
+
+                auto& w_table = ws.get_table(table_id);
+                w_table.emplace_back(key, new_iter);
+
+                if (res == Index::Result::BAD_INSERT) return nullptr;
+
+                return rec;
+            } else if (res == Index::Result::OK) {
+                // Update if found in index
+                // Copy record and tidword from index
+                Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+                TidWord tw;
+                copy_record(*val, rec, tw, record_size);
+                // Null check
+                if (!is_readable(tw)) {
+                    MemoryAllocator::deallocate(rec);
+                    return nullptr;
+                }
+                // Place it in readwrite set
+                auto new_iter = rw_table.emplace_hint(
+                    rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                    std::forward_as_tuple(rec, tw, ReadWriteType::INSERT, false, val));
+                // Place it in write set
+                auto& w_table = ws.get_table(table_id);
+                w_table.emplace_back(key, new_iter);
+
+                return rec;
+            } else {
+                throw std::runtime_error("invalid state");
+            }
+        }
+
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ) {
+            assert(rw_iter->second.rec == nullptr);
+            // Local set will point to allocated record
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            TidWord tw;
+            copy_record(*rw_iter->second.val, rec, tw, record_size);
+
+            // Check if tidword stored locally is the latest
+            if (!is_same(tw, rw_iter->second.tw)) {
+                MemoryAllocator::deallocate(rec);
+                return nullptr;
+            }
+            rw_iter->second.rec = rec;
+            rw_iter->second.rwt = ReadWriteType::UPDATE;
+
+            // Place it in writeset
+            auto& w_table = ws.get_table(table_id);
+            w_table.emplace_back(key, rw_iter);
+
+            return rec;
+        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+            // Check if tidword stored locally is the latest
+            if (!is_tidword_latest(*(rw_iter->second.val), rw_iter->second.tw)) return nullptr;
+            return rw_iter->second.rec;
+        } else if (rwt == ReadWriteType::DELETE) {
+            assert(rw_iter->second.rec == nullptr);
+            // Check if tidword stored locally is the latest
+            if (!is_tidword_latest(*(rw_iter->second.val), rw_iter->second.tw)) return nullptr;
+            // Allocate memory for write
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            rw_iter->second.rec = rec;
+            rw_iter->second.rwt = ReadWriteType::UPDATE;
+            return rec;
+        } else {
+            throw std::runtime_error("invalid state");
+        }
+    }
+
     Rec* upsert(TableID table_id, Key key) {
         LOG_INFO("UPSERT (e: %u, t: %lu, k: %lu)", starting_epoch, table_id, key);
 

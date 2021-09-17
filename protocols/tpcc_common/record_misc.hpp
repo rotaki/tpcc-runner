@@ -3,8 +3,8 @@
 #include <deque>
 #include <map>
 
-#include "tpcc/include/record_key.hpp"
-#include "tpcc/include/record_layout.hpp"
+#include "benchmarks/tpcc/include/record_key.hpp"
+#include "benchmarks/tpcc/include/record_layout.hpp"
 
 struct CustomerSecondaryKey;
 struct OrderSecondaryKey;

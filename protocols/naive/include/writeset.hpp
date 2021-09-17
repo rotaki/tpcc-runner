@@ -1,8 +1,8 @@
 #pragma once
+#include "benchmarks/tpcc/include/record_layout.hpp"
 #include "protocols/naive/include/cache.hpp"
 #include "protocols/naive/include/database.hpp"
 #include "protocols/naive/include/type_tuple.hpp"
-#include "tpcc/include/record_layout.hpp"
 #include "utils/logger.hpp"
 
 
