@@ -49,7 +49,7 @@ def run_all():
     for setup in gen_setups():
         protocol = setup[0]
         thread = setup[1]
-        warehouse = thread
+        warehouse = 1
         second = NUM_SECONDS
         args = " " + str(warehouse) + " " + str(thread) + " " + str(second)
         print("[" + protocol + "]" + " W:" + str(warehouse) +
@@ -81,7 +81,7 @@ def plot_all():
         if protocol not in abort_rates:
             abort_rates[protocol] = []
         thread = setup[1]
-        warehouse = thread
+        warehouse = 1
         second = NUM_SECONDS
         average_throughput = 0
         average_abort_rate = 0
@@ -129,17 +129,15 @@ def plot_all():
     ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax2.xaxis.set_major_locator(MaxNLocator(integer=True))
 
-    ax1.set_xlabel(
-        "Thread Count = Num Warehouse ({} seconds)".format(NUM_SECONDS))
-    ax2.set_xlabel(
-        "Thread Count = Num Warehouse ({} seconds)".format(NUM_SECONDS))
+    ax1.set_xlabel("Thread Count (1 Warehouse, {} seconds)".format(NUM_SECONDS))
+    ax2.set_xlabel("Thread Count (1 Warehouse, {} seconds)".format(NUM_SECONDS))
     ax1.set_ylabel("Throughput (Million txns/s)")
     ax2.set_ylabel("Abort Rate")
     ax1.grid()
     ax2.grid()
     fig.legend(loc="upper center", ncol=len(throughputs.keys()))
-    fig.savefig("./plots/warehouse_threadcount.pdf")
-    print("warehouse_threadcount.pdf is saved in ./build/bin/res/plots/")
+    fig.savefig("./plots/warehouse_single.pdf")
+    print("warehouse_single.png is saved in ./build/bin/res/plots/")
     os.chdir("../../../")  # go back to base directory
 
 
