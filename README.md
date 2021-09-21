@@ -23,7 +23,7 @@ In tpcc-runner, three protocols with two benchmarks are supported.
   - Multiversion protocol which maintains version chains that keep versions in the timestamp order of transactions.
 ​
 ## Benchmark
-- TPCC
+- TPC-C
   -  [TPC-C](http://www.tpc.org/tpcc/) is a benchmark for online transaction processing systems used as "realistic workloads" in academia.
 TPC-C executes a mix of five different concurrent transactions of different types and complexity to measure the various performances of transaction engines.
 - YCSB
@@ -38,9 +38,9 @@ Read more about each implementation in the docs directory.
 - g++ >= 10
 ​
 ## Build and Execute
-### TPCC
+### TPC-C
 ​
-To build, SILO with TPCC
+To build, SILO with TPC-C
 ​
 ```sh
 mkdir build
