@@ -20,7 +20,7 @@ In tpcc-runner, three protocols with two benchmarks are supported.
 - NOWAIT
   - S2PL protocol which aborts as soon as a locked record is detected.
 - MVTO
-  - Multiversion protocol which maintains version chains that keeps versions in the timestamp order of transactions.
+  - Multiversion protocol which maintains version chains that keep versions in the timestamp order of transactions.
 ​
 ## Benchmark
 - TPCC
@@ -29,6 +29,7 @@ TPC-C executes a mix of five different concurrent transactions of different type
 - YCSB
   - [YCSB](https://ycsb.site) is a micro-benchmark for database systems. YCSB provides six sets of core workloads (A to F) that define a basic benchmark for cloud systems. tpcc-runner supports four of them (A, B, C, F).
 ​
+
 Read more about each implementation in the docs directory.
 ​
 # Getting Started
