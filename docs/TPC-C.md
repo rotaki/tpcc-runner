@@ -1,3 +1,9 @@
+# Optimization
+1. The specification of TPC-C requires to print the output of each transaction in a certain format. This is simplified by creating a 64-bit checksum of the specified output.
+2. Timestamp is implemented as `int64_t`.
+3. No transaction reads the history table and it is an append only table. Also, it does not have a primary key. Therefore, it is implemented as thread local deque. See `protocols/tpcc-common/record_misc.hpp` for details.
+4. Secondary table is required for Order and Customer Table. While Order Secondary Table is implemented using the thread-safe index structure, Customer Secondary Table is implemented using the thread-unsafe `std::multimap` where the value is the Customer record **pointer**. This is possible because no new Customer record is inserted during the execution. Cusotomer records are and only read or updated (fields that consist the secondary key is not updated), which means that the secondary index does not have to be thread-safe. See `protocols/tpcc-common/record_misc.hpp` for details.
+
 # Phantom protection
 
 ## What is it?
