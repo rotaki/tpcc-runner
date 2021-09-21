@@ -11,6 +11,9 @@ from matplotlib.ticker import MaxNLocator
 NUM_EXPERIMENTS_PER_SETUP = 5
 NUM_SECONDS = 10
 
+def get_filename(protocol, thread, warehouse, second, i):
+    return "TPCC" + protocol + "T" + str(thread) + "W" + str(warehouse) + "S" + str(second) + ".log" + str(i)
+
 def gen_setups():
     protocols = ["silo", "nowait", "mvto"]
     threads = [1, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120]
@@ -31,7 +34,7 @@ def build():
             continue
         print("Compiling " + protocol)
         os.system(
-            "cmake .. -DLOG_LEVEL=0 -DCMAKE_BUILD_TYPE=Release -DCC_ALG=" + protocol.upper())
+            "cmake .. -DLOG_LEVEL=0 -DCMAKE_BUILD_TYPE=Release -DBENCHMARK=TPCC -DCC_ALG=" + protocol.upper())
         logfile = protocol + ".compile_log"
         ret = os.system("make -j > ./log/" + logfile + " 2>&1")
         if ret != 0:
@@ -53,11 +56,9 @@ def run_all():
         print("[" + protocol + "]" + " W:" + str(warehouse) +
               " T:" + str(thread) + " S:" + str(second))
         for i in range(NUM_EXPERIMENTS_PER_SETUP):
-            result_file = protocol + "T" + \
-                str(thread) + "W" + str(warehouse) + \
-                "S" + str(second) + ".log" + str(i)
+            result_file = get_filename(protocol, thread, warehouse, second, i)
             print(" Trial:" + str(i))
-            ret = os.system("./" + protocol + args +
+            ret = os.system("./tpcc_" + protocol + args +
                             " > ./res/" + result_file + " 2>&1")
             if ret != 0:
                 print("Error. Stopping")
@@ -84,9 +85,7 @@ def plot_all():
         average_throughput = 0
         average_abort_rate = 0
         for i in range(NUM_EXPERIMENTS_PER_SETUP):
-            result_file = protocol + "T" + \
-                str(thread) + "W" + str(warehouse) + \
-                "S" + str(second) + ".log" + str(i)
+            result_file = get_filename(protocol, thread, warehouse, second, i) 
             result_file = open(result_file)
             for line in result_file:
                 line = line.strip().split()
@@ -135,8 +134,10 @@ def plot_all():
     ax2.set_ylabel("Abort Rate")
     ax1.grid()
     ax2.grid()
-    fig.legend(loc="upper center", ncol=len(throughputs.keys()))
-    fig.savefig("./plots/warehouse_threadcount.pdf")
+    fig.legend(loc="upper center", bbox_to_anchor=(0.5, 0.94), ncol=len(throughputs.keys()))
+    fig.suptitle("(full) TPC-C")
+    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig.savefig("./plots/warehouse_threadcount.png")
     print("warehouse_threadcount.png is saved in ./build/bin/res/plots/")
     os.chdir("../../../")  # go back to base directory
 

@@ -13,7 +13,7 @@ NUM_SECONDS = 10
 
 
 def get_filename(protocol, payload, workload, record, thread, skew, reps, second, i):
-    return protocol + "P" + str(payload) + "W" + workload + "R" + str(record) + "T" + str(thread) + "S" + str(second) + "Theta" + str(skew).replace('.', '') + "Reps" + str(reps) + ".log" + str(i)
+    return "YCSB" + protocol + "P" + str(payload) + "W" + workload + "R" + str(record) + "T" + str(thread) + "S" + str(second) + "Theta" + str(skew).replace('.', '') + "Reps" + str(reps) + ".log" + str(i)
 
 
 def gen_build_setups():
@@ -116,7 +116,7 @@ def get_stats_from_file(result_file):
 
 def tuple_to_string(tup):
     payload, workload, record, skew, reps = tup
-    return "({})P{}R{}THETA{}REPS{}".format(workload, payload, record, str(skew).replace('.', ''), reps)
+    return "YCSB({})P{}R{}THETA{}REPS{}".format(workload, payload, record, str(skew).replace('.', ''), reps)
 
 
 def plot_all():
