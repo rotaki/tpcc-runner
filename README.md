@@ -3,10 +3,10 @@
 An implementation of various in-memory concurrency control protocols by Riki Otaki. To evaluate in-memory concurrency control comprehensively, tpcc-runner aims to provide an Open Source C++ implementation of in-memory concurrency control protocols with full functionality (read, update, insert, delete, range scan, (blind) write, range queries).
 ​
 # Key features
-- Optimisitc, Pessimistic, and Multiversion concurrency control.
+- Optimistic, Pessimistic, and Multiversion concurrency control.
 - Range queries with phantom protection in all the protocols.
 - YCSB and full TPC-C as benchmarks.
-- Conflict graph generation to test (conflict) serialiability at implementation level.
+- Conflict graph generation to test (conflict) serializability at implementation level.
 - Generic interface between benchmark and protocols, protocols and indexes.
 - 100% Open-Source (MIT License)
 ​
@@ -15,7 +15,6 @@ An implementation of various in-memory concurrency control protocols by Riki Ota
 In tpcc-runner, three protocols with two benchmarks are supported.
 ​
 ## Protocols
-​
 - SILO
   - A scalable multi-core optimistic concurrency control protocol proposed in the paper: ["Speedy Transactions in Multicore In-Memory Databases"](http://people.csail.mit.edu/stephentu/papers/silo.pdf).
 - NOWAIT
@@ -33,13 +32,11 @@ TPC-C executes a mix of five different concurrent transactions of different type
 Read more about each implementation in the docs directory.
 ​
 # Getting Started
-​
 ## Dependencies
 - Ubuntu 20.04
 - g++ >= 10
 ​
 ## Build and Execute
-  
 ### TPCC
 ​
 To build, SILO with TPCC
@@ -62,8 +59,7 @@ cd build/bin
 For example, `./tpcc_silo 2 5 20` will create tables with 2 warehouses and executes TPC-C using 5 threads for 20 seconds.
 ​
 ### YCSB
-​
-- To build SILO with YCSB
+​To build SILO with YCSB
 ​
 ```sh
 mkdir build
@@ -84,16 +80,11 @@ cd build/bin
 For example, `./yscb4_silo A 10000000 15 10 0.99 2` will create table with 10M records (each with four bytes) and executes YCSB-A with 0.99 skew, two operations per transaction using 15 threads for 10 seconds. See [ycsb documentation](https://github.com/brianfrankcooper/YCSB/wiki/Core-Workloads) for the details of the workload.
 ​
 # Performance
-​
 ## Overview (WIP)
-
 ## TPC-C
-
 ## YCSB
 ## General output format 
-
 ### TPC-C
-
 ```
 Loading all tables with 10 warehouse(s)
 Loaded
@@ -160,7 +151,6 @@ System Abort Details:
         PRECOMMIT                                    : 0
 ```
 ### YCSB
-
 ```
 Loading all tables with 10000000 record(s) each with 128 bytes
 Loaded
@@ -178,9 +168,7 @@ Details:
 
 Read more about the implementation details of the protocols and benchmarks in the docs directory.
 # Author
-​
 Riki Otaki
 ​
 # Licensing
-​
 [MIT License](https://github.com/wattlebirdaz/tpcc-runner/blob/master/LICENSE)
