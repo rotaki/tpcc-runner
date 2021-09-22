@@ -87,7 +87,7 @@ For example, `./yscb4_silo A 10000000 15 10 0.99 2` will create table with 10M r
 
 ## YCSB
 ![YCSB-A(Record: 1000)](docs/images/YCSB(A)P100R1000THETA099REPS16.png)
-![YCSB-A(Record: 10000)](docs/images/YCSB(A)P100R1000THETA099REPS16.png)
+![YCSB-A(Record: 10000)](docs/images/YCSB(A)P100R10000THETA099REPS16.png)
 ![YCSB-B(Record: 1000)](docs/images/YCSB(B)P100R1000THETA099REPS16.png)
 ![YCSB-B(Record: 10000)](docs/images/YCSB(B)P100R10000THETA099REPS16.png)
 ![YCSB-C(Record: 1000)](docs/images/YCSB(C)P1024R10000000THETA0REPS2.png)
