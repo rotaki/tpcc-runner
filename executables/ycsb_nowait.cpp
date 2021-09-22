@@ -30,30 +30,12 @@ template <typename Protocol>
 void run_tx(int* flag, ThreadLocalData& t_data, uint32_t worker_id, EpochManager<Protocol>& em) {
     Worker<Protocol> w(worker_id);
     em.set_worker(worker_id, &w);
-    const Config& c = get_config();
-    int r = c.get_read_propotion();
-    int u = c.get_update_propotion();
-    int rmw = c.get_readmodifywrite_propotion();
     while (__atomic_load_n(flag, __ATOMIC_ACQUIRE)) {
         Transaction tx(w);
 
         Stat& stat = t_data.stat;
 
-        using R = ReadTx<Record>;
-        using U = UpdateTx<Record>;
-        using RWM = ReadModifyWriteTx<Record>;
-
-        int x = urand_int(1, 100);
-        int p = 0;
-        if (x <= (p += r)) {
-            run_with_retry<R>(tx, stat);
-        } else if (x <= (p += u)) {
-            run_with_retry<U>(tx, stat);
-        } else if (x <= (p += rmw)) {
-            run_with_retry<RWM>(tx, stat);
-        } else {
-            throw std::runtime_error("No operation found");
-        }
+        run_with_retry<Tx<Record>>(tx, stat);
     }
 }
 

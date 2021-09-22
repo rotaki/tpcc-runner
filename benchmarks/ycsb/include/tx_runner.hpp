@@ -3,10 +3,8 @@
 #include <cstdint>
 #include <stdexcept>
 
-#include "benchmarks/ycsb/include/read_modify_write_tx.hpp"
-#include "benchmarks/ycsb/include/read_tx.hpp"
+#include "benchmarks/ycsb/include/tx.hpp"
 #include "benchmarks/ycsb/include/tx_utils.hpp"
-#include "benchmarks/ycsb/include/update_tx.hpp"
 #include "utils/logger.hpp"
 
 template <typename TxProfile, typename Transaction>

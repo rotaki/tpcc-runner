@@ -10,36 +10,17 @@ enum Status {
     BUG            // if any stage of a transaciton returns unexpected Result::FAIL
 };
 
-enum TxProfileID : uint8_t { READ_TX = 0, UPDATE_TX = 1, READMODIFYWRITE_TX = 2, MAX = 3 };
+enum TxProfileID : uint8_t { TX = 0, MAX = 1 };
 
 template <typename Record>
-class ReadTx;
-
-template <typename Record>
-class ReadModifyWriteTx;
-
-template <typename Record>
-class UpdateTx;
-
+class Tx;
 template <TxProfileID i>
 struct TxType;
 
 template <>
-struct TxType<TxProfileID::READ_TX> {
+struct TxType<TxProfileID::TX> {
     template <typename Record>
-    using Profile = ReadTx<Record>;
-};
-
-template <>
-struct TxType<TxProfileID::READMODIFYWRITE_TX> {
-    template <typename Record>
-    using Profile = ReadModifyWriteTx<Record>;
-};
-
-template <>
-struct TxType<TxProfileID::UPDATE_TX> {
-    template <typename Record>
-    using Profile = UpdateTx<Record>;
+    using Profile = Tx<Record>;
 };
 
 template <TxProfileID i, typename Record>
