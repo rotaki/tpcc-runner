@@ -135,7 +135,7 @@ def plot_all():
     ax1.grid()
     ax2.grid()
     fig.legend(loc="upper center", bbox_to_anchor=(0.5, 0.94), ncol=len(throughputs.keys()))
-    fig.suptitle("(full) TPC-C")
+    fig.suptitle("(NP Only) TPC-C")
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     fig.savefig("./plots/warehouse_threadcount.png")
     print("warehouse_threadcount.png is saved in ./build/bin/res/plots/")

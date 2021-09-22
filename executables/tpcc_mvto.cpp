@@ -31,13 +31,13 @@ void run_tx(
         Output& out = t_data.out;
 
         int x = urand_int(1, 100);
-        if (x <= 4) {
-            run_with_retry<StockLevelTx>(tx, stat, out);
-        } else if (x <= 8) {
-            run_with_retry<DeliveryTx>(tx, stat, out);
-        } else if (x <= 12) {
-            run_with_retry<OrderStatusTx>(tx, stat, out);
-        } else if (x <= 12 + 43) {
+        // if (x <= 4) {
+        //     run_with_retry<StockLevelTx>(tx, stat, out);
+        // } else if (x <= 8) {
+        //     run_with_retry<DeliveryTx>(tx, stat, out);
+        // } else if (x <= 12) {
+        //     run_with_retry<OrderStatusTx>(tx, stat, out);
+        if (x <= 50) {
             run_with_retry<PaymentTx>(tx, stat, out);
         } else {
             run_with_retry<NewOrderTx>(tx, stat, out);
