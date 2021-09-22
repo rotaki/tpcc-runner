@@ -9,7 +9,7 @@ Details for the protocols implemented in this repository.
 | -------- | ------------------ | ---------- | ------------- | ------------------ | --------------------------- | ---- | --------------- | ------------------------ |
 | SILO     | Optimistic         | By Pointer | Copy on Write | Node Verify        | Epoch Based Tuple Level     | Spin | -               | -                        |
 | NOWAIT   | Pessimistic        | By Pointer | Copy on Write | Next-Key Lock      | Epoch Based Tuple Level     | Spin | -               | -                        |
-| MVTO     | Timestamp Ordering | By Pointer | Copy on Write | Node Timestamp     | Timestamp Based Tuple Level | Spin | O2N             | No                       |
+| MVTO     | Timestamp Ordering | By Pointer | Copy on Write | Node Timestamp     | Timestamp Based Tuple Level | Spin | N2O             | No                       |
 ## Type
 ### Pessimistic
 Pessimistic approach locks record on read.
