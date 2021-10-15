@@ -5,7 +5,6 @@
 #include "benchmarks/ycsb/include/record_layout.hpp"
 #include "protocols/common/memory_allocator.hpp"
 #include "protocols/common/schema.hpp"
-#include "protocols/silo/include/tidword.hpp"
 #include "protocols/ycsb_common/record_misc.hpp"
 #include "utils/utils.hpp"
 

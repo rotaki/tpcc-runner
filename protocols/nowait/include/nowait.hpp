@@ -297,10 +297,6 @@ public:
             auto rw_iter = rw_table.find(key);
 
             if (rw_iter == rw_table.end()) {
-                // Abort if key is not found in table
-                Value* val;
-                typename Index::Result res = idx.find(table_id, key, val);
-                if (res == Index::Result::NOT_FOUND) return false;  // abort
                 // Get read lock
                 if (!val->rwl.try_lock_shared()) return false;  // abort
                 // Place it into readwriteset
@@ -429,9 +425,6 @@ public:
 
         Index& idx = Index::get_index();
 
-        // get epoch
-        uint32_t commit_epoch = load_acquire(EpochManager<NoWait<Index>>::get_global_epoch());
-
         // unlock read lock
         for (TableID table_id: tables) {
             auto& rw_table = rws.get_table(table_id);
@@ -451,7 +444,7 @@ public:
                 } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
                     Rec* old = exchange(rw_iter->second.val->rec, rw_iter->second.rec);
                     rw_iter->second.val->rwl.unlock();
-                    GarbageCollector::collect(commit_epoch, old);
+                    MemoryAllocator::deallocate(old);
                 } else if (rwt == ReadWriteType::DELETE) {
                     idx.remove(table_id, rw_iter->first);
                     MemoryAllocator::deallocate(rw_iter->second.val->rec);
