@@ -265,7 +265,7 @@ public:
             return rec;
         } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
             return rw_iter->second.rec;
-        } else if (rw_iter->second.rwt == ReadWriteType::DELETE) {
+        } else if (rwt == ReadWriteType::DELETE) {
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
             rw_iter->second.rec = rec;
             rw_iter->second.rwt = ReadWriteType::UPDATE;
