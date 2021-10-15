@@ -131,8 +131,8 @@ endif()
 #                            CC Specific Parameters                           #
 ###############################################################################
 
-set(CC_ALG "NAIVE" CACHE STRING "Choose CC Algorithm: NAIVE, SILO, NOWAIT, MVTO")
-set_property(CACHE CC_ALG PROPERTY STRINGS "NAIVE" "SILO" "NOWAIT" "MVTO")
+set(CC_ALG "NAIVE" CACHE STRING "Choose CC Algorithm: NAIVE, SILO, NOWAIT, MVTO, WAITDIE")
+set_property(CACHE CC_ALG PROPERTY STRINGS "NAIVE" "SILO" "NOWAIT" "MVTO" "WAITDIE")
 
 set(CC_LINK_LIBRARIES "")
 set(CC_INCLUDE_DIRECTORIES "")
@@ -153,6 +153,11 @@ elseif ("${CC_ALG}" STREQUAL "MVTO")
   set(CMAKE_CXX_STANDARD 17)
   list(APPEND CC_LINK_LIBRARIES "masstree")
   add_dep(masstree https://github.com/wattlebirdaz/masstree-beta.git MVTO) # MVTO branch
+  list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
+elseif ("${CC_ALG}" STREQUAL "WAITDIE")
+set(CMAKE_CXX_STANDARD 17)
+  list(APPEND CC_LINK_LIBRARIES "masstree")
+  add_dep(masstree https://github.com/wattlebirdaz/masstree-beta.git master)
   list(APPEND CC_INCLUDE_DIRECTORIES "${CMAKE_BINARY_DIR}/_deps/src/") # masstree
 endif()
 
