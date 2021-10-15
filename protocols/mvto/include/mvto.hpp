@@ -619,7 +619,7 @@ public:
                         unlock_writeset(table_id, w_iter->first, false);
                         return false;
                     } else if (res == Index::Result::OK) {
-                        // to prevent phantoms, abort if timestamp of the node is smaller than
+                        // to prevent phantoms, abort if timestamp of the node is larger than
                         // start_ts
                         LeafNode* leaf = reinterpret_cast<LeafNode*>(ni.node);
                         if (leaf->get_ts() > start_ts) {
