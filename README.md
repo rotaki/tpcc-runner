@@ -12,7 +12,7 @@ An implementation of various in-memory concurrency control protocols by Riki Ota
 ​
 # Details
 ​
-In tpcc-runner, three protocols with two benchmarks are supported.
+In tpcc-runner, four protocols with two benchmarks are supported.
 ​
 ## Protocols
 - SILO
@@ -21,7 +21,8 @@ In tpcc-runner, three protocols with two benchmarks are supported.
   - S2PL protocol which aborts as soon as a locked record is detected.
 - MVTO
   - Multiversion protocol which maintains version chains that keep versions in the timestamp order of transactions.
-​
+​- WAITDIE
+  - S2PL protocol with waitdie style lock
 ## Benchmark
 - TPC-C
   -  [TPC-C](http://www.tpc.org/tpcc/) is a benchmark for online transaction processing systems used as "realistic workloads" in academia.

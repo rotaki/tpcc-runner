@@ -5,11 +5,12 @@ Details for the protocols implemented in this repository.
 
 # Overview
 
-| Protocol | Type               | Read       | Update        | Phantom Protection | GC                          | Lock | Version Storage | Version Head Indirection |
-| -------- | ------------------ | ---------- | ------------- | ------------------ | --------------------------- | ---- | --------------- | ------------------------ |
-| SILO     | Optimistic         | By Pointer | Copy on Write | Node Verify        | Epoch Based Tuple Level     | Spin | -               | -                        |
-| NOWAIT   | Pessimistic        | By Pointer | Copy on Write | Next-Key Lock      | Epoch Based Tuple Level     | Spin | -               | -                        |
-| MVTO     | Timestamp Ordering | By Pointer | Copy on Write | Node Timestamp     | Timestamp Based Tuple Level | Spin | N2O             | No                       |
+| Protocol | Type               | Read       | Update        | Phantom Protection | Update GC                   | Delete GC                   | Lock    | Version Storage | Version Head Indirection |
+| -------- | ------------------ | ---------- | ------------- | ------------------ | --------------------------- | --------------------------- | ------- | --------------- | ------------------------ |
+| SILO     | Optimistic         | By Pointer | Copy on Write | Node Verify        | Epoch Based Tuple Level     | Epoch Based Tuple Level     | Spin    | -               | -                        |
+| NOWAIT   | Pessimistic        | By Pointer | Copy on Write | Next-Key Lock      | -                           | Epoch Based Tuple Level     | Spin    | -               | -                        |
+| MVTO     | Timestamp Ordering | By Pointer | Copy on Write | Node Timestamp     | Timestamp Based Tuple Level | Timestamp Based Tuple Level | Spin    | N2O             | No                       |
+| NOWAIT   | Pessimistic        | By Pointer | Copy on Write | Next-Key Lock      | -                           | Epoch Based Tuple Level     | WaitDie | -               | -                        |
 ## Type
 ### Pessimistic
 Pessimistic approach locks record on read.
