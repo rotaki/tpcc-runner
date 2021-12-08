@@ -184,7 +184,7 @@ file(GLOB_RECURSE UTILS_SRCS
 
 # Add common dependencies
 add_dep(mimalloc https://github.com/microsoft/mimalloc v1.7.1)
-add_dep(googletest https://github.com/google/googletest.git master)
+add_dep(googletest https://github.com/google/googletest.git main)
 
 set(TPCCRUNNER_SRCS "")
 set(TPCCRUNNER_COMPILE_DEFINITIONS "")
