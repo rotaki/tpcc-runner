@@ -34,7 +34,7 @@ inline uint64_t urand_int(uint64_t min, uint64_t max) {
     return (get_rand()() % (max - min + 1)) + min;
 }
 
-inline uint64_t zipf_int(uint64_t theta, uint64_t nr) {
+inline uint64_t zipf_int(double theta, uint64_t nr) {
     thread_local FastZipf fz(get_rand(), theta, nr);
     return fz();
 }
