@@ -43,7 +43,7 @@ struct TxType<TxProfileID::UPDATE_TX> {
 };
 
 template <TxProfileID i, typename Record>
-using TxProfile = typename TxType<i>::Profile<Record>;
+using TxProfile = typename TxType<i>::template Profile<Record>;
 
 struct Stat {
     struct PerTxType {
