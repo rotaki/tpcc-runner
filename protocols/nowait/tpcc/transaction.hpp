@@ -65,7 +65,7 @@ public:
     }
 
     template <typename Record>
-    Result finish_insert(Record* rec_ptr) {
+    Result finish_insert([[maybe_unused]] Record* rec_ptr) {
         // secondary index insert
         if constexpr (std::is_same<Record, Order>::value) {
             Secondary<Record>* sec = nullptr;
