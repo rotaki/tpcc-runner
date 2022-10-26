@@ -36,7 +36,7 @@ Read more about each implementation in the docs directory.
 # Getting Started
 ## Dependencies
 - Ubuntu 20.04
-- g++ >= 10
+- g++ >= 9
 ​
 ## Build and Execute
 ### TPC-C
