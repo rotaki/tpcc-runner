@@ -651,7 +651,7 @@ public:
         }
 
         commit_tw.epoch = load_acquire(EpochManager<Silo<Index>>::get_global_epoch());
-        LOG_INFO("  SERIAL POINT (se: %u, ce: %u)", starting_epoch, commit_tw.epoch);
+        LOG_INFO("  SERIAL POINT (se: %u, ce: %lu)", starting_epoch, commit_tw.epoch);
 
         // Phase 2.1 (Validate ReadSet)
         LOG_INFO("  P2.1 (Validate ReadSet)");
@@ -674,7 +674,7 @@ public:
 
         // Generate tid that is bigger than that of read/writeset
         commit_tw.tid++;
-        LOG_INFO("  COMMIT TID: %u", commit_tw.tid);
+        LOG_INFO("  COMMIT TID: %lu", commit_tw.tid);
 
         // Phase 2.2 (Validate NodeSet)
         LOG_INFO("  P2.2 (Validate NodeSet) ");

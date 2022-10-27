@@ -2,9 +2,10 @@
 
 #include <ctime>
 #include <string>
+#include <thread>
 
 #define LOG_LOG_TIME_FORMAT "%Y-%m-%d %H:%M:%S"
-#define LOG_OUTPUT_STREAM stdout
+#define LOG_OUTPUT_STREAM THREAD_LOCAL_FILE()
 
 // Log levels
 #define LOG_LEVEL_OFF 0
@@ -13,6 +14,13 @@
 #define LOG_LEVEL_INFO 3
 #define LOG_LEVEL_DEBUG 4
 #define LOG_LEVEL_TRACE 5
+
+inline FILE* THREAD_LOCAL_FILE() {
+    thread_local uint64_t id = std::hash<std::thread::id>{}(std::this_thread::get_id());
+    thread_local std::string file_name = "log" + std::to_string(id) + ".txt";
+    thread_local FILE* pFile = fopen(file_name.c_str(), "w");
+    return pFile;
+}
 
 // https://blog.galowicz.de/2016/02/20/short_file_macro/
 using cstr = const char*;
