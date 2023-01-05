@@ -8,6 +8,7 @@
 #include "benchmarks/tpcc/include/record_layout.hpp"
 #include "benchmarks/tpcc/include/tx_utils.hpp"
 #include "utils/logger.hpp"
+#include "utils/tsc.hpp"
 
 
 class NewOrderTx {
@@ -131,6 +132,8 @@ public:
 
     template <typename Transaction>
     Status run(Transaction& tx, Stat& stat, Output& out) {
+        uint64_t start, end;
+        start = rdtscp();
         typename Transaction::Result res;
         TxHelper<Transaction> helper(tx, stat[TxProfileID::NEWORDER_TX]);
 
@@ -240,8 +243,8 @@ public:
 
         total *= (1 - c->c_discount) * (1 + w->w_tax + d->d_tax);
         out << total;
-
-        return helper.commit(PRECOMMIT);
+        end = rdtscp();
+        return helper.commit(PRECOMMIT, end - start);
     }
 
 private:

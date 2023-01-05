@@ -9,7 +9,7 @@
 #include "benchmarks/tpcc/include/record_layout.hpp"
 #include "benchmarks/tpcc/include/tx_utils.hpp"
 #include "utils/logger.hpp"
-
+#include "utils/tsc.hpp"
 
 class StockLevelTx {
 public:
@@ -64,6 +64,8 @@ public:
 
     template <typename Transaction>
     Status run(Transaction& tx, Stat& stat, Output& out) {
+        uint64_t start, end;
+        start = rdtscp();
         typename Transaction::Result res;
         TxHelper<Transaction> helper(tx, stat[TxProfileID::STOCKLEVEL_TX]);
 
@@ -101,6 +103,7 @@ public:
         }
 
         out << s_i_ids.size();
-        return helper.commit(PRECOMMIT);
+        end = rdtscp();
+        return helper.commit(PRECOMMIT, end - start);
     }
 };

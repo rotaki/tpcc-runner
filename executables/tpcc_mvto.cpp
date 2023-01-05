@@ -1,3 +1,4 @@
+#include <inttypes.h>
 #include <unistd.h>
 
 #include <string>
@@ -109,9 +110,12 @@ int main(int argc, const char* argv[]) {
         constexpr auto p = static_cast<TxProfileID>(i.value);
         using Profile = TxProfile<p>;
         printf(
-            "    %-11s c:%8lu(%.2f%%)   ua:%6lu  sa:%6lu\n", Profile::name, stat[p].num_commits,
-            stat[p].num_commits / (double)total.num_commits, stat[p].num_usr_aborts,
-            stat[p].num_sys_aborts);
+            "    %-11s c:%10lu(%.2f%%)   ua:%10lu  sa:%10lu  avgl:%10.0lf  minl:%10" PRIu64
+            "  maxl:%10" PRIu64 "\n",
+            Profile::name, stat[p].num_commits, stat[p].num_commits / (double)total.num_commits,
+            stat[p].num_usr_aborts, stat[p].num_sys_aborts,
+            stat[p].total_latency / (double)stat[p].num_commits, stat[p].min_latency,
+            stat[p].max_latency);
     });
 
     printf("\nSystem Abort Details:\n");

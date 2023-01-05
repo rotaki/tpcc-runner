@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "benchmarks/tpcc/include/config.hpp"
 #include "utils/utils.hpp"
 
@@ -92,6 +94,9 @@ struct Stat {
         size_t num_usr_aborts = 0;
         size_t num_sys_aborts = 0;
         size_t abort_details[ABORT_DETAILS_SIZE] = {};
+        uint64_t total_latency = 0;
+        uint64_t min_latency = UINT64_MAX;
+        uint64_t max_latency = 0;
 
         void add(const PerTxType& rhs, bool with_abort_details) {
             num_commits += rhs.num_commits;
@@ -103,6 +108,10 @@ struct Stat {
                     abort_details[i] += rhs.abort_details[i];
                 }
             }
+
+            total_latency += rhs.total_latency;
+            min_latency = std::min(min_latency, rhs.min_latency);
+            max_latency = std::max(max_latency, rhs.max_latency);
         }
     };
 
@@ -166,8 +175,11 @@ struct TxHelper {
         }
     }
 
-    Status commit(uint8_t abort_id) {
+    Status commit(uint8_t abort_id, uint64_t time) {
         if (tx_.commit()) {
+            per_type_.total_latency += time;
+            per_type_.min_latency = std::min(per_type_.min_latency, time);
+            per_type_.max_latency = std::max(per_type_.max_latency, time);
             per_type_.num_commits++;
             return Status::SUCCESS;
         } else {
