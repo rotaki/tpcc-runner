@@ -88,11 +88,13 @@ int main(int argc, const char* argv[]) {
     constexpr_for<TxProfileID::MAX>([&](auto i) {
         constexpr auto p = static_cast<TxProfileID>(i.value);
         using Profile = TxProfile<p>;
+        double tries = stat[p].num_commits + stat[p].num_usr_aborts + stat[p].num_sys_aborts;
         printf(
-            "    %-11s c:%10lu(%.2f%%)   ua:%10lu  sa:%10lu  avgl:%10.0lf  minl:%10" PRIu64
+            "    %-11s c[%.2f%%]:%10lu(%.2f%%)   ua:%10lu(%.2f%%)  sa:%10lu(%.2f%%)  avgl:%10.0lf  minl:%10" PRIu64
             "  maxl:%10" PRIu64 "\n",
-            Profile::name, stat[p].num_commits, stat[p].num_commits / (double)total.num_commits,
-            stat[p].num_usr_aborts, stat[p].num_sys_aborts,
+            Profile::name, stat[p].num_commits / (double)total.num_commits, stat[p].num_commits,
+            stat[p].num_commits / tries, stat[p].num_usr_aborts, stat[p].num_usr_aborts / tries,
+            stat[p].num_sys_aborts, stat[p].num_sys_aborts / tries,
             stat[p].total_latency / (double)stat[p].num_commits, stat[p].min_latency,
             stat[p].max_latency);
     });
