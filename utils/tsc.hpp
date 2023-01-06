@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-static uint64_t rdtscp() {
+inline uint64_t rdtscp() {
     uint64_t rax;
     uint64_t rdx;
     uint32_t aux;
