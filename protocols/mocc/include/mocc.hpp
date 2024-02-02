@@ -220,75 +220,86 @@ public:
     }
 
     Rec* update(TableID table_id, Key key) {
-        return nullptr;
-        // LOG_INFO(
-        //     "UPDATE (ts: %lu, s_ts: %lu, l_ts: %lu, t: %lu, k: %lu)", start_ts, smallest_ts,
-        //     largest_ts, table_id, key);
-        // const Schema& sch = Schema::get_schema();
-        // Index& idx = Index::get_index();
+        LOG_INFO("UPDATE (t: %lu, k: %lu)", table_id, key);
+        const Schema& sch = Schema::get_schema();
+        Index& idx = Index::get_index();
 
-        // size_t record_size = sch.get_record_size(table_id);
-        // tables.insert(table_id);
-        // auto& rw_table = rws.get_table(table_id);
-        // auto rw_iter = rw_table.find(key);
+        size_t record_size = sch.get_record_size(table_id);
+        tables.insert(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        auto rw_iter = rw_table.find(key);
 
-        // if (rw_iter == rw_table.end()) {
-        //     // Abort if not found in index
-        //     Value* val;
-        //     typename Index::Result res = idx.find(table_id, key, val);
-        //     if (res == Index::Result::NOT_FOUND) return nullptr;
+        if (rw_iter == rw_table.end()) {
+            Value* val;
+            typename Index::Result res = idx.find(table_id, key, val);
+            if (res == Index::Result::NOT_FOUND) return nullptr;
 
-        //     // Read version chain and get the correct version
-        //     val->lock();
-        //     if (val->is_detached_from_tree()) {
-        //         val->unlock();
-        //         return nullptr;
-        //     }
-        //     if (val->is_empty()) {
-        //         delete_from_tree(table_id, key, val);
-        //         val->unlock();
-        //         return nullptr;
-        //     }
-        //     Version* version = get_correct_version(val);
-        //     gc_version_chain(val);
-        //     if (version == nullptr) {
-        //         val->unlock();
-        //         return nullptr;  // no visible version
-        //     }
-        //     version->update_readts(start_ts);  // update read timestamp
-        //     val->unlock();
-        //     if (version->deleted == true) return nullptr;
+            // Update if found in index
+            Epotemp loadepot;
+            const int per_xx_temp = 4096;
+            const int temp_threshold = 5;
+            const int temp_max = 20;
+            const int temp_reset_us = 100;
 
-        //     // Allocate memory for write
-        //     Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-        //     memcpy(rec, version->rec, record_size);
-        //     auto new_iter = rw_table.emplace_hint(
-        //         rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-        //         std::forward_as_tuple(version->rec, rec, ReadWriteType::UPDATE, false, val));
-        //     // Place it in writeset
-        //     auto& w_table = ws.get_table(table_id);
-        //     w_table.emplace_back(key, new_iter);
-        //     return rec;
-        // }
+            size_t epotemp_index;
+            epotemp_index = key * sizeof(Value) / per_xx_temp;
+            loadepot.obj = load_acquire(EpotempAry[epotemp_index].obj);
 
-        // auto rwt = rw_iter->second.rwt;
-        // if (rwt == ReadWriteType::READ) {
-        //     // Localset will point to allocated record
-        //     Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-        //     memcpy(rec, rw_iter->second.read_rec, record_size);
-        //     rw_iter->second.write_rec = rec;
-        //     rw_iter->second.rwt = ReadWriteType::UPDATE;
-        //     // Place it in writeset
-        //     auto& w_table = ws.get_table(table_id);
-        //     w_table.emplace_back(key, rw_iter);
-        //     return rec;
-        // } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
-        //     return rw_iter->second.write_rec;
-        // } else if (rwt == ReadWriteType::DELETE) {
-        //     return nullptr;
-        // } else {
-        //     throw std::runtime_error("invalid state");
-        // }
+            // Get write lock
+            if (loadepot.temp >= temp_threshold) lock(table_id, key, val, LockType::WRITE);
+            if (status == TransactionStatus::aborted) return nullptr;
+
+            LockElement<RWLock> *in_rtr_locklist;
+            in_rtr_locklist = search_locklists(retrospective_locklists.get_table(table_id), key);
+
+            if (in_rtr_locklist != nullptr) lock(table_id, key, val, LockType::WRITE);
+            if (status == TransactionStatus::aborted) return nullptr;
+
+            // Allocate memory for write
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            memcpy(rec, val->rec, record_size);
+            rw_table.emplace_hint(
+                rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(rec, ReadWriteType::UPDATE, false, val));
+            return rec;
+        }
+
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ) {
+            // Upgrade lock
+            Epotemp loadepot;
+            const int per_xx_temp = 4096;
+            const int temp_threshold = 5;
+            const int temp_max = 20;
+            const int temp_reset_us = 100;
+
+            size_t epotemp_index;
+            epotemp_index = key * sizeof(Value) / per_xx_temp;
+            loadepot.obj = load_acquire(EpotempAry[epotemp_index].obj);
+
+            // Get write lock
+            if (loadepot.temp >= temp_threshold) lock(table_id, key, rw_iter->second.val, LockType::WRITE);
+            if (status == TransactionStatus::aborted) return nullptr;
+
+            LockElement<RWLock> *in_rtr_locklist;
+            in_rtr_locklist = search_locklists(retrospective_locklists.get_table(table_id), key);
+
+            if (in_rtr_locklist != nullptr) lock(table_id, key, rw_iter->second.val, LockType::WRITE);
+            if (status == TransactionStatus::aborted) return nullptr;
+
+            // Localset will point to allocated record
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            memcpy(rec, rw_iter->second.val->rec, record_size);
+            rw_iter->second.rec = rec;
+            rw_iter->second.rwt = ReadWriteType::UPDATE;
+            return rec;
+        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+            return rw_iter->second.rec;
+        } else if (rwt == ReadWriteType::DELETE) {
+            return nullptr;
+        } else {
+            throw std::runtime_error("invalid state");
+        }
     }
 
     Rec* write(TableID table_id, Key key) {
