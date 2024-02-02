@@ -132,91 +132,70 @@ public:
     }
 
     Rec* insert(TableID table_id, Key key) {
-        return nullptr;
-        // LOG_INFO(
-        //     "INSERT (ts: %lu, s_ts: %lu, l_ts: %lu, t: %lu, k: %lu)", start_ts, smallest_ts,
-        //     largest_ts, table_id, key);
+        LOG_INFO("IN (t: %lu, k: %lu)", table_id, key);
+        const Schema& sch = Schema::get_schema();
+        Index& idx = Index::get_index();
 
-        // const Schema& sch = Schema::get_schema();
-        // Index& idx = Index::get_index();
+        size_t record_size = sch.get_record_size(table_id);
+        tables.insert(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        auto rw_iter = rw_table.find(key);
 
-        // size_t record_size = sch.get_record_size(table_id);
-        // tables.insert(table_id);
-        // auto& rw_table = rws.get_table(table_id);
-        // auto rw_iter = rw_table.find(key);
+        if (rw_iter == rw_table.end()) {
+            Value* val;
+            typename Index::Result res = idx.find(table_id, key, val);
+            if (res != Index::Result::OK) return nullptr;
 
-        // if (rw_iter == rw_table.end()) {
-        //     // Insert possible when
-        //     // 1. Key exists in index with a deleted version as head of the version chain
-        //     // 2. Key is not in index
+            // TODO: confirm if next key locking is necessary
+            // In Nemoto implementation, next key locking is not implemented
 
-        //     Value* val;
-        //     typename Index::Result res = idx.find(table_id, key, val);
+            // Get next key write lock
+            Key next_key;
+            Value* next_value;
+            res = idx.get_next_kv(table_id, key, next_key, next_value);
+            assert(next_key != 0);
+            assert(next_value != nullptr);
+            if (res != Index::Result::OK) return nullptr;
+            auto next_iter = rw_table.find(next_key);
+            if (next_iter == rw_table.end()) {
+                if (!next_value->rwl.try_lock()) return nullptr;
+            } else if (next_iter->second.rwt == ReadWriteType::READ) {
+                if (!next_value->rwl.try_lock_upgrade()) return nullptr;
+            }
 
-        //     if (res == Index::Result::OK) {
-        //         val->lock();
-        //         if (val->is_detached_from_tree()) {
-        //             val->unlock();
-        //             return nullptr;
-        //         }
-        //         if (val->is_empty()) {
-        //             delete_from_tree(table_id, key, val);
-        //             val->unlock();
-        //             return nullptr;
-        //         }
-        //         Version* head_version = val->version;
-        //         Version* version = get_correct_version(val);
-        //         gc_version_chain(val);
-        //         if (version == nullptr) {
-        //             val->unlock();
-        //             return nullptr;  // no visible version
-        //         }
-        //         version->update_readts(start_ts);  // update read timestamp
-        //         val->unlock();
-        //         if (!(head_version == version && version->deleted)) return nullptr;
+            // Insert new record
+            Value* new_val =
+                reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
+            new_val->initialize();
+            new_val->lock();
+            new_val->rec = nullptr;
+            res = idx.insert(table_id, key, new_val);
+            if (res == Index::Result::NOT_INSERTED) {
+                MemoryAllocator::deallocate(new_val);
+                return nullptr;  // abort
+            }
+            // Unlock next key
+            next_value->rwl.unlock();
+            // Place record to modify into localset
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            rw_table.emplace_hint(
+                rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(rec, ReadWriteType::INSERT, true, new_val));
+            return rec;
+        }
 
-        //         Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-
-        //         auto new_iter = rw_table.emplace_hint(
-        //             rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-        //             std::forward_as_tuple(nullptr, rec, ReadWriteType::INSERT, false, val));
-        //         auto& w_table = ws.get_table(table_id);
-        //         w_table.emplace_back(key, new_iter);
-        //         return rec;
-        //     }
-
-        //     // Create new value to insert
-        //     Value* new_val =
-        //         reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
-        //     Version* version =
-        //         reinterpret_cast<Version*>(MemoryAllocator::aligned_allocate(sizeof(Version)));
-        //     Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-        //     new_val->initialize();
-        //     new_val->version = version;
-        //     version->read_ts = start_ts;
-        //     version->write_ts = start_ts;
-        //     version->prev = nullptr;
-        //     version->rec = rec;
-        //     version->deleted = false;
-        //     auto new_iter = rw_table.emplace_hint(
-        //         rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-        //         std::forward_as_tuple(nullptr, rec, ReadWriteType::INSERT, true, new_val));
-
-        //     auto& w_table = ws.get_table(table_id);
-        //     w_table.emplace_back(key, new_iter);
-        //     return rec;
-        // }
-
-        // auto rwt = rw_iter->second.rwt;
-        // if (rwt == ReadWriteType::READ || rwt == ReadWriteType::UPDATE
-        //     || rwt == ReadWriteType::INSERT) {
-        //     return nullptr;
-        // } else if (rwt == ReadWriteType::DELETE) {
-        //     rw_iter->second.rwt = ReadWriteType::UPDATE;
-        //     return rw_iter->second.write_rec;
-        // } else {
-        //     throw std::runtime_error("invalid state");
-        // }
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ || rwt == ReadWriteType::UPDATE
+            || rwt == ReadWriteType::INSERT) {
+            return nullptr;
+        } else if (rwt == ReadWriteType::DELETE) {
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            rw_iter->second.rec = rec;
+            rw_iter->second.rwt = ReadWriteType::UPDATE;
+            return rec;
+        } else {
+            throw std::runtime_error("invalid state");
+        }
     }
 
     Rec* update(TableID table_id, Key key) {
@@ -308,7 +287,7 @@ public:
     }
 
     Rec* upsert(TableID table_id, Key key) {
-        LOG_INFO("UPDATE (t: %lu, k: %lu)", table_id, key);
+        LOG_INFO("UPSERT (t: %lu, k: %lu)", table_id, key);
         const Schema& sch = Schema::get_schema();
         Index& idx = Index::get_index();
 
@@ -321,6 +300,9 @@ public:
             Value* val;
             typename Index::Result res = idx.find(table_id, key, val);
             if (res == Index::Result::NOT_FOUND) {
+                // TODO: confirm if next key locking is necessary
+                // In Nemoto implementation, next key locking is not implemented
+                
                 // Get next key write lock
                 Key next_key;
                 Value* next_value;
