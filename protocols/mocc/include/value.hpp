@@ -11,10 +11,16 @@
 
 struct Value {
     alignas(64) TidWord tidword;
+    Epotemp epotemp_;
     RWLock rwl;
     void* rec;
 
-    void initialize() { rwl.initialize(); }
+    void initialize() { 
+        rwl.initialize(); 
+        tidword.obj = 0;
+        tidword.absent = true;
+        epotemp_.temp = 0;
+    }
 
     void lock() { rwl.lock(); }
 

@@ -6,7 +6,8 @@ struct TidWord {
     union {
         uint64_t obj;
         struct {
-            uint64_t tid : 32;
+            bool absent : 1;
+            uint64_t tid : 31;
             uint64_t epoch : 32;
         };
     };
