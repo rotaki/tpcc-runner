@@ -414,161 +414,67 @@ public:
     bool read_scan(
         TableID table_id, Key lkey, Key rkey, int64_t count, bool rev,
         std::map<Key, Rec*>& kr_map) {
-        return false;
-        // LOG_INFO(
-        //     "READ_SCAN (ts: %lu, s_ts: %lu, l_ts: %lu, t: %lu, lk: %lu, rk: %lu, c: %ld)",
-        //     start_ts, smallest_ts, largest_ts, table_id, lkey, rkey, count);
+        // no reverse scan in nowait
+        if (rev == true) throw std::runtime_error("reverse scan not supported in mocc");
+        LOG_INFO("READ_SCAN (t: %lu, lk: %lu, rk: %lu, c: %ld)", table_id, lkey, rkey, count);
 
-        // Index& idx = Index::get_index();
-        // tables.insert(table_id);
-        // auto& rw_table = rws.get_table(table_id);
+        Index& idx = Index::get_index();
+        tables.insert(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        std::map<Key, Value*> kv_map;
 
-        // auto per_node_func = [&](LeafNode* leaf, uint64_t version, bool& continue_flag) {
-        //     unused(version, continue_flag);
-        //     leaf->update_ts(start_ts);
-        // };
-        // auto per_kv_func = [&](Key key, Value* val, bool& continue_flag) {
-        //     auto rw_iter = rw_table.find(key);
-        //     if (rw_iter == rw_table.end()) {
-        //         val->lock();
-        //         if (val->is_detached_from_tree()) {
-        //             val->unlock();
-        //             return;
-        //         }
-        //         if (val->is_empty()) {
-        //             delete_from_tree(table_id, key, val);
-        //             val->unlock();
-        //             return;
-        //         }
-        //         Version* version = get_correct_version(val);
-        //         gc_version_chain(val);
-        //         if (version == nullptr) {
-        //             val->unlock();
-        //             return;
-        //         }
-        //         version->update_readts(start_ts);  // update read timestamp
-        //         val->unlock();
-        //         if (version->deleted == true) return;
+        [[maybe_unused]] typename Index::Result res;
+        res = idx.get_kv_in_range(table_id, lkey, rkey, count, kv_map);
+        assert(res == Index::Result::OK);
 
-        //         // Place it into readwriteset
-        //         rw_table.emplace_hint(
-        //             rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-        //             std::forward_as_tuple(version->rec, nullptr, ReadWriteType::READ, false,
-        //             val));
+        for (auto& [key, val]: kv_map) {
+            auto rw_iter = rw_table.find(key);
 
-        //         kr_map.emplace(key, version->rec);
-        //     } else {
-        //         auto rwt = rw_iter->second.rwt;
-        //         if (rwt == ReadWriteType::READ) {
-        //             kr_map.emplace(key, rw_iter->second.read_rec);
-        //         } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
-        //             kr_map.emplace(key, rw_iter->second.write_rec);
-        //         } else if (rwt == ReadWriteType::DELETE) {
-        //             throw std::runtime_error("deleted value");
-        //         } else {
-        //             throw std::runtime_error("invalid state");
-        //         }
-        //     }
+            if (rw_iter == rw_table.end()) {
+                if (read(table_id, key) == nullptr) return false;
+                kr_map.emplace(key, val->rec);
+                continue;
+            }
 
-        //     if (count != -1 && static_cast<int64_t>(kr_map.size()) >= count) continue_flag =
-        //     false;
-        // };
-
-        // [[maybe_unused]] typename Index::Result res;
-        // if (rev == true) {
-        //     res = idx.get_kv_in_rev_range(table_id, lkey, rkey, per_node_func, per_kv_func);
-        // } else {
-        //     res = idx.get_kv_in_range(table_id, lkey, rkey, per_node_func, per_kv_func);
-        // }
-        // assert(res == Index::Result::OK);
-        // return true;
+            auto rwt = rw_iter->second.rwt;
+            if (rwt == ReadWriteType::READ) {
+                kr_map.emplace(key, rw_iter->second.val->rec);
+            } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+                kr_map.emplace(key, rw_iter->second.rec);
+            } else if (rwt == ReadWriteType::DELETE) {
+                return false;
+            } else {
+                throw std::runtime_error("invalid state");
+            }
+        }
+        return true;
     }
 
 
     bool update_scan(
         TableID table_id, Key lkey, Key rkey, int64_t count, bool rev,
         std::map<Key, Rec*>& kr_map) {
-        return false;
-        // LOG_INFO(
-        //     "UPDATE_SCAN (ts: %lu, s_ts: %lu, l_ts: %lu, t: %lu, lk: %lu, rk: %lu, c: %ld)",
-        //     start_ts, smallest_ts, largest_ts, table_id, lkey, rkey, count);
+        if (rev == true) throw std::runtime_error("reverse scan not supported in mocc");
+        LOG_INFO("UPDATE_SCAN (t: %lu, lk: %lu, rk: %lu, c: %ld)", table_id, lkey, rkey, count);
 
-        // const Schema& sch = Schema::get_schema();
-        // size_t record_size = sch.get_record_size(table_id);
-        // Index& idx = Index::get_index();
-        // tables.insert(table_id);
-        // auto& rw_table = rws.get_table(table_id);
-        // auto& w_table = ws.get_table(table_id);
+        const Schema& sch = Schema::get_schema();
+        Index& idx = Index::get_index();
 
-        // auto per_node_func = [&](LeafNode* leaf, uint64_t version, bool& continue_flag) {
-        //     unused(version, continue_flag);
-        //     leaf->update_ts(start_ts);
-        // };
-        // auto per_kv_func = [&](Key key, Value* val, bool& continue_flag) {
-        //     auto rw_iter = rw_table.find(key);
-        //     if (rw_iter == rw_table.end()) {
-        //         // Read version chain and get the correct version
-        //         val->lock();
-        //         if (val->is_detached_from_tree()) {
-        //             val->unlock();
-        //             return;
-        //         }
-        //         if (val->is_empty()) {
-        //             delete_from_tree(table_id, key, val);
-        //             val->unlock();
-        //             return;
-        //         }
-        //         Version* version = get_correct_version(val);
-        //         gc_version_chain(val);
-        //         if (version == nullptr) {
-        //             val->unlock();
-        //             return;
-        //         }
-        //         version->update_readts(start_ts);  // update read timestamp
-        //         val->unlock();
-        //         if (version->deleted == true) return;
+        size_t record_size = sch.get_record_size(table_id);
+        tables.insert(table_id);
+        auto& rw_table = rws.get_table(table_id);
+        std::map<Key, Value*> kv_map;
 
-        //         // Allocate memory for write
-        //         Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-        //         memcpy(rec, version->rec, record_size);
-        //         auto new_iter = rw_table.emplace_hint(
-        //             rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-        //             std::forward_as_tuple(version->rec, rec, ReadWriteType::UPDATE, false, val));
-        //         // Place it in writeset
-        //         w_table.emplace_back(key, new_iter);
-        //         kr_map.emplace(key, rec);
-        //     } else {
-        //         auto rwt = rw_iter->second.rwt;
-        //         if (rwt == ReadWriteType::READ) {
-        //             // Localset will point to allocated record
-        //             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-        //             memcpy(rec, rw_iter->second.read_rec, record_size);
-        //             rw_iter->second.write_rec = rec;
-        //             rw_iter->second.rwt = ReadWriteType::UPDATE;
-        //             // Place it in writeset
-        //             w_table.emplace_back(key, rw_iter);
-        //             kr_map.emplace(key, rec);
-        //         } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
-        //             kr_map.emplace(key, rw_iter->second.write_rec);
-        //         } else if (rwt == ReadWriteType::DELETE) {
-        //             throw std::runtime_error("deleted value");
-        //         } else {
-        //             throw std::runtime_error("invalid state");
-        //         }
-        //     }
+        [[maybe_unused]] typename Index::Result res;
+        res = idx.get_kv_in_range(table_id, lkey, rkey, count, kv_map);
+        assert(res == Index::Result::OK);
 
-        //     if (count != -1 && static_cast<int64_t>(kr_map.size()) >= count) continue_flag =
-        //     false;
-        // };
-
-        // [[maybe_unused]] typename Index::Result res;
-        // if (rev == true) {
-        //     res = idx.get_kv_in_rev_range(table_id, lkey, rkey, per_node_func, per_kv_func);
-        // } else {
-        //     res = idx.get_kv_in_range(table_id, lkey, rkey, per_node_func, per_kv_func);
-        // }
-        // assert(res == Index::Result::OK);
-        // return true;
+        for (auto& [key, val]: kv_map) {
+            auto rec = update(table_id, key);
+            if (rec == nullptr) return false;
+            kr_map.emplace(key, rec);
+        }
+        return true;
     }
 
     const Rec* remove(TableID table_id, Key key) {
