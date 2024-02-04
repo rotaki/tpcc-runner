@@ -52,6 +52,8 @@ public:
     using Table = std::vector<LockElement<Lock>>;
     Table& get_table(TableID table_id) { return tables[table_id]; }
 
+    void clear() { tables.clear(); }
+
 private:
     std::unordered_map<TableID, Table> tables;
 };

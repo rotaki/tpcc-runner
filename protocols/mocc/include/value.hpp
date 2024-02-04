@@ -11,7 +11,7 @@
 
 struct Value {
     alignas(64) TidWord tidword;
-    Epotemp epotemp_;
+    Epotemp epotemp;
     RWLock rwl;
     void* rec;
 
@@ -19,7 +19,7 @@ struct Value {
         rwl.initialize(); 
         tidword.obj = 0;
         tidword.absent = true;
-        epotemp_.temp = 0;
+        epotemp.temp = 0;
     }
 
     void lock() { rwl.lock(); }
