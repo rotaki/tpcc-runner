@@ -32,6 +32,7 @@ public:
     class NodeSet {
     public:
         typename Index::NodeMap& get_nodemap(TableID table_id) { return ns[table_id]; }
+        void clear() { ns.clear(); }
 
     private:
         std::unordered_map<TableID, typename Index::NodeMap> ns;
@@ -43,7 +44,10 @@ public:
         LOG_INFO("START Tx, e: %u", starting_epoch);
     }
 
-    ~MOCC() { GarbageCollector::remove(starting_epoch); }
+    ~MOCC() { 
+        LOG_INFO("Destructor called, e: %u", starting_epoch);
+        GarbageCollector::remove(starting_epoch); 
+    }
 
     const Rec* read(TableID table_id, Key key) {
         LOG_INFO("READ (e: %u, t: %lu, k: %lu)", starting_epoch, table_id, key);
@@ -612,15 +616,17 @@ public:
                     MemoryAllocator::deallocate(rw_iter->second.rec);
                 }
             }
-            w_table.clear();
-            auto& rw_table = rws.get_table(table_id);
-            rw_table.clear();
-            auto& nm = ns.get_nodemap(table_id);
-            nm.clear();
         }
-        tables.clear();
         unlock_current_locklists();
+        construct_retrospective_locklists();
+
+        rws.clear();
+        ws.clear();
+        ns.clear();
+        tables.clear();
         this->status = TransactionStatus::inFlight;
+        max_rset = 0;
+        max_wset = 0;
     }
 
 private:
@@ -638,7 +644,7 @@ private:
     TidWord most_recently_chosen_tw;
     const uint64_t per_xx_temp = 4096;
     const uint64_t temp_threshold = 5;
-    const int temp_max = 20;
+    const uint64_t temp_max = 20;
     const int temp_reset_us = 100;
 
     /**

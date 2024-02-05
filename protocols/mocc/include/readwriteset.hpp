@@ -43,6 +43,7 @@ class ReadWriteSet {
 public:
     using Table = std::unordered_map<Key, ReadWriteElement<Value>>;
     Table& get_table(TableID table_id) { return rws[table_id]; }
+    void clear() { rws.clear(); }
 
 private:
     std::unordered_map<TableID, Table> rws;
@@ -53,6 +54,7 @@ class WriteSet {
 public:
     using P = std::pair<Key, typename std::unordered_map<Key, ReadWriteElement<Value>>::iterator>;
     std::vector<P>& get_table(TableID table_id) { return ws[table_id]; }
+    void clear() { ws.clear(); }
 
 private:
     std::unordered_map<TableID, std::vector<P>> ws;
