@@ -133,8 +133,6 @@ public:
             || rwt == ReadWriteType::INSERT) {
             return nullptr;
         } else if (rwt == ReadWriteType::DELETE) {
-            return nullptr;
-            LOG_INFO("unexpected behavior");
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
             rw_iter->second.rec = rec;
             rw_iter->second.rwt = ReadWriteType::UPDATE;
@@ -272,7 +270,6 @@ public:
         } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
             return rw_iter->second.rec;
         } else if (rwt == ReadWriteType::DELETE) {
-            return nullptr;
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
             rw_iter->second.rec = rec;
             rw_iter->second.rwt = ReadWriteType::UPDATE;
@@ -459,7 +456,6 @@ public:
 
             return rw_iter->second.val->rec;
         } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
-            return nullptr;
             MemoryAllocator::deallocate(rw_iter->second.rec);
             rw_iter->second.rec = nullptr;
             rw_iter->second.rwt = ReadWriteType::DELETE;
