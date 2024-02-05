@@ -192,17 +192,6 @@ public:
         sch.set_record_size(get_id<OrderLine>(), sizeof(OrderLine));
         sch.set_record_size(get_id<NewOrder>(), sizeof(NewOrder));
 
-        // Insert sentinel
-        insert_into_index(get_id<Item>(), UINT64_MAX, nullptr);
-        insert_into_index(get_id<Warehouse>(), UINT64_MAX, nullptr);
-        insert_into_index(get_id<Stock>(), UINT64_MAX, nullptr);
-        insert_into_index(get_id<District>(), UINT64_MAX, nullptr);
-        insert_into_index(get_id<Customer>(), UINT64_MAX, nullptr);
-        insert_into_index(get_id<Order>(), UINT64_MAX, nullptr);
-        insert_into_index(get_id<OrderSecondary>(), UINT64_MAX, nullptr);
-        insert_into_index(get_id<OrderLine>(), UINT64_MAX, nullptr);
-        insert_into_index(get_id<NewOrder>(), UINT64_MAX, nullptr);
-
         load_items_table();
         load_warehouses_table();
     }
