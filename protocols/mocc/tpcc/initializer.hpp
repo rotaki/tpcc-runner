@@ -17,7 +17,7 @@ private:
     static void insert_into_index(TableID table_id, Key key, void* rec) {
         Value* val = reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
         val->rec = rec;
-        val->rwl.initialize();
+        val->initialize();
         Index::get_index().insert(table_id, key, val);
     }
 

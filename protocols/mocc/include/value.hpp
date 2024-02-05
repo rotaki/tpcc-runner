@@ -17,9 +17,11 @@ struct Value {
 
     void initialize() { 
         rwl.initialize(); 
-        tidword.obj = 0;
-        tidword.absent = true;
+        tidword.epoch = 1;
+        tidword.tid = 0;
+        tidword.absent = false;
         epotemp.temp = 0;
+        epotemp.epoch = 1;
     }
 
     void lock() { rwl.lock(); }

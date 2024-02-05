@@ -18,8 +18,6 @@
 #include "utils/logger.hpp"
 #include "utils/utils.hpp"
 
-Epotemp* EpotempAry;
-
 enum class TransactionStatus : uint8_t {
     inFlight,
     committed,
@@ -53,19 +51,20 @@ public:
         tables.insert(table_id);
         auto& rw_table = rws.get_table(table_id);
         auto rw_iter = rw_table.find(key);
+        auto& nm = ns.get_nodemap(table_id);
 
         if (rw_iter == rw_table.end()) {
             Value* val;
-            typename Index::Result res = idx.find(table_id, key, val);
+            typename Index::Result res = idx.find(table_id, key, val, nm);
             if (res == Index::Result::NOT_FOUND) return nullptr;
 
             // Read version chain and get the correct version
             Epotemp loadepot;
             TidWord expected, desired;
 
-            size_t epotemp_index;
-            epotemp_index = key * sizeof(Value) / per_xx_temp;
-            loadepot.obj = load_acquire(EpotempAry[epotemp_index].obj);
+            // size_t epotemp_index;
+            // epotemp_index = key * sizeof(Value) / per_xx_temp;
+            loadepot.obj = load_acquire(val->epotemp.obj);
             bool need_verification;
             need_verification = true;
             auto& rtr_locks = retrospective_locklists.get_table(table_id);
@@ -142,42 +141,31 @@ public:
         tables.insert(table_id);
         auto& rw_table = rws.get_table(table_id);
         auto rw_iter = rw_table.find(key);
+        auto& nm = ns.get_nodemap(table_id);
 
         if (rw_iter == rw_table.end()) {
             Value* val;
             typename Index::Result res = idx.find(table_id, key, val);
-            if (res != Index::Result::OK) return nullptr;
+            if (res == Index::Result::OK) return nullptr;
 
             // TODO: confirm if next key locking is necessary
             // In Nemoto implementation, next key locking is not implemented
 
-            // Get next key write lock
-            Key next_key;
-            Value* next_value;
-            res = idx.get_next_kv(table_id, key, next_key, next_value);
-            assert(next_key != 0);
-            assert(next_value != nullptr);
-            if (res != Index::Result::OK) return nullptr;
-            auto next_iter = rw_table.find(next_key);
-            if (next_iter == rw_table.end()) {
-                if (!next_value->rwl.try_lock()) return nullptr;
-            } else if (next_iter->second.rwt == ReadWriteType::READ) {
-                if (!next_value->rwl.try_lock_upgrade()) return nullptr;
-            }
-
             // Insert new record
             Value* new_val =
                 reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
-            new_val->initialize();
-            new_val->lock();
+            new_val->tidword.tid = 0;
+            new_val->tidword.absent = true;
+            new_val->epotemp.temp = 0;
             new_val->rec = nullptr;
-            res = idx.insert(table_id, key, new_val);
-            if (res == Index::Result::NOT_INSERTED) {
+            new_val->rwl.initialize();
+
+            res = idx.insert(table_id, key, new_val, nm);
+            if (res != Index::Result::OK) {
                 MemoryAllocator::deallocate(new_val);
                 return nullptr;  // abort
             }
-            // Unlock next key
-            next_value->rwl.unlock();
+
             // Place record to modify into localset
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
             auto new_iter = rw_table.emplace_hint(
@@ -222,9 +210,9 @@ public:
             // Update if found in index
             Epotemp loadepot;
 
-            size_t epotemp_index;
-            epotemp_index = key * sizeof(Value) / per_xx_temp;
-            loadepot.obj = load_acquire(EpotempAry[epotemp_index].obj);
+            // size_t epotemp_index;
+            // epotemp_index = key * sizeof(Value) / per_xx_temp;
+            loadepot.obj = load_acquire(val->epotemp.obj);
 
             // Get write lock
             if (loadepot.temp >= temp_threshold) lock(table_id, key, val, LockType::WRITE);
@@ -254,9 +242,9 @@ public:
             // Upgrade lock
             Epotemp loadepot;
 
-            size_t epotemp_index;
-            epotemp_index = key * sizeof(Value) / per_xx_temp;
-            loadepot.obj = load_acquire(EpotempAry[epotemp_index].obj);
+            // size_t epotemp_index;
+            // epotemp_index = key * sizeof(Value) / per_xx_temp;
+            loadepot.obj = load_acquire(rw_iter->second.val->epotemp.obj);
 
             // Get write lock
             if (loadepot.temp >= temp_threshold) lock(table_id, key, rw_iter->second.val, LockType::WRITE);
@@ -300,6 +288,7 @@ public:
         tables.insert(table_id);
         auto& rw_table = rws.get_table(table_id);
         auto rw_iter = rw_table.find(key);
+        auto& nm = ns.get_nodemap(table_id);
 
         if (rw_iter == rw_table.end()) {
             Value* val;
@@ -308,31 +297,20 @@ public:
                 // TODO: confirm if next key locking is necessary
                 // In Nemoto implementation, next key locking is not implemented
                 
-                // Get next key write lock
-                Key next_key;
-                Value* next_value;
-                res = idx.get_next_kv(table_id, key, next_key, next_value);
-                if (res != Index::Result::OK) return nullptr;
-                auto next_iter = rw_table.find(next_key);
-                if (next_iter == rw_table.end()) {
-                    if (!next_value->rwl.try_lock()) return nullptr;
-                } else if (next_iter->second.rwt == ReadWriteType::READ) {
-                    if (!next_value->rwl.try_lock_upgrade()) return nullptr;
-                }
-
                 // Insert new record
                 Value* new_val =
                     reinterpret_cast<Value*>(MemoryAllocator::aligned_allocate(sizeof(Value)));
-                new_val->initialize();
-                new_val->lock();
+                new_val->tidword.tid = 0;
+                new_val->tidword.absent = true;
+                new_val->epotemp.temp = 0;
                 new_val->rec = nullptr;
-                res = idx.insert(table_id, key, new_val);
-                if (res == Index::Result::NOT_INSERTED) {
+                new_val->rwl.initialize();
+                
+                res = idx.insert(table_id, key, new_val, nm);
+                if (res != Index::Result::OK) {
                     MemoryAllocator::deallocate(new_val);
                     return nullptr;  // abort
                 }
-                // Unlock next key
-                next_value->rwl.unlock();
                 // Place record to modify into localset
                 Rec* rec = MemoryAllocator::aligned_allocate(record_size);
                 auto new_iter = rw_table.emplace_hint(
@@ -349,9 +327,9 @@ public:
                 // Update if found in index
                 Epotemp loadepot;
 
-                size_t epotemp_index;
-                epotemp_index = key * sizeof(Value) / per_xx_temp;
-                loadepot.obj = load_acquire(EpotempAry[epotemp_index].obj);
+                // size_t epotemp_index;
+                // epotemp_index = key * sizeof(Value) / per_xx_temp;
+                loadepot.obj = load_acquire(val->epotemp.obj);
 
                 // Get write lock
                 if (loadepot.temp >= temp_threshold) lock(table_id, key, val, LockType::WRITE);
@@ -384,9 +362,9 @@ public:
             // Upgrade lock
             Epotemp loadepot;
 
-            size_t epotemp_index;
-            epotemp_index = key * sizeof(Value) / per_xx_temp;
-            loadepot.obj = load_acquire(EpotempAry[epotemp_index].obj);
+            // size_t epotemp_index;
+            // epotemp_index = key * sizeof(Value) / per_xx_temp;
+            loadepot.obj = load_acquire(rw_iter->second.val->epotemp.obj);
 
             // Get write lock
             if (loadepot.temp >= temp_threshold) lock(table_id, key, rw_iter->second.val, LockType::WRITE);
@@ -429,10 +407,12 @@ public:
         Index& idx = Index::get_index();
         tables.insert(table_id);
         auto& rw_table = rws.get_table(table_id);
+        auto& nm = ns.get_nodemap(table_id);
+
         std::map<Key, Value*> kv_map;
 
-        [[maybe_unused]] typename Index::Result res;
-        res = idx.get_kv_in_range(table_id, lkey, rkey, count, kv_map);
+        typename Index::Result res;
+        res = idx.get_kv_in_range(table_id, lkey, rkey, count, kv_map, nm);
         assert(res == Index::Result::OK);
 
         for (auto& [key, val]: kv_map) {
@@ -468,10 +448,11 @@ public:
         Index& idx = Index::get_index();
 
         tables.insert(table_id);
-        std::map<Key, Value*> kv_map;
+        auto& nm = ns.get_nodemap(table_id);
 
+        std::map<Key, Value*> kv_map;
         [[maybe_unused]] typename Index::Result res;
-        res = idx.get_kv_in_range(table_id, lkey, rkey, count, kv_map);
+        res = idx.get_kv_in_range(table_id, lkey, rkey, count, kv_map, nm);
         assert(res == Index::Result::OK);
 
         for (auto& [key, val]: kv_map) {
@@ -500,9 +481,9 @@ public:
             // Update if found in index
             Epotemp loadepot;
 
-            size_t epotemp_index;
-            epotemp_index = key * sizeof(Value) / per_xx_temp;
-            loadepot.obj = load_acquire(EpotempAry[epotemp_index].obj);
+            // size_t epotemp_index;
+            // epotemp_index = key * sizeof(Value) / per_xx_temp;
+            loadepot.obj = load_acquire(val->epotemp.obj);
 
             // Get write lock
             if (loadepot.temp >= temp_threshold) lock(table_id, key, val, LockType::WRITE);
@@ -529,9 +510,9 @@ public:
             // Upgrade lock
             Epotemp loadepot;
 
-            size_t epotemp_index;
-            epotemp_index = key * sizeof(Value) / per_xx_temp;
-            loadepot.obj = load_acquire(EpotempAry[epotemp_index].obj);
+            // size_t epotemp_index;
+            // epotemp_index = key * sizeof(Value) / per_xx_temp;
+            loadepot.obj = load_acquire(rw_iter->second.val->epotemp.obj);
 
             // Get write lock
             if (loadepot.temp >= temp_threshold) lock(table_id, key, rw_iter->second.val, LockType::WRITE);
@@ -713,7 +694,7 @@ public:
         }
         tables.clear();
         unlock_current_locklists();
-
+        this->status = TransactionStatus::inFlight;
     }
 
 private:
