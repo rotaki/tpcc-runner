@@ -398,40 +398,13 @@ public:
         auto& rw_table = rws.get_table(table_id);
         auto rw_iter = rw_table.find(key);
 
-        if (rw_iter == rw_table.end()) {
-            // Abort if not found in index
-            Value* val;
-            typename Index::Result res = idx.find(table_id, key, val);
-            if (res == Index::Result::NOT_FOUND) return nullptr;  // abort
+        if (rw_iter != rw_table.end()) {
+            auto rwt = rw_iter->second.rwt;
 
-            Epotemp loadepot;
+            if (rwt == ReadWriteType::DELETE) return nullptr;
+            if (rwt != ReadWriteType::READ && rwt != ReadWriteType::UPDATE && rwt != ReadWriteType::INSERT)
+                throw std::runtime_error("invalid state");
 
-            // size_t epotemp_index;
-            // epotemp_index = key * sizeof(Value) / per_xx_temp;
-            loadepot.obj = load_acquire(val->epotemp.obj);
-
-            // Get write lock
-            if (loadepot.temp >= temp_threshold) lock(table_id, key, val, LockType::WRITE);
-            if (status == TransactionStatus::aborted) return nullptr;
-
-            LockElement<RWLock> *in_rtr_locklist;
-            in_rtr_locklist = search_locklists(retrospective_locklists.get_table(table_id), key);
-
-            if (in_rtr_locklist != nullptr) lock(table_id, key, val, LockType::WRITE);
-            if (status == TransactionStatus::aborted) return nullptr;
-
-            auto new_iter = rw_table.emplace_hint(
-                rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-                std::forward_as_tuple(nullptr, ReadWriteType::DELETE, false, val));
-
-            auto& w_table = ws.get_table(table_id);
-            w_table.emplace_back(key, new_iter);
-
-            return val->rec;
-        }
-
-        auto rwt = rw_iter->second.rwt;
-        if (rwt == ReadWriteType::READ) {
             // Upgrade lock
             Epotemp loadepot;
 
@@ -449,22 +422,49 @@ public:
             if (in_rtr_locklist != nullptr) lock(table_id, key, rw_iter->second.val, LockType::WRITE);
             if (status == TransactionStatus::aborted) return nullptr;
 
+            if (rwt == ReadWriteType::READ) {
+                auto& w_table = ws.get_table(table_id);
+                w_table.emplace_back(key, rw_iter);
+            } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+                MemoryAllocator::deallocate(rw_iter->second.rec);
+                assert(rw_iter->second.val->rec != nullptr);
+                rw_iter->second.rec = nullptr;
+            }
             rw_iter->second.rwt = ReadWriteType::DELETE;
-
-            auto& w_table = ws.get_table(table_id);
-            w_table.emplace_back(key, rw_iter);
-
+            rw_iter->second.val->txid = txid;
+            rw_iter->second.val->last_opertion = ReadWriteType::DELETE;
             return rw_iter->second.val->rec;
-        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
-            MemoryAllocator::deallocate(rw_iter->second.rec);
-            rw_iter->second.rec = nullptr;
-            rw_iter->second.rwt = ReadWriteType::DELETE;
-            return rw_iter->second.val->rec;
-        } else if (rwt == ReadWriteType::DELETE) {
-            return nullptr;
-        } else {
-            throw std::runtime_error("invalid state");
         }
+
+        // Abort if not found in index
+        Value* val;
+        typename Index::Result res = idx.find(table_id, key, val);
+        if (res == Index::Result::NOT_FOUND) return nullptr;  // abort
+
+        Epotemp loadepot;
+
+        // size_t epotemp_index;
+        // epotemp_index = key * sizeof(Value) / per_xx_temp;
+        loadepot.obj = load_acquire(val->epotemp.obj);
+
+        // Get write lock
+        if (loadepot.temp >= temp_threshold) lock(table_id, key, val, LockType::WRITE);
+        if (status == TransactionStatus::aborted) return nullptr;
+
+        LockElement<RWLock> *in_rtr_locklist;
+        in_rtr_locklist = search_locklists(retrospective_locklists.get_table(table_id), key);
+
+        if (in_rtr_locklist != nullptr) lock(table_id, key, val, LockType::WRITE);
+        if (status == TransactionStatus::aborted) return nullptr;
+
+        auto new_iter = rw_table.emplace_hint(
+            rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+            std::forward_as_tuple(nullptr, ReadWriteType::DELETE, false, val));
+
+        auto& w_table = ws.get_table(table_id);
+        w_table.emplace_back(key, new_iter);
+
+        return val->rec;
     }
 
     bool precommit() {
@@ -574,7 +574,8 @@ public:
                 store_release(rw_iter->second.val->tidword.obj, new_tw.obj);
                 GarbageCollector::collect(commit_tw.epoch, old);
                 if (rwt == ReadWriteType::DELETE) {
-                    idx.remove(table_id, w_iter->first);
+                    auto res = idx.remove(table_id, w_iter->first);
+                    assert(res == Index::Result::OK);
                     GarbageCollector::collect(commit_tw.epoch, rw_iter->second.val);
                 }
             }
@@ -596,15 +597,9 @@ public:
             for (auto w_iter = w_table.begin(); w_iter != w_table.end(); ++w_iter) {
                 auto rw_iter = w_iter->second;
                 // For failed inserts
-                if (rw_iter->second.is_new) {
-                    lock(table_id, w_iter->first, rw_iter->second.val, LockType::WRITE);
-                    assert(load_acquire(rw_iter->second.val->rec) == nullptr);
-                    TidWord tw;
-                    tw.obj = load_acquire(rw_iter->second.val->tidword.obj);
-                    tw.absent = 1;
-                    store_release(rw_iter->second.val->tidword.obj, tw.obj);
+                if (rw_iter->second.rwt == ReadWriteType::INSERT) {
                     idx.remove(table_id, w_iter->first);
-                    GarbageCollector::collect(starting_epoch, rw_iter->second.val);
+                    MemoryAllocator::deallocate(rw_iter->second.val);
                 }
 
                 auto rwt = rw_iter->second.rwt;
@@ -632,8 +627,8 @@ private:
     ReadWriteSet<Key, Value> rws;
     WriteSet<Key, Value> ws;
     NodeSet ns;
-    LockList<Key, RWLock> retrospective_locklists;
-    LockList<Key, RWLock> current_locklists;
+    LockList<RWLock> retrospective_locklists;
+    LockList<RWLock> current_locklists;
     TransactionStatus status;
     TidWord max_wset;
     TidWord max_rset;
@@ -816,20 +811,25 @@ private:
 
         if (vioctr != 0) {
             // not in canonical mode. restore.
-            for (auto itr = cur_lock_list.begin() + (cur_lock_list.size() - vioctr);
-                 itr != cur_lock_list.end(); ++itr) {
-                if ((*itr).type == LockType::WRITE)
-                    (*itr).lock->unlock();
-                else
-                    (*itr).lock->unlock_shared();
+            size_t num_locks = 0;
+            for (TableID table_id: tables) {
+                auto& cur_lock_list = current_locklists.get_table(table_id);
+                num_locks += cur_lock_list.size();
+                for (auto itr = cur_lock_list.begin() + (cur_lock_list.size() - vioctr);
+                    itr != cur_lock_list.end(); ++itr) {
+                    if ((*itr).type == LockType::WRITE)
+                        (*itr).lock->unlock();
+                    else
+                        (*itr).lock->unlock_shared();
+                }
             }
-
             // delete from CLL_
-            if (cur_lock_list.size() == vioctr)
-                cur_lock_list.clear();
-            else
+            if (num_locks == vioctr)
+                current_locklists.clear();
+            else {
                 cur_lock_list.erase(
                     cur_lock_list.begin() + (cur_lock_list.size() - vioctr), cur_lock_list.end());
+            }
         }
 
 
@@ -848,6 +848,12 @@ private:
                 break;
             }
         }
+
+        if (type == LockType::WRITE)
+            val->rwl.lock();
+        else
+            val->rwl.lock_shared();
+        cur_lock_list.emplace_back(key, &(val->rwl), type);
     }
 
     void unlock_current_locklists() {
@@ -861,6 +867,7 @@ private:
                     (*itr).lock->unlock_shared();
             }
         }
+        current_locklists.clear();
     }
 
     void construct_retrospective_locklists() {

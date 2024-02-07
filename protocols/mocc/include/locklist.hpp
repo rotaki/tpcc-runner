@@ -10,11 +10,11 @@ enum class LockType { READ = 0, WRITE = 1 };
 
 template <typename Lock>
 struct LockElement {
-    unsigned int key;  // record を識別する．
+    uint64_t key;  // record を識別する．
     Lock* lock;
     LockType type;  // 0 read-mode, 1 write-mode
 
-    LockElement(unsigned int key, Lock* lock, LockType locktype)
+    LockElement(uint64_t key, Lock* lock, LockType locktype)
         : key(key)
         , lock(lock)
         , type(locktype) {}
@@ -46,7 +46,7 @@ struct LockElement {
 };
 
 
-template <typename Key, typename Lock>
+template <typename Lock>
 class LockList {
 public:
     using Table = std::vector<LockElement<Lock>>;
