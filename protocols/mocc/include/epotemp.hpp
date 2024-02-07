@@ -21,11 +21,4 @@ struct Epotemp {
     bool operator==(const Epotemp& right) const { return obj == right.obj; }
 
     bool operator!=(const Epotemp& right) const { return !operator==(right); }
-
-    bool eqEpoch(uint64_t epo) {
-        if (epoch == epo)
-            return true;
-        else
-            return false;
-    }
 };

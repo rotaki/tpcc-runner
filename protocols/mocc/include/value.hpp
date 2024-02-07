@@ -15,8 +15,8 @@ struct Value {
     RWLock rwl;
     void* rec;
 
-    void initialize() { 
-        rwl.initialize(); 
+    void initialize() {
+        rwl.initialize();
         tidword.epoch = 1;
         tidword.tid = 0;
         tidword.absent = false;

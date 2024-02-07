@@ -53,9 +53,13 @@ public:
         uint64_t table_id;
         uint64_t key;
 
-        ValueID(uint64_t k1, uint64_t k2) : table_id(k1), key(k2) {}
+        ValueID(uint64_t k1, uint64_t k2)
+            : table_id(k1)
+            , key(k2) {}
 
-        bool operator==(const ValueID& other) const { return table_id == other.table_id && key == other.key; }
+        bool operator==(const ValueID& other) const {
+            return table_id == other.table_id && key == other.key;
+        }
 
         bool operator>=(const ValueID& other) const {
             if (table_id > other.table_id) {
@@ -89,14 +93,14 @@ public:
     };
 
     struct ValueComparator {
-        bool operator() (const ValueID& a, const ValueID& b) const {
+        bool operator()(const ValueID& a, const ValueID& b) const {
             if (a.table_id != b.table_id) {
                 return a.table_id < b.table_id;
             }
             return a.key < b.key;
         }
     };
-    
+
     LockElement<Lock>* get_lock(ValueID vid) {
         auto it = lock_list.find(vid);
         if (it == lock_list.end()) {
@@ -110,7 +114,7 @@ public:
     typename std::map<ValueID, LockElement<Lock>, ValueComparator>::reverse_iterator back() {
         return lock_list.rbegin();
     }
-    
+
     void clear() { lock_list.clear(); }
 
     typename std::map<ValueID, LockElement<Lock>, ValueComparator>::iterator begin() {
@@ -125,8 +129,9 @@ public:
         lock_list.insert(std::make_pair(vid, LockElement<Lock>(vid.key, lock, locktype)));
     }
 
-    void erase(typename std::map<ValueID, LockElement<Lock>, ValueComparator>::iterator first,
-               typename std::map<ValueID, LockElement<Lock>, ValueComparator>::iterator last) {
+    void erase(
+        typename std::map<ValueID, LockElement<Lock>, ValueComparator>::iterator first,
+        typename std::map<ValueID, LockElement<Lock>, ValueComparator>::iterator last) {
         lock_list.erase(first, last);
     }
 

@@ -1,13 +1,12 @@
 #pragma once
 
+#include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
 #include <set>
 #include <stdexcept>
-#include <algorithm>
-#include <cmath>
 
 #include "protocols/common/epoch_manager.hpp"
 #include "protocols/common/readwritelock.hpp"
@@ -151,7 +150,7 @@ public:
             if (res == Index::Result::NOT_FOUND) return nullptr;
 
             if (write_lock(table_id, key, val) == false) return nullptr;
-            
+
             // Allocate memory for write
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
             memcpy(rec, val->rec, record_size);
@@ -168,7 +167,7 @@ public:
         auto rwt = rw_iter->second.rwt;
         if (rwt == ReadWriteType::READ) {
             if (write_lock(table_id, key, rw_iter->second.val) == false) return nullptr;
-            
+
             // Allocate memory for write
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
             memcpy(rec, rw_iter->second.val->rec, record_size);
@@ -239,7 +238,7 @@ public:
             } else if (res == Index::Result::OK) {
                 // Update if found in index
                 if (write_lock(table_id, key, val) == false) return nullptr;
-            
+
                 // Allocate memory for write
                 Rec* rec = MemoryAllocator::aligned_allocate(record_size);
                 memcpy(rec, val->rec, record_size);
@@ -247,7 +246,7 @@ public:
                 auto new_iter = rw_table.emplace_hint(
                     rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
                     std::forward_as_tuple(rec, ReadWriteType::UPDATE, false, val));
-                
+
                 auto& w_table = ws.get_table(table_id);
                 w_table.emplace_back(key, new_iter);
 
@@ -261,14 +260,14 @@ public:
         if (rwt == ReadWriteType::READ) {
             // Upgrade lock
             if (write_lock(table_id, key, rw_iter->second.val) == false) return nullptr;
-            
+
             // Allocate memory for write
             Rec* rec = MemoryAllocator::aligned_allocate(record_size);
             memcpy(rec, rw_iter->second.val->rec, record_size);
 
             rw_iter->second.rec = rec;
             rw_iter->second.rwt = ReadWriteType::UPDATE;
-            
+
             auto& w_table = ws.get_table(table_id);
             w_table.emplace_back(key, rw_iter);
             return rec;
@@ -359,7 +358,7 @@ public:
 
             if (rw_iter == rw_table.end()) {
                 if (write_lock(table_id, key, val) == false) return false;
-            
+
                 // Allocate memory for write
                 Rec* rec = MemoryAllocator::aligned_allocate(record_size);
                 memcpy(rec, val->rec, record_size);
@@ -378,7 +377,7 @@ public:
             if (rwt == ReadWriteType::READ) {
                 assert(rw_iter->second.rec == nullptr);
                 if (write_lock(table_id, key, rw_iter->second.val) == false) return false;
-                
+
                 // Allocate memory for write
                 Rec* rec = MemoryAllocator::aligned_allocate(record_size);
                 memcpy(rec, rw_iter->second.val->rec, record_size);
@@ -468,17 +467,18 @@ public:
                 if (rw_iter->second.rwt == ReadWriteType::INSERT) continue;
                 if (!lock(table_id, w_iter->first, rw_iter->second.val, LockType::WRITE))
                     return false;
-                if (rw_iter->second.rwt == ReadWriteType::UPDATE && rw_iter->second.val->tidword.absent)
+                if (rw_iter->second.rwt == ReadWriteType::UPDATE
+                    && rw_iter->second.val->tidword.absent)
                     return false;
 
                 this->max_wset = std::max(this->max_wset, rw_iter->second.val->tidword);
             }
         }
 
-        asm volatile("":: : "memory");
+        asm volatile("" ::: "memory");
         uint32_t epoch = load_acquire(EpochManager<MOCC<Index>>::get_global_epoch());
         LOG_INFO("  SERIAL POINT (se: %u, ce: %u)", starting_epoch, epoch);
-        asm volatile("":: : "memory");
+        asm volatile("" ::: "memory");
 
         // Phase 2.1 (Validate ReadSet)
         LOG_INFO("  P2.1 (Validate ReadSet)");
@@ -497,8 +497,8 @@ public:
                     return false;
                 }
 
-                if (rw_iter->second.val->rwl.get_lock_cnt() == static_cast<int>(LockType::WRITE) 
-                && search_writeset(table_id, rw_iter->first) == nullptr) {
+                if (rw_iter->second.val->rwl.get_lock_cnt() == static_cast<int>(LockType::WRITE)
+                    && search_writeset(table_id, rw_iter->first) == nullptr) {
                     rw_iter->second.failed_verification = true;
                     return false;
                 }
@@ -616,8 +616,8 @@ private:
 
     /**
      * @brief MOCC lock/verification required for successful read operation
-     * 
-     * @return std::pair<Rec*, TidWord> 
+     *
+     * @return std::pair<Rec*, TidWord>
      *
      * @note This function does not add the record to readwriteset
      *       The return values should be used to add the record to readwriteset
@@ -652,7 +652,8 @@ private:
             auto value_id = LockList<RWLock>::ValueID(table_id, key);
             for (;;) {
                 while (val->rwl.get_lock_cnt() == static_cast<int>(LockType::WRITE)) {
-                    if (current_locklists.size() > 0 && value_id < current_locklists.back()->first) {
+                    if (current_locklists.size() > 0
+                        && value_id < current_locklists.back()->first) {
                         rw_table.emplace_hint(
                             rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
                             std::forward_as_tuple(nullptr, ReadWriteType::READ, false, val));
@@ -665,7 +666,7 @@ private:
                 if (expected.absent) {
                     return {nullptr, 0};
                 }
-                
+
                 desired.obj = load_acquire(val->tidword.obj);
                 if (expected == desired)
                     break;
@@ -681,7 +682,7 @@ private:
 
     /**
      * @brief MOCC lock operation required for all write related operations
-     * 
+     *
      * @return true: lock success
      * @return false: lock failed, ready to abort
      */
@@ -696,8 +697,9 @@ private:
             if (!lock_success) return false;
         }
 
-        LockElement<RWLock> *in_rtr_locklist;
-        in_rtr_locklist = retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
+        LockElement<RWLock>* in_rtr_locklist;
+        in_rtr_locklist =
+            retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
 
         if (in_rtr_locklist != nullptr) {
             bool lock_success = lock(table_id, key, val, LockType::WRITE);
@@ -748,14 +750,16 @@ private:
                         return false;
                     }
                 } else if (val->rwl.try_lock()) {
-                    current_locklists.insert(LockList<RWLock>::ValueID(table_id, key), &(val->rwl), LockType::WRITE);
+                    current_locklists.insert(
+                        LockList<RWLock>::ValueID(table_id, key), &(val->rwl), LockType::WRITE);
                     return true;
                 } else {
                     return false;
                 }
             } else {
                 if (val->rwl.try_lock_shared()) {
-                    current_locklists.insert(LockList<RWLock>::ValueID(table_id, key), &(val->rwl), LockType::READ);
+                    current_locklists.insert(
+                        LockList<RWLock>::ValueID(table_id, key), &(val->rwl), LockType::READ);
                     return true;
                 } else {
                     return false;
@@ -783,7 +787,8 @@ private:
         }
 
 
-        for (auto itr = retrospective_locklists.begin(); itr != retrospective_locklists.end(); ++itr) {
+        for (auto itr = retrospective_locklists.begin(); itr != retrospective_locklists.end();
+             ++itr) {
             auto value_id = (*itr).first;
             auto& lock_element = (*itr).second;
 
@@ -833,12 +838,13 @@ private:
         for (TableID table_id: tables) {
             auto& rw_table = rws.get_table(table_id);
             for (auto rw_iter = rw_table.begin(); rw_iter != rw_table.end(); ++rw_iter) {
-                if (rw_iter->second.rwt == ReadWriteType::READ &&
-                    rw_iter->second.failed_verification) {
+                if (rw_iter->second.rwt == ReadWriteType::READ
+                    && rw_iter->second.failed_verification) {
                     Epotemp expected, desired;
                     expected.obj = load_acquire(rw_iter->second.val->epotemp.obj);
 
-                    uint64_t current_epoch = load_acquire(EpochManager<MOCC<Index>>::get_global_epoch());
+                    uint64_t current_epoch =
+                        load_acquire(EpochManager<MOCC<Index>>::get_global_epoch());
                     if (expected.epoch != current_epoch) {
                         desired.epoch = current_epoch;
                         desired.temp = 0;
@@ -855,14 +861,17 @@ private:
                         } else {
                             break;
                         }
-                        
-                        if (compare_exchange(rw_iter->second.val->epotemp.obj, expected.obj, desired.obj)) {
+
+                        if (compare_exchange(
+                                rw_iter->second.val->epotemp.obj, expected.obj, desired.obj)) {
                             break;
                         }
                     }
                 }
 
-                if (retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, rw_iter->first)) != nullptr) {
+                if (retrospective_locklists.get_lock(
+                        LockList<RWLock>::ValueID(table_id, rw_iter->first))
+                    != nullptr) {
                     continue;
                 }
 

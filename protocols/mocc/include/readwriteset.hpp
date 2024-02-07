@@ -28,7 +28,7 @@ struct ReadWriteElement {
         , failed_verification(false)
         , is_new(is_new)
         , val(val){};
-        
+
     Rec* rec = nullptr;  // nullptr when rwt is READ or DELETE
                          // points to local record when rwt is UPDATE or INSERT
     TidWord tw;          // tidword when the data is read first
