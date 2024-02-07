@@ -1,7 +1,9 @@
 #pragma once
 
 #include <cassert>
+#include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <set>
 #include <stdexcept>
 #include <algorithm>
@@ -417,7 +419,7 @@ public:
             if (status == TransactionStatus::aborted) return nullptr;
 
             LockElement<RWLock> *in_rtr_locklist;
-            in_rtr_locklist = search_locklists(retrospective_locklists.get_table(table_id), key);
+            in_rtr_locklist = retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
 
             if (in_rtr_locklist != nullptr) lock(table_id, key, rw_iter->second.val, LockType::WRITE);
             if (status == TransactionStatus::aborted) return nullptr;
@@ -431,8 +433,6 @@ public:
                 rw_iter->second.rec = nullptr;
             }
             rw_iter->second.rwt = ReadWriteType::DELETE;
-            rw_iter->second.val->txid = txid;
-            rw_iter->second.val->last_opertion = ReadWriteType::DELETE;
             return rw_iter->second.val->rec;
         }
 
@@ -452,7 +452,7 @@ public:
         if (status == TransactionStatus::aborted) return nullptr;
 
         LockElement<RWLock> *in_rtr_locklist;
-        in_rtr_locklist = search_locklists(retrospective_locklists.get_table(table_id), key);
+        in_rtr_locklist = retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
 
         if (in_rtr_locklist != nullptr) lock(table_id, key, val, LockType::WRITE);
         if (status == TransactionStatus::aborted) return nullptr;
@@ -578,12 +578,14 @@ public:
                     assert(res == Index::Result::OK);
                     GarbageCollector::collect(commit_tw.epoch, rw_iter->second.val);
                 }
+                auto value_id = LockList<RWLock>::ValueID(table_id, w_iter->first);
+                if (value_id.table_id == 2 && value_id.key == 1) {
+                    continue;
+                }
             }
         }
 
         unlock_current_locklists();
-        // TODO: make sure MOCC destructor is called after commit
-        // or else we need to clear readset writeset nodemap and retrospective_locklists
         LOG_INFO("PRECOMMIT SUCCESS");
         return true;
     }
@@ -661,8 +663,7 @@ private:
         loadepot.obj = load_acquire(val->epotemp.obj);
         bool need_verification;
         need_verification = true;
-        auto& rtr_locks = retrospective_locklists.get_table(table_id);
-        auto rtr_lock = search_locklists(rtr_locks, key);
+        auto rtr_lock = retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
         if (rtr_lock != nullptr) {
             lock(table_id, key, val, rtr_lock->type);
             if (status == TransactionStatus::aborted) {
@@ -681,12 +682,12 @@ private:
 
         if (need_verification) {
             expected.obj = load_acquire(val->tidword.obj);
-            auto& curr_locks = current_locklists.get_table(table_id);
+            auto value_id = LockList<RWLock>::ValueID(table_id, key);
             for (;;) {
                 // rwl is -1 when there is a write lock
                 const int64_t write_locked = -1;
                 while (val->rwl.get_lock_cnt() == write_locked) {
-                    if (curr_locks.size() > 0 && key < curr_locks.back().key) {
+                    if (current_locklists.size() > 0 && value_id < current_locklists.back()->first) {
                         status = TransactionStatus::aborted;
                         rw_table.emplace_hint(
                             rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
@@ -740,7 +741,7 @@ private:
         if (status == TransactionStatus::aborted) return nullptr;
 
         LockElement<RWLock> *in_rtr_locklist;
-        in_rtr_locklist = search_locklists(retrospective_locklists.get_table(table_id), key);
+        in_rtr_locklist = retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
 
         if (in_rtr_locklist != nullptr) lock(table_id, key, val, LockType::WRITE);
         if (status == TransactionStatus::aborted) return nullptr;
@@ -754,33 +755,35 @@ private:
 
     void lock(TableID table_id, Key key, Value* val, LockType type) {
         unsigned int vioctr = 0;
-        unsigned int threshold;
+        LockList<RWLock>::ValueID threshold(0, 0);
+        auto target_vid = LockList<RWLock>::ValueID(table_id, key);
         bool upgrade = false;
         LockElement<RWLock>* le = nullptr;
 
-        auto& cur_lock_list = current_locklists.get_table(table_id);
-        sort(cur_lock_list.begin(), cur_lock_list.end());
-        for (auto itr = cur_lock_list.begin(); itr != cur_lock_list.end(); ++itr) {
+        // current_locklists is sorted
+        for (auto itr = current_locklists.begin(); itr != current_locklists.end(); ++itr) {
             // lock already exists in CLL_
             //    && its lock mode is equal to needed mode or it is stronger than needed
             //    mode.
-            if ((*itr).key == key) {
-                if (type == (*itr).type || type < (*itr).type)
+            auto value_id = (*itr).first;
+            auto& lock_element = (*itr).second;
+            if (value_id == target_vid) {
+                if (type == lock_element.type || type < lock_element.type)
                     return;
                 else {
-                    le = &(*itr);
+                    le = &lock_element;
                     upgrade = true;
                 }
             }
 
             // collect violation
-            if ((*itr).key >= key) {
-                if (vioctr == 0) threshold = (*itr).key;
+            if (value_id >= target_vid) {
+                if (vioctr == 0) threshold = value_id;
 
                 vioctr++;
             }
         }
-        if (vioctr == 0) threshold = -1;
+        if (vioctr == 0) threshold = LockList<RWLock>::ValueID(UINT64_MAX, UINT64_MAX);
         if ((vioctr > 100)) {
             if (type != LockType::READ) {
                 if (upgrade) {
@@ -792,7 +795,7 @@ private:
                         return;
                     }
                 } else if (val->rwl.try_lock()) {
-                    cur_lock_list.push_back(LockElement<RWLock>(key, &(val->rwl), LockType::WRITE));
+                    current_locklists.insert(LockList<RWLock>::ValueID(table_id, key), &(val->rwl), LockType::WRITE);
                     return;
                 } else {
                     status = TransactionStatus::aborted;
@@ -800,7 +803,7 @@ private:
                 }
             } else {
                 if (val->rwl.try_lock_shared()) {
-                    cur_lock_list.push_back(LockElement<RWLock>(key, &(val->rwl), LockType::READ));
+                    current_locklists.insert(LockList<RWLock>::ValueID(table_id, key), &(val->rwl), LockType::READ);
                     return;
                 } else {
                     status = TransactionStatus::aborted;
@@ -811,39 +814,37 @@ private:
 
         if (vioctr != 0) {
             // not in canonical mode. restore.
-            size_t num_locks = 0;
-            for (TableID table_id: tables) {
-                auto& cur_lock_list = current_locklists.get_table(table_id);
-                num_locks += cur_lock_list.size();
-                for (auto itr = cur_lock_list.begin() + (cur_lock_list.size() - vioctr);
-                    itr != cur_lock_list.end(); ++itr) {
-                    if ((*itr).type == LockType::WRITE)
-                        (*itr).lock->unlock();
-                    else
-                        (*itr).lock->unlock_shared();
-                }
+            auto itr = current_locklists.begin();
+            std::advance(itr, current_locklists.size() - vioctr);
+            auto begin_itr = itr;
+            for (; itr != current_locklists.end(); ++itr) {
+                auto& lock_element = (*itr).second;
+                if (lock_element.type == LockType::WRITE)
+                    lock_element.lock->unlock();
+                else
+                    lock_element.lock->unlock_shared();
             }
             // delete from CLL_
-            if (num_locks == vioctr)
+            if (current_locklists.size() == vioctr)
                 current_locklists.clear();
-            else {
-                cur_lock_list.erase(
-                    cur_lock_list.begin() + (cur_lock_list.size() - vioctr), cur_lock_list.end());
-            }
+            else
+                current_locklists.erase(begin_itr, current_locklists.end());
         }
 
 
-        auto& retro_lock_list = retrospective_locklists.get_table(table_id);
-        for (auto itr = retro_lock_list.begin(); itr != retro_lock_list.end(); ++itr) {
-            if ((*itr).key <= threshold) continue;
+        for (auto itr = retrospective_locklists.begin(); itr != retrospective_locklists.end(); ++itr) {
+            auto value_id = (*itr).first;
+            auto& lock_element = (*itr).second;
 
-            if ((*itr).key < key) {
-                if ((*itr).type == LockType::WRITE)
-                    (*itr).lock->lock();
+            if (value_id <= threshold) continue;
+
+            if (value_id < target_vid) {
+                if (lock_element.type == LockType::WRITE)
+                    lock_element.lock->lock();
                 else
-                    (*itr).lock->lock_shared();
+                    lock_element.lock->lock_shared();
 
-                cur_lock_list.emplace_back((*itr).key, (*itr).lock, (*itr).type);
+                current_locklists.insert(value_id, lock_element.lock, lock_element.type);
             } else {
                 break;
             }
@@ -853,19 +854,16 @@ private:
             val->rwl.lock();
         else
             val->rwl.lock_shared();
-        cur_lock_list.emplace_back(key, &(val->rwl), type);
+        current_locklists.insert(target_vid, &(val->rwl), type);
     }
 
     void unlock_current_locklists() {
         LOG_INFO("UNLOCK");
-        for (TableID table_id: tables) {
-            auto& cur_lock_list = current_locklists.get_table(table_id);
-            for (auto itr = cur_lock_list.begin(); itr != cur_lock_list.end(); ++itr) {
-                if ((*itr).type == LockType::WRITE)
-                    (*itr).lock->unlock();
-                else
-                    (*itr).lock->unlock_shared();
-            }
+        for (auto itr = current_locklists.begin(); itr != current_locklists.end(); ++itr) {
+            if ((*itr).second.type == LockType::WRITE)
+                (*itr).second.lock->unlock();
+            else
+                (*itr).second.lock->unlock_shared();
         }
         current_locklists.clear();
     }
@@ -876,8 +874,9 @@ private:
             auto& w_table = ws.get_table(table_id);
             for (auto w_iter = w_table.begin(); w_iter != w_table.end(); ++w_iter) {
                 auto rw_iter = w_iter->second;
-                retrospective_locklists.get_table(table_id).emplace_back(
-                    w_iter->first, &(rw_iter->second.val->rwl), LockType::WRITE);
+                auto value_id = LockList<RWLock>::ValueID(table_id, w_iter->first);
+                auto& lock = rw_iter->second.val->rwl;
+                retrospective_locklists.insert(value_id, &(lock), LockType::WRITE);
             }
         }
         for (TableID table_id: tables) {
@@ -905,28 +904,20 @@ private:
                     }
                 }
 
-                if (search_locklists(retrospective_locklists.get_table(table_id), rw_iter->first) != nullptr) {
+                if (retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, rw_iter->first)) != nullptr) {
                     continue;
                 }
 
                 Epotemp loadepot;
                 loadepot.obj = load_acquire(rw_iter->second.val->epotemp.obj);
                 if (loadepot.temp >= temp_threshold || rw_iter->second.failed_verification) {
-                    retrospective_locklists.get_table(table_id).emplace_back(
-                        rw_iter->first, &(rw_iter->second.val->rwl), LockType::READ);
+                    auto value_id = LockList<RWLock>::ValueID(table_id, rw_iter->first);
+                    auto& lock = rw_iter->second.val->rwl;
+                    retrospective_locklists.insert(value_id, &(lock), LockType::WRITE);
                 }
             }
-            sort(retrospective_locklists.get_table(table_id).begin(), retrospective_locklists.get_table(table_id).end());
         }
-    }
-
-    template <typename Lock>
-    LockElement<Lock>* search_locklists(std::vector<LockElement<Lock>>& lock_list, Key key) {
-        // will do : binary search
-        for (auto itr = lock_list.begin(); itr != lock_list.end(); ++itr) {
-            if ((*itr).key == key) return &(*itr);
-        }
-        return nullptr;
+        // retrospective_locklists is sorted
     }
 
     ReadWriteElement<Value>* search_writeset(TableID table_id, Key key) {
