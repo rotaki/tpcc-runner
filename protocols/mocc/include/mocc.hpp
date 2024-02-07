@@ -20,12 +20,6 @@
 #include "utils/logger.hpp"
 #include "utils/utils.hpp"
 
-enum class TransactionStatus : uint8_t {
-    inFlight,
-    committed,
-    aborted,
-};
-
 template <typename Index>
 class MOCC {
 public:
@@ -46,10 +40,7 @@ public:
         LOG_INFO("START Tx, e: %u", starting_epoch);
     }
 
-    ~MOCC() { 
-        LOG_INFO("Destructor called, e: %u", starting_epoch);
-        GarbageCollector::remove(starting_epoch); 
-    }
+    ~MOCC() { GarbageCollector::remove(starting_epoch); }
 
     const Rec* read(TableID table_id, Key key) {
         LOG_INFO("READ (e: %u, t: %lu, k: %lu)", starting_epoch, table_id, key);
@@ -159,8 +150,11 @@ public:
             typename Index::Result res = idx.find(table_id, key, val);
             if (res == Index::Result::NOT_FOUND) return nullptr;
 
-            auto rec = update_internal(table_id, key, val, record_size);
-            if (rec == nullptr) return nullptr;
+            if (write_lock(table_id, key, val) == false) return nullptr;
+            
+            // Allocate memory for write
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            memcpy(rec, val->rec, record_size);
 
             auto new_iter = rw_table.emplace_hint(
                 rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
@@ -173,8 +167,11 @@ public:
 
         auto rwt = rw_iter->second.rwt;
         if (rwt == ReadWriteType::READ) {
-            auto rec = update_internal(table_id, key, rw_iter->second.val, record_size);
-            if (rec == nullptr) return nullptr;
+            if (write_lock(table_id, key, rw_iter->second.val) == false) return nullptr;
+            
+            // Allocate memory for write
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            memcpy(rec, rw_iter->second.val->rec, record_size);
 
             rw_iter->second.rec = rec;
             rw_iter->second.rwt = ReadWriteType::UPDATE;
@@ -241,8 +238,11 @@ public:
 
             } else if (res == Index::Result::OK) {
                 // Update if found in index
-                auto rec = update_internal(table_id, key, val, record_size);
-                if (rec == nullptr) return nullptr;
+                if (write_lock(table_id, key, val) == false) return nullptr;
+            
+                // Allocate memory for write
+                Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+                memcpy(rec, val->rec, record_size);
 
                 auto new_iter = rw_table.emplace_hint(
                     rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
@@ -260,8 +260,11 @@ public:
         auto rwt = rw_iter->second.rwt;
         if (rwt == ReadWriteType::READ) {
             // Upgrade lock
-            auto rec = update_internal(table_id, key, rw_iter->second.val, record_size);
-            if (rec == nullptr) return nullptr;
+            if (write_lock(table_id, key, rw_iter->second.val) == false) return nullptr;
+            
+            // Allocate memory for write
+            Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+            memcpy(rec, rw_iter->second.val->rec, record_size);
 
             rw_iter->second.rec = rec;
             rw_iter->second.rwt = ReadWriteType::UPDATE;
@@ -355,8 +358,11 @@ public:
             auto rw_iter = rw_table.find(key);
 
             if (rw_iter == rw_table.end()) {
-                auto rec = update_internal(table_id, key, val, record_size);
-                if (rec == nullptr) return false;
+                if (write_lock(table_id, key, val) == false) return false;
+            
+                // Allocate memory for write
+                Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+                memcpy(rec, val->rec, record_size);
 
                 auto new_iter = rw_table.emplace_hint(
                     rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
@@ -371,8 +377,11 @@ public:
             auto rwt = rw_iter->second.rwt;
             if (rwt == ReadWriteType::READ) {
                 assert(rw_iter->second.rec == nullptr);
-                auto rec = update_internal(table_id, key, rw_iter->second.val, record_size);
-                if (rec == nullptr) return false;
+                if (write_lock(table_id, key, rw_iter->second.val) == false) return false;
+                
+                // Allocate memory for write
+                Rec* rec = MemoryAllocator::aligned_allocate(record_size);
+                memcpy(rec, rw_iter->second.val->rec, record_size);
 
                 rw_iter->second.rec = rec;
                 rw_iter->second.rwt = ReadWriteType::UPDATE;
@@ -400,71 +409,45 @@ public:
         auto& rw_table = rws.get_table(table_id);
         auto rw_iter = rw_table.find(key);
 
-        if (rw_iter != rw_table.end()) {
-            auto rwt = rw_iter->second.rwt;
+        if (rw_iter == rw_table.end()) {
+            // Abort if not found in index
+            Value* val;
+            typename Index::Result res = idx.find(table_id, key, val);
+            if (res == Index::Result::NOT_FOUND) return nullptr;  // abort
 
-            if (rwt == ReadWriteType::DELETE) return nullptr;
-            if (rwt != ReadWriteType::READ && rwt != ReadWriteType::UPDATE && rwt != ReadWriteType::INSERT)
-                throw std::runtime_error("invalid state");
+            if (write_lock(table_id, key, val) == false) return nullptr;
 
-            // Upgrade lock
-            Epotemp loadepot;
+            auto new_iter = rw_table.emplace_hint(
+                rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
+                std::forward_as_tuple(nullptr, ReadWriteType::DELETE, false, val));
 
-            // size_t epotemp_index;
-            // epotemp_index = key * sizeof(Value) / per_xx_temp;
-            loadepot.obj = load_acquire(rw_iter->second.val->epotemp.obj);
+            auto& w_table = ws.get_table(table_id);
+            w_table.emplace_back(key, new_iter);
 
-            // Get write lock
-            if (loadepot.temp >= temp_threshold) lock(table_id, key, rw_iter->second.val, LockType::WRITE);
-            if (status == TransactionStatus::aborted) return nullptr;
-
-            LockElement<RWLock> *in_rtr_locklist;
-            in_rtr_locklist = retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
-
-            if (in_rtr_locklist != nullptr) lock(table_id, key, rw_iter->second.val, LockType::WRITE);
-            if (status == TransactionStatus::aborted) return nullptr;
-
-            if (rwt == ReadWriteType::READ) {
-                auto& w_table = ws.get_table(table_id);
-                w_table.emplace_back(key, rw_iter);
-            } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
-                MemoryAllocator::deallocate(rw_iter->second.rec);
-                assert(rw_iter->second.val->rec != nullptr);
-                rw_iter->second.rec = nullptr;
-            }
-            rw_iter->second.rwt = ReadWriteType::DELETE;
-            return rw_iter->second.val->rec;
+            return val->rec;
         }
 
-        // Abort if not found in index
-        Value* val;
-        typename Index::Result res = idx.find(table_id, key, val);
-        if (res == Index::Result::NOT_FOUND) return nullptr;  // abort
-
-        Epotemp loadepot;
-
-        // size_t epotemp_index;
-        // epotemp_index = key * sizeof(Value) / per_xx_temp;
-        loadepot.obj = load_acquire(val->epotemp.obj);
-
-        // Get write lock
-        if (loadepot.temp >= temp_threshold) lock(table_id, key, val, LockType::WRITE);
-        if (status == TransactionStatus::aborted) return nullptr;
-
-        LockElement<RWLock> *in_rtr_locklist;
-        in_rtr_locklist = retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
-
-        if (in_rtr_locklist != nullptr) lock(table_id, key, val, LockType::WRITE);
-        if (status == TransactionStatus::aborted) return nullptr;
-
-        auto new_iter = rw_table.emplace_hint(
-            rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
-            std::forward_as_tuple(nullptr, ReadWriteType::DELETE, false, val));
-
-        auto& w_table = ws.get_table(table_id);
-        w_table.emplace_back(key, new_iter);
-
-        return val->rec;
+        auto rwt = rw_iter->second.rwt;
+        if (rwt == ReadWriteType::READ) {
+            // Upgrade lock
+            if (write_lock(table_id, key, rw_iter->second.val) == false) return nullptr;
+            auto& w_table = ws.get_table(table_id);
+            w_table.emplace_back(key, rw_iter);
+            rw_iter->second.val->rec;
+            rw_iter->second.rwt = ReadWriteType::DELETE;
+            return rw_iter->second.val->rec;
+        } else if (rwt == ReadWriteType::UPDATE || rwt == ReadWriteType::INSERT) {
+            if (write_lock(table_id, key, rw_iter->second.val) == false) return nullptr;
+            MemoryAllocator::deallocate(rw_iter->second.rec);
+            assert(rw_iter->second.val->rec != nullptr);
+            rw_iter->second.rec = nullptr;
+            rw_iter->second.rwt = ReadWriteType::DELETE;
+            return rw_iter->second.val->rec;
+        } else if (rwt == ReadWriteType::DELETE) {
+            return nullptr;
+        } else {
+            throw std::runtime_error("invalid state");
+        }
     }
 
     bool precommit() {
@@ -483,12 +466,10 @@ public:
                 LOG_DEBUG("     LOCK (t: %lu, k: %lu)", table_id, w_iter->first);
                 auto rw_iter = w_iter->second;
                 if (rw_iter->second.rwt == ReadWriteType::INSERT) continue;
-                lock(table_id, w_iter->first, rw_iter->second.val, LockType::WRITE);
-                if (this->status == TransactionStatus::aborted) return false;
-                if (rw_iter->second.rwt == ReadWriteType::UPDATE && rw_iter->second.val->tidword.absent) {
-                    this->status = TransactionStatus::aborted;
+                if (!lock(table_id, w_iter->first, rw_iter->second.val, LockType::WRITE))
                     return false;
-                }
+                if (rw_iter->second.rwt == ReadWriteType::UPDATE && rw_iter->second.val->tidword.absent)
+                    return false;
 
                 this->max_wset = std::max(this->max_wset, rw_iter->second.val->tidword);
             }
@@ -511,17 +492,14 @@ public:
                 current.obj = load_acquire(rw_iter->second.val->tidword.obj);
                 expected.obj = rw_iter->second.tw.obj;
 
-                const int64_t write_locked = -1;
                 if (!is_valid(current, expected)) {
                     rw_iter->second.failed_verification = true;
-                    this->status = TransactionStatus::aborted;
                     return false;
                 }
 
-                if (rw_iter->second.val->rwl.get_lock_cnt() == write_locked 
+                if (rw_iter->second.val->rwl.get_lock_cnt() == static_cast<int>(LockType::WRITE) 
                 && search_writeset(table_id, rw_iter->first) == nullptr) {
                     rw_iter->second.failed_verification = true;
-                    this->status = TransactionStatus::aborted;
                     return false;
                 }
 
@@ -539,7 +517,6 @@ public:
                     LOG_DEBUG(
                         "NODE VERIFY FAILED (t: %lu, old_v: %lu, new_v: %lu)", table_id,
                         iter->second, current_version);
-                    this->status = TransactionStatus::aborted;
                     return false;
                 }
             }
@@ -556,7 +533,6 @@ public:
         tid_c.epoch = epoch;
 
         TidWord commit_tw = std::max({tid_a, tid_b, tid_c});
-        LOG_INFO("  COMMIT TID: %d", commit_tw.tid);
         most_recently_chosen_tw = commit_tw;
 
         // Phase 3 (Write to Shared Memory)
@@ -617,7 +593,6 @@ public:
         ws.clear();
         ns.clear();
         tables.clear();
-        this->status = TransactionStatus::inFlight;
         max_rset = 0;
         max_wset = 0;
     }
@@ -631,21 +606,17 @@ private:
     NodeSet ns;
     LockList<RWLock> retrospective_locklists;
     LockList<RWLock> current_locklists;
-    TransactionStatus status;
     TidWord max_wset;
     TidWord max_rset;
     TidWord most_recently_chosen_tw;
-    const uint64_t per_xx_temp = 4096;
-    const uint64_t temp_threshold = 5;
-    const uint64_t temp_max = 20;
-    const int temp_reset_us = 100;
+
+    // MOCC parameters
+    static constexpr uint64_t temp_threshold = 5;
+    static constexpr uint64_t temp_max = 20;
 
     /**
-     * @brief MOCC read on unseen record
+     * @brief MOCC lock/verification required for successful read operation
      * 
-     * @param table_id 
-     * @param key 
-     * @param val 
      * @return std::pair<Rec*, TidWord> 
      *
      * @note This function does not add the record to readwriteset
@@ -658,22 +629,18 @@ private:
         Epotemp loadepot;
         TidWord expected, desired;
 
-        // size_t epotemp_index;
-        // epotemp_index = key * sizeof(Value) / per_xx_temp;
         loadepot.obj = load_acquire(val->epotemp.obj);
         bool need_verification;
         need_verification = true;
         auto rtr_lock = retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
         if (rtr_lock != nullptr) {
-            lock(table_id, key, val, rtr_lock->type);
-            if (status == TransactionStatus::aborted) {
+            if (!lock(table_id, key, val, rtr_lock->type)) {
                 return {nullptr, 0};
             } else {
                 need_verification = false;
             }
         } else if (loadepot.temp >= temp_threshold) {
-            lock(table_id, key, val, LockType::READ);
-            if (status == TransactionStatus::aborted) {
+            if (!lock(table_id, key, val, LockType::READ)) {
                 return {nullptr, 0};
             } else {
                 need_verification = false;
@@ -684,11 +651,8 @@ private:
             expected.obj = load_acquire(val->tidword.obj);
             auto value_id = LockList<RWLock>::ValueID(table_id, key);
             for (;;) {
-                // rwl is -1 when there is a write lock
-                const int64_t write_locked = -1;
-                while (val->rwl.get_lock_cnt() == write_locked) {
+                while (val->rwl.get_lock_cnt() == static_cast<int>(LockType::WRITE)) {
                     if (current_locklists.size() > 0 && value_id < current_locklists.back()->first) {
-                        status = TransactionStatus::aborted;
                         rw_table.emplace_hint(
                             rw_iter, std::piecewise_construct, std::forward_as_tuple(key),
                             std::forward_as_tuple(nullptr, ReadWriteType::READ, false, val));
@@ -699,7 +663,6 @@ private:
                 }
 
                 if (expected.absent) {
-                    status = TransactionStatus::aborted;
                     return {nullptr, 0};
                 }
                 
@@ -717,44 +680,35 @@ private:
     }
 
     /**
-     * @brief 
-     * MOCC write on a record.
-     * This function can handle normal write and upgrade from read to write
+     * @brief MOCC lock operation required for all write related operations
      * 
-     * @param table_id 
-     * @param key 
-     * @param val 
-     * @param record_size
-     * @return Rec*
-     *
-     * @note This function does not add the record to readwriteset or writeset
+     * @return true: lock success
+     * @return false: lock failed, ready to abort
      */
-    Rec* update_internal(TableID table_id, Key key, Value* val, size_t record_size) {
+    bool write_lock(TableID table_id, Key key, Value* val) {
         Epotemp loadepot;
 
-        // size_t epotemp_index;
-        // epotemp_index = key * sizeof(Value) / per_xx_temp;
         loadepot.obj = load_acquire(val->epotemp.obj);
 
         // Get write lock
-        if (loadepot.temp >= temp_threshold) lock(table_id, key, val, LockType::WRITE);
-        if (status == TransactionStatus::aborted) return nullptr;
+        if (loadepot.temp >= temp_threshold) {
+            bool lock_success = lock(table_id, key, val, LockType::WRITE);
+            if (!lock_success) return false;
+        }
 
         LockElement<RWLock> *in_rtr_locklist;
         in_rtr_locklist = retrospective_locklists.get_lock(LockList<RWLock>::ValueID(table_id, key));
 
-        if (in_rtr_locklist != nullptr) lock(table_id, key, val, LockType::WRITE);
-        if (status == TransactionStatus::aborted) return nullptr;
+        if (in_rtr_locklist != nullptr) {
+            bool lock_success = lock(table_id, key, val, LockType::WRITE);
+            if (!lock_success) return false;
+        }
 
-        // Allocate memory for write
-        Rec* rec = MemoryAllocator::aligned_allocate(record_size);
-        memcpy(rec, val->rec, record_size);
-
-        return rec;
+        return true;
     }
 
-    void lock(TableID table_id, Key key, Value* val, LockType type) {
-        unsigned int vioctr = 0;
+    bool lock(TableID table_id, Key key, Value* val, LockType type) {
+        size_t vioctr = 0;
         LockList<RWLock>::ValueID threshold(0, 0);
         auto target_vid = LockList<RWLock>::ValueID(table_id, key);
         bool upgrade = false;
@@ -769,7 +723,7 @@ private:
             auto& lock_element = (*itr).second;
             if (value_id == target_vid) {
                 if (type == lock_element.type || type < lock_element.type)
-                    return;
+                    return true;
                 else {
                     le = &lock_element;
                     upgrade = true;
@@ -789,25 +743,22 @@ private:
                 if (upgrade) {
                     if (val->rwl.try_lock_upgrade()) {
                         le->type = LockType::WRITE;
-                        return;
+                        return true;
                     } else {
-                        status = TransactionStatus::aborted;
-                        return;
+                        return false;
                     }
                 } else if (val->rwl.try_lock()) {
                     current_locklists.insert(LockList<RWLock>::ValueID(table_id, key), &(val->rwl), LockType::WRITE);
-                    return;
+                    return true;
                 } else {
-                    status = TransactionStatus::aborted;
-                    return;
+                    return false;
                 }
             } else {
                 if (val->rwl.try_lock_shared()) {
                     current_locklists.insert(LockList<RWLock>::ValueID(table_id, key), &(val->rwl), LockType::READ);
-                    return;
+                    return true;
                 } else {
-                    status = TransactionStatus::aborted;
-                    return;
+                    return false;
                 }
             }
         }
@@ -855,10 +806,10 @@ private:
         else
             val->rwl.lock_shared();
         current_locklists.insert(target_vid, &(val->rwl), type);
+        return true;
     }
 
     void unlock_current_locklists() {
-        LOG_INFO("UNLOCK");
         for (auto itr = current_locklists.begin(); itr != current_locklists.end(); ++itr) {
             if ((*itr).second.type == LockType::WRITE)
                 (*itr).second.lock->unlock();
@@ -886,6 +837,13 @@ private:
                     rw_iter->second.failed_verification) {
                     Epotemp expected, desired;
                     expected.obj = load_acquire(rw_iter->second.val->epotemp.obj);
+
+                    uint64_t current_epoch = load_acquire(EpochManager<MOCC<Index>>::get_global_epoch());
+                    if (expected.epoch != current_epoch) {
+                        desired.epoch = current_epoch;
+                        desired.temp = 0;
+                        store_release(rw_iter->second.val->epotemp.obj, desired.obj);
+                    }
 
                     for (;;) {
                         if (expected.temp == temp_max) {

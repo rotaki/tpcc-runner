@@ -6,13 +6,13 @@
 
 #include "protocols/common/schema.hpp"
 
-enum class LockType { READ = 0, WRITE = 1 };
+enum class LockType { READ = 0, WRITE = -1 };
 
 template <typename Lock>
 struct LockElement {
     uint64_t key;  // record を識別する．
     Lock* lock;
-    LockType type;  // 0 read-mode, 1 write-mode
+    LockType type;  // 0 read-mode, -1 write-mode
 
     LockElement(uint64_t key, Lock* lock, LockType locktype)
         : key(key)
