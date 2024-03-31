@@ -77,6 +77,8 @@ public:
 
     void unlock() { fetch_add(cnt, 1); }
 
+    int64_t get_lock_cnt() { return load_acquire(cnt); }
+
 private:
     int64_t cnt = 0;
 };

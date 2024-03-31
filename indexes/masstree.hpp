@@ -26,7 +26,17 @@ public:
         NOT_DELETED,
         BAD_SCAN,
     };
-
+    
+    /**
+     * @brief Finds the value for the given key and table_id.
+     * 
+     * @param table_id The ID of the table to search in.
+     * @param key The key to search for.
+     * @param val A pointer to a Value object. If the key is found, this will be set to the corresponding value.
+     * @return Result::OK if the key is found, Result::NOT_FOUND otherwise.
+     * 
+     * @note This function has a side effect: it modifies the value of 'val'.
+     */
     Result find(TableID table_id, Key key, Value*& val) {
         auto& mt = indexes[table_id];
         mt.thread_init(0);
